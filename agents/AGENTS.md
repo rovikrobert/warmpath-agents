@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `agents/` directory contains an automated engineering team that scans the WarmPath codebase for issues across five domains: code architecture, test quality, performance, dependencies, and documentation. A lead agent aggregates findings into prioritized daily briefs.
+The `agents/` directory contains an automated engineering team that scans the WarmPath codebase for issues across seven domains: code architecture, test quality, performance, dependencies, documentation, security, and privacy. A lead agent aggregates findings into prioritized daily briefs.
 
 ## Architecture
 
@@ -40,6 +40,14 @@ agents/
 ├── doc_keeper/
 │   ├── AGENT.md              # Documentation keeper specification
 │   ├── doc_keeper.py         # CLAUDE.md sync, docstrings, privacy claims, conventions
+│   └── state.json            # Learning state (auto-generated)
+├── security/
+│   ├── AGENT.md              # Security agent specification
+│   ├── security.py           # Wraps scripts/security_scan.py → AgentReport
+│   └── state.json            # Learning state (auto-generated)
+├── privy/
+│   ├── AGENT.md              # Privacy agent specification
+│   ├── privy.py              # Wraps scripts/privacy_scan.py → AgentReport
 │   └── state.json            # Learning state (auto-generated)
 └── reports/
     └── *_latest.json         # Latest report from each agent (auto-generated)
@@ -79,6 +87,8 @@ python -m agents.orchestrator --all -v
 | **perf_monitor** | Performance & costs | Claude API token costs, missing DB indexes, N+1 patterns, unbounded queries, table growth projections |
 | **deps_manager** | Dependency health | Version pinning, CVEs (pip-audit), dead/missing deps, licenses, Dockerfile |
 | **doc_keeper** | Documentation accuracy | CLAUDE.md sync (test/table counts), API docstrings, privacy policy claims, conventions |
+| **security** | Security vulnerabilities | Dependency CVEs (OSV), dangerous code patterns, config safety, auth coverage, input validation |
+| **privy** | Privacy compliance | PII encryption, suppression list, consent/DSAR, data retention, vault isolation, marketplace anonymization |
 | **lead** | Aggregation & prioritization | Deduplicates cross-agent findings, generates daily briefs, tracks trends |
 
 ## Self-Learning System

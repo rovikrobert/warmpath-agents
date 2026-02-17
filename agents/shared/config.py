@@ -56,4 +56,6 @@ AGENT_NAMES = [
     "perf_monitor",
     "deps_manager",
     "doc_keeper",
+    "security",
+    "privy",
 ]

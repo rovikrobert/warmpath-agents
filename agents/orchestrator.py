@@ -39,6 +39,8 @@ _AGENT_MODULES = {
     "perf_monitor": "agents.perf_monitor.perf_monitor",
     "deps_manager": "agents.deps_manager.deps_manager",
     "doc_keeper": "agents.doc_keeper.doc_keeper",
+    "security": "agents.security.security",
+    "privy": "agents.privy.privy",
 }
 
 
