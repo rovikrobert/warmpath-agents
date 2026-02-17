@@ -14,6 +14,7 @@ from pathlib import Path
 
 from agents.shared.report import Finding
 from data_team.shared.config import DATA_AGENT_NAMES, KPI_TARGETS, REPORTS_DIR
+from data_team.shared.intelligence import DataIntelligence
 from data_team.shared.learning import DataLearningState
 from data_team.shared.report import DataTeamReport, Insight, KPISnapshot
 
@@ -121,6 +122,44 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
         lines.append(f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s")
     lines.append("")
 
+    # Learning Updates section
+    lines.append("## Learning Updates\n")
+    for r in reports:
+        if r.learning_updates:
+            for lu in r.learning_updates:
+                lines.append(f"- **{r.agent}**: {lu}")
+    # Add meta-learning summaries
+    for agent_name in ["pipeline", "analyst", "model_engineer"]:
+        try:
+            ls = DataLearningState(agent_name)
+            report = ls.generate_meta_learning_report()
+            trajectory = report.get("health_trajectory", "insufficient_data")
+            total_scans = report.get("total_scans", 0)
+            escalated = len(report.get("escalated_patterns", []))
+            if total_scans > 0:
+                lines.append(f"- **{agent_name} meta**: {total_scans} scans, "
+                             f"health={trajectory}, escalated={escalated}")
+        except Exception:
+            pass
+    lines.append("")
+
+    # Intelligence section
+    try:
+        di = DataIntelligence()
+        urgent = di.get_urgent()
+        unadopted = di.get_unadopted()
+        if urgent or unadopted:
+            lines.append("## External Intelligence\n")
+            if urgent:
+                lines.append(f"**Urgent items:** {len(urgent)}")
+                for item in urgent[:3]:
+                    lines.append(f"- [{item.severity}] {item.title}")
+            if unadopted:
+                lines.append(f"**Unadopted items:** {len(unadopted)}")
+            lines.append("")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 
@@ -179,6 +218,45 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
     if not any([not funnel_ok, not model_ok, not schema_ok]):
         lines.append("All major areas are in good shape.")
     lines.append("")
+
+    # Learning deep dive (weekly)
+    lines.append("## Learning Deep Dive\n")
+    for agent_name in ["pipeline", "analyst", "model_engineer"]:
+        try:
+            ls = DataLearningState(agent_name)
+            report = ls.generate_meta_learning_report()
+            lines.append(f"### {agent_name}")
+            lines.append(f"- Scans: {report['total_scans']}, "
+                         f"Findings tracked: {report['total_findings_tracked']}")
+            lines.append(f"- Health trajectory: {report['health_trajectory']}")
+            if report.get("fix_effectiveness_rate") is not None:
+                lines.append(f"- Fix effectiveness: {report['fix_effectiveness_rate']:.0%}")
+            if report.get("escalated_patterns"):
+                lines.append(f"- Escalated patterns: {len(report['escalated_patterns'])}")
+            if report.get("systemic_patterns"):
+                lines.append(f"- Systemic patterns: {len(report['systemic_patterns'])}")
+            lines.append("")
+        except Exception:
+            pass
+
+    # Intelligence status (weekly)
+    try:
+        di = DataIntelligence()
+        intel_report = di.generate_intel_report()
+        lines.append("## Intelligence Status\n")
+        lines.append(f"- Categories: {intel_report['categories_fresh']} fresh / "
+                     f"{intel_report['categories_stale']} stale of {intel_report['categories_total']}")
+        lines.append(f"- Total items: {intel_report['total_items']}, "
+                     f"Urgent: {intel_report['urgent_items']}, "
+                     f"Unadopted: {intel_report['unadopted_items']}")
+        agenda = di.generate_research_agenda()
+        if agenda:
+            lines.append(f"- Research agenda: {len(agenda)} items pending")
+            for item in agenda[:3]:
+                lines.append(f"  - [{item['priority']}] {item['category']}")
+        lines.append("")
+    except Exception:
+        pass
 
     return "\n".join(lines)
 
@@ -281,9 +359,29 @@ def scan() -> DataTeamReport:
 
     duration = time.time() - start
 
-    # Learning
+    # Learning — record scan, findings, health snapshot, KPIs
     ls = DataLearningState(AGENT_NAME)
     ls.record_scan(metrics)
+    for f in findings:
+        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category, "title": f.title})
+        ls.record_severity_calibration(f.severity)
+
+    # Health snapshot
+    severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}
+    penalty = sum(severity_penalty.get(f.severity, 0) for f in findings)
+    health = max(0.0, 100.0 - penalty)
+    finding_counts = {}
+    for f in findings:
+        finding_counts[f.severity] = finding_counts.get(f.severity, 0) + 1
+    ls.record_health_snapshot(health, finding_counts)
+
+    ls.track_kpi("sub_agents_reporting", len(reports))
+    ls.track_kpi("total_findings", len(findings))
+
+    learning_updates = [f"Aggregated {len(reports)} sub-agent reports"]
+    trajectory = ls.get_health_trajectory()
+    if trajectory != "insufficient_data":
+        learning_updates.append(f"Health trajectory: {trajectory}")
 
     return DataTeamReport(
         agent=AGENT_NAME,
@@ -292,7 +390,7 @@ def scan() -> DataTeamReport:
         insights=insights,
         metrics=metrics,
         cross_team_requests=cross_team_requests,
-        learning_updates=[f"Aggregated {len(reports)} sub-agent reports"],
+        learning_updates=learning_updates,
     )
 
 

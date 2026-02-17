@@ -296,11 +296,46 @@ def scan() -> DataTeamReport:
 
     duration = time.time() - start
 
-    # Learning
+    # Learning — record scan, findings, attention weights, health snapshot
     ls = DataLearningState(AGENT_NAME)
     ls.record_scan(metrics)
+    file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category, "title": f.title})
+        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
+                           "title": f.title, "file": getattr(f, "file", None)})
+        if getattr(f, "file", None):
+            file_findings[f.file] = file_findings.get(f.file, 0) + 1
+    if file_findings:
+        ls.update_attention_weights(file_findings)
+
+    for f in findings:
+        ls.record_severity_calibration(f.severity)
+
+    # Health snapshot
+    severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}
+    penalty = sum(severity_penalty.get(f.severity, 0) for f in findings)
+    health = max(0.0, 100.0 - penalty)
+    finding_counts = {}
+    for f in findings:
+        finding_counts[f.severity] = finding_counts.get(f.severity, 0) + 1
+    ls.record_health_snapshot(health, finding_counts)
+
+    # Track KPIs
+    ls.track_kpi("warm_score_features", metrics.get("warm_score_features_count", 0))
+    ls.track_kpi("cultural_context_variants", metrics.get("cultural_context_variants", 0))
+
+    # Record insights
+    for i in insights:
+        ls.record_insight({"id": i.id, "category": i.category, "title": i.title, "confidence": i.confidence})
+
+    learning_updates = [f"Analyzed warm score ({metrics.get('warm_score_features_count', 0)} features), "
+                        f"cultural context ({metrics.get('cultural_context_variants', 0)} styles)"]
+    hot_spots = ls.get_hot_spots(top_n=3)
+    if hot_spots:
+        learning_updates.append(f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}")
+    trajectory = ls.get_health_trajectory()
+    if trajectory != "insufficient_data":
+        learning_updates.append(f"Health trajectory: {trajectory}")
 
     return DataTeamReport(
         agent=AGENT_NAME,
@@ -308,8 +343,7 @@ def scan() -> DataTeamReport:
         findings=findings,
         insights=insights,
         metrics=metrics,
-        learning_updates=[f"Analyzed warm score ({metrics.get('warm_score_features_count', 0)} features), "
-                         f"cultural context ({metrics.get('cultural_context_variants', 0)} styles)"],
+        learning_updates=learning_updates,
     )
 
 

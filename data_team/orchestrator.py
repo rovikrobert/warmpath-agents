@@ -7,6 +7,9 @@ Usage:
     python -m data_team.orchestrator --weekly           # Weekly deep dive
     python -m data_team.orchestrator --monthly          # Monthly review
     python -m data_team.orchestrator --intel            # Intel freshness check
+    python -m data_team.orchestrator --intel-report     # Full intel summary
+    python -m data_team.orchestrator --learning-report  # Meta-learning reports
+    python -m data_team.orchestrator --research-agenda  # Research priorities
 """
 
 from __future__ import annotations
@@ -143,6 +146,103 @@ def cmd_intel() -> None:
             print(f"  [{item['priority']}] {item['question']}")
 
 
+def cmd_intel_report() -> None:
+    """Full intelligence summary report."""
+    import json as _json
+    from data_team.shared.intelligence import DataIntelligence
+    di = DataIntelligence()
+    report = di.generate_intel_report()
+
+    print("=" * 60)
+    print("DATA TEAM — Intelligence Report")
+    print("=" * 60)
+    print(f"\nTotal items: {report['total_items']}")
+    print(f"Urgent: {report['urgent_items']}")
+    print(f"Unadopted: {report['unadopted_items']}")
+    print(f"Categories: {report['categories_fresh']} fresh / "
+          f"{report['categories_stale']} stale of {report['categories_total']}")
+
+    if report.get("items_by_category"):
+        print("\nBy Category:")
+        for cat, count in sorted(report["items_by_category"].items()):
+            print(f"  {cat}: {count}")
+
+    freshness = report.get("freshness", {})
+    if freshness:
+        print("\nFreshness Detail:")
+        for cat, is_fresh in freshness.items():
+            print(f"  {cat}: {'fresh' if is_fresh else 'STALE'}")
+
+
+def cmd_learning_report() -> None:
+    """Meta-learning reports for all data team agents."""
+    from data_team.shared.config import DATA_AGENT_NAMES
+    from data_team.shared.learning import DataLearningState
+
+    print("=" * 60)
+    print("DATA TEAM — Learning Reports")
+    print("=" * 60)
+
+    for agent_name in DATA_AGENT_NAMES:
+        ls = DataLearningState(agent_name)
+        report = ls.generate_meta_learning_report()
+
+        print(f"\n--- {agent_name} ---")
+        print(f"  Total scans: {report['total_scans']}")
+        print(f"  Findings tracked: {report['total_findings_tracked']}")
+        print(f"  Insights tracked: {report['total_insights_tracked']}")
+        print(f"  Health trajectory: {report['health_trajectory']}")
+        print(f"  Methodologies adopted: {report['methodologies_adopted']}")
+
+        if report.get("fix_effectiveness_rate") is not None:
+            print(f"  Fix effectiveness: {report['fix_effectiveness_rate']:.0%} "
+                  f"({report['fix_records_sampled']} sampled)")
+
+        if report.get("hot_spots"):
+            print("  Hot spots:")
+            for hs in report["hot_spots"][:3]:
+                print(f"    {hs['file']}: weight={hs['weight']:.2f}")
+
+        if report.get("escalated_patterns"):
+            print(f"  Escalated patterns: {len(report['escalated_patterns'])}")
+            for p in report["escalated_patterns"][:3]:
+                print(f"    {p['key']}: count={p['count']}")
+
+        if report.get("systemic_patterns"):
+            print(f"  Systemic patterns: {len(report['systemic_patterns'])}")
+
+        if report.get("tool_reliability"):
+            print("  Tool reliability:")
+            for tool, score in report["tool_reliability"].items():
+                print(f"    {tool}: {score:.0%}")
+
+        if report.get("kpi_trends"):
+            print("  KPI trends:")
+            for kpi, trend in report["kpi_trends"].items():
+                print(f"    {kpi}: {trend}")
+
+
+def cmd_research_agenda() -> None:
+    """Show prioritized research agenda."""
+    from data_team.shared.intelligence import DataIntelligence
+    di = DataIntelligence()
+    agenda = di.generate_research_agenda()
+
+    print("=" * 60)
+    print("DATA TEAM — Research Agenda")
+    print("=" * 60)
+
+    if not agenda:
+        print("\nAll intelligence categories are fresh. No research needed.")
+        return
+
+    for i, item in enumerate(agenda, 1):
+        print(f"\n{i}. [{item['priority'].upper()}] {item['category']}")
+        print(f"   Question: {item['question']}")
+        print(f"   Source: {item.get('source', 'unknown')}")
+        print(f"   Agents: {', '.join(item.get('relevant_agents', []))}")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -165,6 +265,9 @@ def main() -> None:
     group.add_argument("--weekly", action="store_true", help="Weekly deep dive")
     group.add_argument("--monthly", action="store_true", help="Monthly review")
     group.add_argument("--intel", action="store_true", help="Intel freshness check")
+    group.add_argument("--intel-report", action="store_true", help="Full intel summary")
+    group.add_argument("--learning-report", action="store_true", help="Meta-learning reports")
+    group.add_argument("--research-agenda", action="store_true", help="Research priorities")
 
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
 
@@ -185,6 +288,12 @@ def main() -> None:
         cmd_monthly()
     elif args.intel:
         cmd_intel()
+    elif args.intel_report:
+        cmd_intel_report()
+    elif args.learning_report:
+        cmd_learning_report()
+    elif args.research_agenda:
+        cmd_research_agenda()
     else:
         # Default: run all
         cmd_all()

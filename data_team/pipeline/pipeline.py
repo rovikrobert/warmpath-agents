@@ -375,11 +375,43 @@ def scan() -> DataTeamReport:
 
     duration = time.time() - start
 
-    # Learning
+    # Learning — record scan, findings, attention weights, health snapshot
     ls = DataLearningState(AGENT_NAME)
     ls.record_scan(metrics)
+    file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category, "title": f.title})
+        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
+                           "title": f.title, "file": f.file})
+        if f.file:
+            file_findings[f.file] = file_findings.get(f.file, 0) + 1
+    if file_findings:
+        ls.update_attention_weights(file_findings)
+
+    # Record severity calibration
+    for f in findings:
+        ls.record_severity_calibration(f.severity)
+
+    # Health snapshot (higher = healthier; penalize by finding severity)
+    severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}
+    penalty = sum(severity_penalty.get(f.severity, 0) for f in findings)
+    health = max(0.0, 100.0 - penalty)
+    finding_counts = {}
+    for f in findings:
+        finding_counts[f.severity] = finding_counts.get(f.severity, 0) + 1
+    ls.record_health_snapshot(health, finding_counts)
+
+    # Track KPIs
+    ls.track_kpi("tables_in_models", metrics.get("tables_in_models", 0))
+    ls.track_kpi("instrumentation_coverage", metrics.get("instrumentation_coverage", 0))
+
+    learning_updates = [f"Scanned {len(model_files)} model files, {len(actual_tables)} tables"]
+    hot_spots = ls.get_hot_spots(top_n=3)
+    if hot_spots:
+        learning_updates.append(f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}")
+    patterns = ls.state.get("recurring_patterns", {})
+    escalated = [k for k, v in patterns.items() if v.get("auto_escalated")]
+    if escalated:
+        learning_updates.append(f"Escalated patterns: {len(escalated)}")
 
     return DataTeamReport(
         agent=AGENT_NAME,
@@ -387,7 +419,7 @@ def scan() -> DataTeamReport:
         findings=findings,
         insights=insights,
         metrics=metrics,
-        learning_updates=[f"Scanned {len(model_files)} model files, {len(actual_tables)} tables"],
+        learning_updates=learning_updates,
     )
 
 

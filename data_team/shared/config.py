@@ -96,3 +96,21 @@ DATA_AGENT_NAMES: list[str] = [
     "model_engineer",
     "data_lead",
 ]
+
+# ---------------------------------------------------------------------------
+# Self-learning thresholds
+# ---------------------------------------------------------------------------
+
+RECURRING_PATTERN_THRESHOLD = 5       # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10       # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05         # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30    # look-back window for fix effectiveness
+INTEL_CACHE_TTL_HOURS = 24            # default intelligence cache TTL
+
+# Health score weights per agent (total = 100)
+HEALTH_WEIGHTS: dict[str, int] = {
+    "pipeline": 30,
+    "analyst": 25,
+    "model_engineer": 25,
+    "data_lead": 20,
+}
