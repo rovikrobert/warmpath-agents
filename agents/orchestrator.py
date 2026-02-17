@@ -6,6 +6,9 @@ Usage:
     python -m agents.orchestrator --lead-only    # Generate brief from cached reports
     python -m agents.orchestrator --weekly       # Generate weekly trend report
     python -m agents.orchestrator --intel-update # Refresh external intelligence cache
+    python -m agents.orchestrator --cos-daily    # Chief of Staff daily brief
+    python -m agents.orchestrator --cos-weekly   # Chief of Staff weekly synthesis
+    python -m agents.orchestrator --cos-status   # Chief of Staff status snapshot
 """
 
 from __future__ import annotations
@@ -135,6 +138,14 @@ def cmd_weekly() -> None:
     print(report)
 
 
+def cmd_kpis() -> None:
+    """Print KPI dashboard from cached reports (no scanning)."""
+    from agents.shared.kpis import compute_kpis, render_dashboard
+
+    dashboard = compute_kpis()
+    print(render_dashboard(dashboard))
+
+
 def cmd_intel_update() -> None:
     """Refresh external intelligence cache."""
     from agents.shared.intelligence import get_all_intelligence
@@ -169,8 +180,18 @@ def main() -> None:
         "--lead-only", action="store_true", help="Brief from cached reports"
     )
     group.add_argument("--weekly", action="store_true", help="Weekly trend report")
+    group.add_argument("--kpis", action="store_true", help="KPI dashboard from cached reports")
     group.add_argument(
         "--intel-update", action="store_true", help="Refresh intelligence cache"
+    )
+    group.add_argument(
+        "--cos-daily", action="store_true", help="Chief of Staff daily brief"
+    )
+    group.add_argument(
+        "--cos-weekly", action="store_true", help="Chief of Staff weekly synthesis"
+    )
+    group.add_argument(
+        "--cos-status", action="store_true", help="Chief of Staff status snapshot"
     )
 
     parser.add_argument(
@@ -194,8 +215,19 @@ def main() -> None:
         cmd_lead_only()
     elif args.weekly:
         cmd_weekly()
+    elif args.kpis:
+        cmd_kpis()
     elif args.intel_update:
         cmd_intel_update()
+    elif args.cos_daily:
+        from agents.chief_of_staff.cos_agent import run_daily
+        print(run_daily())
+    elif args.cos_weekly:
+        from agents.chief_of_staff.cos_agent import run_weekly
+        print(run_weekly())
+    elif args.cos_status:
+        from agents.chief_of_staff.cos_agent import run_status
+        print(run_status())
 
 
 if __name__ == "__main__":

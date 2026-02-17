@@ -231,6 +231,16 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
             lines.append(f"- ... and {len(low) - MAX_FINDINGS_PER_BRIEF} more")
         lines.append("\n</details>")
 
+    # KPI snapshot (supplementary — don't break the brief if it fails)
+    try:
+        from agents.shared.kpis import compute_kpis, render_kpi_summary
+
+        dashboard = compute_kpis(reports)
+        lines.append("")
+        lines.append(render_kpi_summary(dashboard))
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 
@@ -277,6 +287,15 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
         for note in r.intelligence_applied:
             lines.append(f"- [{r.agent}] {note}")
     lines.append("")
+
+    # KPI trends (supplementary — don't break the weekly report if it fails)
+    try:
+        from agents.shared.kpis import compute_kpis, render_kpi_trends
+
+        dashboard = compute_kpis(reports)
+        lines.append(render_kpi_trends(dashboard))
+    except Exception:
+        pass
 
     return "\n".join(lines)
 

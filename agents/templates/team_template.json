@@ -1,0 +1,30 @@
+{
+    "team": {
+        "name": "",
+        "lead_agent": "",
+        "purpose": "",
+        "business_outcomes_served": []
+    },
+    "agents": [
+        {
+            "name": "",
+            "role": "",
+            "scan_scope": "",
+            "frequency": "daily",
+            "kpis": []
+        }
+    ],
+    "reporting": {
+        "cadence": "daily",
+        "format": "team_report",
+        "lead_submits_to": "chief_of_staff"
+    },
+    "cost_budget": {
+        "max_daily_tokens": 0,
+        "alert_threshold_pct": 150
+    },
+    "cross_team_interfaces": {
+        "provides_to": [],
+        "depends_on": []
+    }
+}

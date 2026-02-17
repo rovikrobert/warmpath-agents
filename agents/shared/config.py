@@ -67,3 +67,37 @@ AGENT_NAMES = [
     "security",
     "privy",
 ]
+
+# KPI targets — (agent, kpi_name) → {target, yellow (optional)}
+KPI_TARGETS: dict[tuple[str, str], dict] = {
+    ("architect", "lint_density"):           {"target": 0.10, "yellow": 0.15},
+    ("architect", "large_file_ratio"):       {"target": 0.10, "yellow": 0.15},
+    ("architect", "type_coverage"):          {"target": 0.95, "yellow": 0.90},
+    ("test_engineer", "test_count"):         {"target": 750,  "yellow": 700},
+    ("test_engineer", "weak_test_ratio"):    {"target": 0.30, "yellow": 0.40},
+    ("test_engineer", "tests_per_file"):     {"target": 25,   "yellow": 20},
+    ("perf_monitor", "n_plus_1_count"):      {"target": 0},
+    ("perf_monitor", "index_coverage"):      {"target": 0.80, "yellow": 0.70},
+    ("perf_monitor", "ai_cost_per_user"):    {"target": 0.50, "yellow": 0.75},
+    ("deps_manager", "cve_count"):           {"target": 0},
+    ("deps_manager", "pin_ratio"):           {"target": 1.0,  "yellow": 0.95},
+    ("deps_manager", "dead_dep_count"):      {"target": 0},
+    ("doc_keeper", "doc_coverage"):          {"target": 0.90, "yellow": 0.80},
+    ("doc_keeper", "claims_accuracy"):       {"target": 1.0,  "yellow": 0.95},
+    ("doc_keeper", "convention_violations"): {"target": 0},
+    ("security", "critical_high"):           {"target": 0},
+    ("security", "medium_findings"):         {"target": 5,    "yellow": 10},
+    ("privy", "critical_high"):              {"target": 0},
+    ("privy", "check_pass_rate"):            {"target": 0.90, "yellow": 0.80},
+}
+
+# Health score weights per agent (total = 100)
+HEALTH_WEIGHTS: dict[str, int] = {
+    "security": 25,
+    "privy": 20,
+    "deps_manager": 15,
+    "test_engineer": 15,
+    "architect": 10,
+    "perf_monitor": 10,
+    "doc_keeper": 5,
+}
