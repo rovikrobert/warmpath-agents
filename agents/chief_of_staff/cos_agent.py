@@ -46,6 +46,18 @@ try:
 except ImportError:
     OPS_TEAM_REPORTS_DIR = None
 
+# Finance team reports directory — resolved lazily, patchable by tests
+try:
+    from finance_team.shared.config import REPORTS_DIR as FINANCE_TEAM_REPORTS_DIR
+except ImportError:
+    FINANCE_TEAM_REPORTS_DIR = None
+
+# GTM team reports directory — resolved lazily, patchable by tests
+try:
+    from gtm_team.shared.config import REPORTS_DIR as GTM_TEAM_REPORTS_DIR
+except ImportError:
+    GTM_TEAM_REPORTS_DIR = None
+
 
 # ---------------------------------------------------------------------------
 # Report loading
@@ -99,6 +111,26 @@ def _load_reports() -> list[AgentReport]:
             except (json.JSONDecodeError, OSError, KeyError, TypeError):
                 continue
 
+    # Finance team reports (if available)
+    if FINANCE_TEAM_REPORTS_DIR is not None and FINANCE_TEAM_REPORTS_DIR.is_dir():
+        for path in sorted(FINANCE_TEAM_REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                reports.append(AgentReport.from_dict(clean))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
+    # GTM team reports (if available)
+    if GTM_TEAM_REPORTS_DIR is not None and GTM_TEAM_REPORTS_DIR.is_dir():
+        for path in sorted(GTM_TEAM_REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                reports.append(AgentReport.from_dict(clean))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
     return reports
 
 
@@ -133,10 +165,14 @@ def run_daily() -> str:
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
     _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents]
+    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents and r.agent not in _finance_agents and r.agent not in _gtm_agents]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
     ops_reports = [r for r in reports if r.agent in _ops_agents]
+    finance_reports = [r for r in reports if r.agent in _finance_agents]
+    gtm_reports = [r for r in reports if r.agent in _gtm_agents]
     update_team_reliability("engineering", eng_reports)
     if data_reports:
         update_team_reliability("data", data_reports)
@@ -144,6 +180,10 @@ def run_daily() -> str:
         update_team_reliability("product", product_reports)
     if ops_reports:
         update_team_reliability("ops", ops_reports)
+    if finance_reports:
+        update_team_reliability("finance", finance_reports)
+    if gtm_reports:
+        update_team_reliability("gtm", gtm_reports)
     record_cost_snapshot(costs)
 
     return brief

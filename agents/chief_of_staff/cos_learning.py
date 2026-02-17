@@ -50,6 +50,16 @@ def _default_state() -> dict:
                 "reports_total": 0,
                 "noise_ratio": 0.0,
             },
+            "finance": {
+                "reports_on_time": 0,
+                "reports_total": 0,
+                "noise_ratio": 0.0,
+            },
+            "gtm": {
+                "reports_on_time": 0,
+                "reports_total": 0,
+                "noise_ratio": 0.0,
+            },
         },
         "cost_trends": [],
         "meta_improvements": [],

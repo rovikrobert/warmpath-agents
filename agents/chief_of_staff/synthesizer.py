@@ -119,6 +119,8 @@ def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
     _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
+    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
     progress: list[dict[str, Any]] = []
     for r in reports:
         critical_high = [
@@ -131,6 +133,10 @@ def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
                 team = "product"
             elif r.agent in _ops_agents:
                 team = "ops"
+            elif r.agent in _finance_agents:
+                team = "finance"
+            elif r.agent in _gtm_agents:
+                team = "gtm"
             else:
                 team = "engineering"
             progress.append({
@@ -330,10 +336,14 @@ def synthesize_status(reports: list[AgentReport]) -> str:
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
     _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents]
+    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents and r.agent not in _finance_agents and r.agent not in _gtm_agents]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
     ops_reports = [r for r in reports if r.agent in _ops_agents]
+    finance_reports = [r for r in reports if r.agent in _finance_agents]
+    gtm_reports = [r for r in reports if r.agent in _gtm_agents]
 
     lines.append("## Engineering")
     eng_findings = [f for r in eng_reports for f in r.findings]
@@ -410,6 +420,48 @@ def synthesize_status(reports: list[AgentReport]) -> str:
             f"{sum(1 for f in ops_findings_all if f.severity in ('low', 'info'))} low"
         )
         for r in ops_reports:
+            count = len(r.findings)
+            worst = "clean"
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if any(f.severity == sev for f in r.findings):
+                    worst = sev
+                    break
+            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
+        lines.append("")
+
+    if finance_reports:
+        lines.append("## Finance Team")
+        finance_findings_all = [f for r in finance_reports for f in r.findings]
+        finance_crit = sum(1 for f in finance_findings_all if f.severity == "critical")
+        finance_high = sum(1 for f in finance_findings_all if f.severity == "high")
+        lines.append(f"- Agents: {len(finance_reports)} reporting")
+        lines.append(
+            f"- Findings: {finance_crit} critical, {finance_high} high, "
+            f"{sum(1 for f in finance_findings_all if f.severity == 'medium')} medium, "
+            f"{sum(1 for f in finance_findings_all if f.severity in ('low', 'info'))} low"
+        )
+        for r in finance_reports:
+            count = len(r.findings)
+            worst = "clean"
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if any(f.severity == sev for f in r.findings):
+                    worst = sev
+                    break
+            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
+        lines.append("")
+
+    if gtm_reports:
+        lines.append("## GTM Team")
+        gtm_findings_all = [f for r in gtm_reports for f in r.findings]
+        gtm_crit = sum(1 for f in gtm_findings_all if f.severity == "critical")
+        gtm_high = sum(1 for f in gtm_findings_all if f.severity == "high")
+        lines.append(f"- Agents: {len(gtm_reports)} reporting")
+        lines.append(
+            f"- Findings: {gtm_crit} critical, {gtm_high} high, "
+            f"{sum(1 for f in gtm_findings_all if f.severity == 'medium')} medium, "
+            f"{sum(1 for f in gtm_findings_all if f.severity in ('low', 'info'))} low"
+        )
+        for r in gtm_reports:
             count = len(r.findings)
             worst = "clean"
             for sev in ("critical", "high", "medium", "low", "info"):

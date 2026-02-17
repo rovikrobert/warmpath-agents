@@ -66,6 +66,28 @@ CATEGORY_OUTCOME_MAP: dict[str, list[str]] = {
     "intro_facilitation": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "credit_economy": [HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
     "marketplace_coverage": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    # Finance team categories
+    "stripe_integration": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "credit_regulation": [BILLION_DOLLAR, HELP_NETWORK_BUILDERS],
+    "cost_tracking": [COST_EFFICIENCY],
+    "billing": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "compliance": [BILLION_DOLLAR, HELP_JOB_SEEKERS],
+    "money_transmitter": [BILLION_DOLLAR],
+    "investor_readiness": [BILLION_DOLLAR],
+    "financial_model": [BILLION_DOLLAR, COST_EFFICIENCY],
+    # GTM team categories
+    "competitive_positioning": [BILLION_DOLLAR, HELP_JOB_SEEKERS],
+    "market_entry": [BILLION_DOLLAR, HELP_JOB_SEEKERS],
+    "pricing_strategy": [HELP_JOB_SEEKERS, COST_EFFICIENCY],
+    "customer_acquisition": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "supply_recruitment": [HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    "marketing_compliance": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "channel_readiness": [HELP_JOB_SEEKERS, COST_EFFICIENCY],
+    "partnership_pipeline": [HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    "brand_messaging": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "content_strategy": [HELP_JOB_SEEKERS, COST_EFFICIENCY],
+    "revenue_model": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "credit_strategy": [HELP_NETWORK_BUILDERS, COST_EFFICIENCY],
 }
 
 # Business impact templates by category + severity
@@ -148,6 +170,68 @@ _IMPACT_TEMPLATES: dict[str, dict[str, str]] = {
         "high": "Ops efficiency gap that increases manual intervention burden",
         "medium": "Ops process that could be automated or streamlined",
         "low": "Minor ops efficiency improvement",
+    },
+    # Finance team impact templates
+    "stripe_integration": {
+        "critical": "Payment infrastructure broken — cannot collect revenue",
+        "high": "Stripe integration gap that could cause missed payments or webhook failures",
+        "medium": "Stripe integration issue that needs attention before scaling",
+        "low": "Minor Stripe integration improvement",
+    },
+    "credit_regulation": {
+        "critical": "Credit economy classified as money transmission — regulatory shutdown risk",
+        "high": "Credit economy gap that could trigger FinCEN/PSA scrutiny",
+        "medium": "Credit economy compliance issue to address before launch",
+        "low": "Minor credit regulation improvement",
+    },
+    "compliance": {
+        "critical": "Regulatory violation — GDPR/CCPA/PDPA non-compliance exposes legal liability",
+        "high": "Compliance gap that could result in enforcement action",
+        "medium": "Compliance issue to address for regulatory readiness",
+        "low": "Minor compliance improvement opportunity",
+    },
+    "investor_readiness": {
+        "critical": "Data room claims materially misrepresent codebase — fundraise risk",
+        "high": "Investor-facing claims have significant gaps vs reality",
+        "medium": "Investor readiness issue that could affect due diligence",
+        "low": "Minor investor readiness improvement",
+    },
+    # GTM team impact templates
+    "competitive_positioning": {
+        "critical": "No competitive positioning — GTM execution has no strategic foundation",
+        "high": "Significant competitive blind spots undermining positioning decisions",
+        "medium": "Competitive coverage gap that could lead to missed threats",
+        "low": "Minor competitive intelligence improvement",
+    },
+    "market_entry": {
+        "critical": "No market entry strategy — geographic expansion is unplanned",
+        "high": "Market entry gaps that could cause failed launches or regulatory issues",
+        "medium": "Market entry planning gap to address before expansion",
+        "low": "Minor market entry documentation improvement",
+    },
+    "pricing_strategy": {
+        "critical": "Pricing model undefined — cannot monetize or communicate value",
+        "high": "Pricing implementation gap between strategy docs and codebase",
+        "medium": "Pricing optimization opportunity for better conversion",
+        "low": "Minor pricing documentation improvement",
+    },
+    "brand_messaging": {
+        "critical": "Brand messaging absent — users cannot understand the value proposition",
+        "high": "Messaging inconsistency degrading user trust and conversion",
+        "medium": "Brand messaging gap between strategy and frontend",
+        "low": "Minor messaging alignment opportunity",
+    },
+    "channel_readiness": {
+        "critical": "No acquisition channels ready — cannot drive user growth",
+        "high": "Key acquisition channel has significant gaps",
+        "medium": "Channel readiness issue to address before scaling",
+        "low": "Minor channel optimization opportunity",
+    },
+    "partnership_pipeline": {
+        "critical": "No partnership infrastructure — supply side recruitment blocked",
+        "high": "Partnership pipeline gap limiting supply side growth",
+        "medium": "Partnership readiness issue to address for network expansion",
+        "low": "Minor partnership process improvement",
     },
 }
 
