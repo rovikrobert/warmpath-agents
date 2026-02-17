@@ -115,7 +115,7 @@ def _scan_ruff_check(findings: list[Finding]) -> int:
                 file=filename,
                 line=row,
                 recommendation=f"Run `ruff check --fix` to auto-fix, or address manually.",
-                auto_fixable=issue.get("fix", {}).get("applicability", "") == "safe",
+                auto_fixable=(issue.get("fix") or {}).get("applicability", "") == "safe",
             ))
     except (json.JSONDecodeError, TypeError) as exc:
         logger.warning("Failed to parse ruff output: %s", exc)
