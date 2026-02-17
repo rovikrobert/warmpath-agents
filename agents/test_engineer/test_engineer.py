@@ -60,12 +60,14 @@ def _extract_test_functions(filepath: Path) -> list[dict]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name.startswith("test_"):
                 assertions = _count_assertions(node)
-                tests.append({
-                    "name": node.name,
-                    "file": str(filepath.relative_to(PROJECT_ROOT)),
-                    "line": node.lineno,
-                    "assertions": assertions,
-                })
+                tests.append(
+                    {
+                        "name": node.name,
+                        "file": str(filepath.relative_to(PROJECT_ROOT)),
+                        "line": node.lineno,
+                        "assertions": assertions,
+                    }
+                )
     return tests
 
 
@@ -86,19 +88,23 @@ def _extract_api_endpoints(filepath: Path) -> list[dict]:
             continue
         for decorator in node.decorator_list:
             # Match router.get("/path"), router.post("/path"), etc.
-            if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute):
+            if isinstance(decorator, ast.Call) and isinstance(
+                decorator.func, ast.Attribute
+            ):
                 method = decorator.func.attr
                 if method in http_methods:
                     path = ""
                     if decorator.args and isinstance(decorator.args[0], ast.Constant):
                         path = decorator.args[0].value
-                    endpoints.append({
-                        "function": node.name,
-                        "method": method.upper(),
-                        "path": path,
-                        "file": str(filepath.relative_to(PROJECT_ROOT)),
-                        "line": node.lineno,
-                    })
+                    endpoints.append(
+                        {
+                            "function": node.name,
+                            "method": method.upper(),
+                            "path": path,
+                            "file": str(filepath.relative_to(PROJECT_ROOT)),
+                            "line": node.lineno,
+                        }
+                    )
     return endpoints
 
 
@@ -142,11 +148,15 @@ def _run_pytest_coverage() -> dict:
                 pass
 
     cmd = [
-        "python3", "-m", "pytest",
+        "python3",
+        "-m",
+        "pytest",
         f"--cov={PROJECT_ROOT / 'app'}",
         "--cov-report=json",
         "--cov-report=term",
-        "-q", "--no-header", "-x",
+        "-q",
+        "--no-header",
+        "-x",
         "--timeout=60",
         str(PROJECT_ROOT / "tests"),
     ]
@@ -216,7 +226,9 @@ def _analyze_coverage(cov_data: dict) -> list[Finding]:
 
         # Check critical modules first
         is_critical = rel_path in CRITICAL_MODULES
-        threshold = COVERAGE_CRITICAL_THRESHOLD if is_critical else COVERAGE_WARN_THRESHOLD
+        threshold = (
+            COVERAGE_CRITICAL_THRESHOLD if is_critical else COVERAGE_WARN_THRESHOLD
+        )
 
         if pct < threshold:
             reason = CRITICAL_MODULES.get(rel_path, "")
@@ -230,23 +242,25 @@ def _analyze_coverage(cov_data: dict) -> list[Finding]:
                 AGENT_NAME, "low_coverage", rel_path
             )
 
-            findings.append(Finding(
-                id=f"TE-COV-{rel_path.replace('/', '-').replace('.', '-')}",
-                severity=severity,
-                category="low_coverage",
-                title=f"{label} {rel_path} at {pct:.0f}% coverage (threshold {threshold}%)",
-                detail=(
-                    f"{num_missing} of {num_stmts} statements not covered. "
-                    f"Target: {threshold}% line coverage."
-                ),
-                file=rel_path,
-                recommendation=(
-                    f"Add tests for uncovered paths in {rel_path}. "
-                    f"Focus on error handling branches and edge cases."
-                ),
-                effort_hours=max(0.5, num_missing * 0.05),
-                recurrence_count=recurrence + 1,
-            ))
+            findings.append(
+                Finding(
+                    id=f"TE-COV-{rel_path.replace('/', '-').replace('.', '-')}",
+                    severity=severity,
+                    category="low_coverage",
+                    title=f"{label} {rel_path} at {pct:.0f}% coverage (threshold {threshold}%)",
+                    detail=(
+                        f"{num_missing} of {num_stmts} statements not covered. "
+                        f"Target: {threshold}% line coverage."
+                    ),
+                    file=rel_path,
+                    recommendation=(
+                        f"Add tests for uncovered paths in {rel_path}. "
+                        f"Focus on error handling branches and edge cases."
+                    ),
+                    effort_hours=max(0.5, num_missing * 0.05),
+                    recurrence_count=recurrence + 1,
+                )
+            )
 
     return findings
 
@@ -260,25 +274,27 @@ def _analyze_test_quality(all_tests: list[dict]) -> list[Finding]:
             recurrence = learning.get_recurrence_count(
                 AGENT_NAME, "weak_test", t["file"]
             )
-            findings.append(Finding(
-                id=f"TE-WEAK-{t['file'].replace('/', '-')}-{t['name']}",
-                severity="low",
-                category="weak_test",
-                title=f"Weak test: {t['name']} has {t['assertions']} assertion(s)",
-                detail=(
-                    f"Test function `{t['name']}` in {t['file']} has only "
-                    f"{t['assertions']} assertion(s). Tests with few assertions "
-                    f"may not validate behavior thoroughly."
-                ),
-                file=t["file"],
-                line=t["line"],
-                recommendation=(
-                    "Add assertions that validate response body content, "
-                    "side effects, or state changes — not just status codes."
-                ),
-                effort_hours=0.25,
-                recurrence_count=recurrence + 1,
-            ))
+            findings.append(
+                Finding(
+                    id=f"TE-WEAK-{t['file'].replace('/', '-')}-{t['name']}",
+                    severity="low",
+                    category="weak_test",
+                    title=f"Weak test: {t['name']} has {t['assertions']} assertion(s)",
+                    detail=(
+                        f"Test function `{t['name']}` in {t['file']} has only "
+                        f"{t['assertions']} assertion(s). Tests with few assertions "
+                        f"may not validate behavior thoroughly."
+                    ),
+                    file=t["file"],
+                    line=t["line"],
+                    recommendation=(
+                        "Add assertions that validate response body content, "
+                        "side effects, or state changes — not just status codes."
+                    ),
+                    effort_hours=0.25,
+                    recurrence_count=recurrence + 1,
+                )
+            )
 
     return findings
 
@@ -321,26 +337,28 @@ def _analyze_error_test_coverage(
                 AGENT_NAME, "missing_error_tests", rel_path
             )
 
-            findings.append(Finding(
-                id=f"TE-ERR-{module_name}",
-                severity="medium",
-                category="missing_error_tests",
-                title=f"No error-path tests found for API module: {module_name}",
-                detail=(
-                    f"API module {rel_path} exposes endpoints "
-                    f"({endpoint_summary}) but no tests assert 4xx status codes. "
-                    f"Error paths (bad input, auth failures, not found) should "
-                    f"be tested."
-                ),
-                file=rel_path,
-                recommendation=(
-                    f"Add tests for {module_name} that cover: invalid input (422), "
-                    f"unauthorized access (401/403), missing resources (404), "
-                    f"and duplicate/conflict scenarios (409) as applicable."
-                ),
-                effort_hours=1.0,
-                recurrence_count=recurrence + 1,
-            ))
+            findings.append(
+                Finding(
+                    id=f"TE-ERR-{module_name}",
+                    severity="medium",
+                    category="missing_error_tests",
+                    title=f"No error-path tests found for API module: {module_name}",
+                    detail=(
+                        f"API module {rel_path} exposes endpoints "
+                        f"({endpoint_summary}) but no tests assert 4xx status codes. "
+                        f"Error paths (bad input, auth failures, not found) should "
+                        f"be tested."
+                    ),
+                    file=rel_path,
+                    recommendation=(
+                        f"Add tests for {module_name} that cover: invalid input (422), "
+                        f"unauthorized access (401/403), missing resources (404), "
+                        f"and duplicate/conflict scenarios (409) as applicable."
+                    ),
+                    effort_hours=1.0,
+                    recurrence_count=recurrence + 1,
+                )
+            )
 
     return findings
 
@@ -392,18 +410,20 @@ def scan() -> AgentReport:
         # Extract a concise error summary (first few lines)
         output_lines = cov_result["output"].strip().splitlines()
         error_excerpt = "\n".join(output_lines[-10:]) if output_lines else "no output"
-        findings.append(Finding(
-            id="TE-RUN-FAIL",
-            severity="high",
-            category="test_run_failure",
-            title="pytest run failed or timed out",
-            detail=f"Could not complete test suite execution.\n\n```\n{error_excerpt}\n```",
-            recommendation=(
-                "Fix failing tests before analyzing coverage. "
-                "Check for import errors, missing fixtures, or database issues."
-            ),
-            effort_hours=1.0,
-        ))
+        findings.append(
+            Finding(
+                id="TE-RUN-FAIL",
+                severity="high",
+                category="test_run_failure",
+                title="pytest run failed or timed out",
+                detail=f"Could not complete test suite execution.\n\n```\n{error_excerpt}\n```",
+                recommendation=(
+                    "Fix failing tests before analyzing coverage. "
+                    "Check for import errors, missing fixtures, or database issues."
+                ),
+                effort_hours=1.0,
+            )
+        )
 
     coverage_pct = cov_result.get("total_coverage_pct")
     if coverage_pct is not None:
@@ -426,9 +446,7 @@ def scan() -> AgentReport:
     findings.extend(quality_findings)
 
     if weak_tests:
-        intelligence_notes.append(
-            f"{len(weak_tests)} tests have 0-1 assertions (weak)"
-        )
+        intelligence_notes.append(f"{len(weak_tests)} tests have 0-1 assertions (weak)")
 
     # ------------------------------------------------------------------
     # 5. Analyze error-path test coverage
@@ -448,22 +466,24 @@ def scan() -> AgentReport:
     if coverage_pct is not None:
         trend = learning.get_trend(AGENT_NAME, "coverage_percent")
         if trend == "down":
-            findings.append(Finding(
-                id="TE-TREND-COV-DOWN",
-                severity="medium",
-                category="coverage_trend",
-                title="Coverage is trending downward",
-                detail=(
-                    f"Current coverage: {coverage_pct:.1f}%. "
-                    f"Coverage has been declining over recent scans. "
-                    f"New code may be landing without adequate tests."
-                ),
-                recommendation=(
-                    "Review recent commits for untested code paths. "
-                    "Consider adding a coverage gate to the CI pipeline."
-                ),
-                effort_hours=2.0,
-            ))
+            findings.append(
+                Finding(
+                    id="TE-TREND-COV-DOWN",
+                    severity="medium",
+                    category="coverage_trend",
+                    title="Coverage is trending downward",
+                    detail=(
+                        f"Current coverage: {coverage_pct:.1f}%. "
+                        f"Coverage has been declining over recent scans. "
+                        f"New code may be landing without adequate tests."
+                    ),
+                    recommendation=(
+                        "Review recent commits for untested code paths. "
+                        "Consider adding a coverage gate to the CI pipeline."
+                    ),
+                    effort_hours=2.0,
+                )
+            )
             intelligence_notes.append("Coverage trend: declining")
         elif trend == "up":
             intelligence_notes.append("Coverage trend: improving")
@@ -479,14 +499,17 @@ def scan() -> AgentReport:
         # Record each finding in history
         file_finding_counts: dict[str, int] = {}
         for f in findings:
-            learning.record_finding(AGENT_NAME, {
-                "id": f.id,
-                "severity": f.severity,
-                "category": f.category,
-                "file": f.file,
-                "line": f.line,
-                "title": f.title,
-            })
+            learning.record_finding(
+                AGENT_NAME,
+                {
+                    "id": f.id,
+                    "severity": f.severity,
+                    "category": f.category,
+                    "file": f.file,
+                    "line": f.line,
+                    "title": f.title,
+                },
+            )
             if f.file:
                 file_finding_counts[f.file] = file_finding_counts.get(f.file, 0) + 1
 

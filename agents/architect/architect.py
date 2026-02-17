@@ -78,13 +78,15 @@ def _scan_ruff_check(findings: list[Finding]) -> int:
     """Run ruff check in JSON mode and create findings. Return issue count."""
     result = _run_tool(["ruff", "check", "app/", "--output-format=json"])
     if result is None:
-        findings.append(Finding(
-            id="ARCH-RUFF-UNAVAIL",
-            severity="info",
-            category="tooling",
-            title="ruff not available",
-            detail="Could not run ruff check. Install with: pip install ruff",
-        ))
+        findings.append(
+            Finding(
+                id="ARCH-RUFF-UNAVAIL",
+                severity="info",
+                category="tooling",
+                title="ruff not available",
+                detail="Could not run ruff check. Install with: pip install ruff",
+            )
+        )
         return 0
 
     count = 0
@@ -106,27 +108,32 @@ def _scan_ruff_check(findings: list[Finding]) -> int:
             else:
                 severity = "low"
 
-            findings.append(Finding(
-                id=f"ARCH-LINT-{code}",
-                severity=severity,
-                category="lint",
-                title=f"Ruff {code}: {message}",
-                detail=message,
-                file=filename,
-                line=row,
-                recommendation=f"Run `ruff check --fix` to auto-fix, or address manually.",
-                auto_fixable=(issue.get("fix") or {}).get("applicability", "") == "safe",
-            ))
+            findings.append(
+                Finding(
+                    id=f"ARCH-LINT-{code}",
+                    severity=severity,
+                    category="lint",
+                    title=f"Ruff {code}: {message}",
+                    detail=message,
+                    file=filename,
+                    line=row,
+                    recommendation="Run `ruff check --fix` to auto-fix, or address manually.",
+                    auto_fixable=(issue.get("fix") or {}).get("applicability", "")
+                    == "safe",
+                )
+            )
     except (json.JSONDecodeError, TypeError) as exc:
         logger.warning("Failed to parse ruff output: %s", exc)
         if result.stderr.strip():
-            findings.append(Finding(
-                id="ARCH-RUFF-ERR",
-                severity="info",
-                category="tooling",
-                title="ruff check produced errors",
-                detail=result.stderr[:500],
-            ))
+            findings.append(
+                Finding(
+                    id="ARCH-RUFF-ERR",
+                    severity="info",
+                    category="tooling",
+                    title="ruff check produced errors",
+                    detail=result.stderr[:500],
+                )
+            )
     return count
 
 
@@ -134,13 +141,15 @@ def _scan_ruff_format(findings: list[Finding]) -> None:
     """Run ruff format --check and flag files with formatting drift."""
     result = _run_tool(["ruff", "format", "--check", "app/"])
     if result is None:
-        findings.append(Finding(
-            id="ARCH-FMTCHK-UNAVAIL",
-            severity="info",
-            category="tooling",
-            title="ruff format not available",
-            detail="Could not run ruff format --check.",
-        ))
+        findings.append(
+            Finding(
+                id="ARCH-FMTCHK-UNAVAIL",
+                severity="info",
+                category="tooling",
+                title="ruff format not available",
+                detail="Could not run ruff format --check.",
+            )
+        )
         return
 
     # ruff format --check exits non-zero if files need formatting.
@@ -152,17 +161,18 @@ def _scan_ruff_format(findings: list[Finding]) -> None:
             if line.strip() and not line.startswith("error")
         ]
         if unformatted:
-            findings.append(Finding(
-                id="ARCH-FMT-DRIFT",
-                severity="low",
-                category="formatting",
-                title=f"Formatting drift in {len(unformatted)} file(s)",
-                detail="Files with formatting drift:\n" + "\n".join(
-                    f"  - {f}" for f in unformatted[:20]
-                ),
-                recommendation="Run `ruff format .` to fix all formatting.",
-                auto_fixable=True,
-            ))
+            findings.append(
+                Finding(
+                    id="ARCH-FMT-DRIFT",
+                    severity="low",
+                    category="formatting",
+                    title=f"Formatting drift in {len(unformatted)} file(s)",
+                    detail="Files with formatting drift:\n"
+                    + "\n".join(f"  - {f}" for f in unformatted[:20]),
+                    recommendation="Run `ruff format .` to fix all formatting.",
+                    auto_fixable=True,
+                )
+            )
 
 
 def _scan_file_sizes(py_files: list[Path], findings: list[Finding]) -> int:
@@ -175,20 +185,22 @@ def _scan_file_sizes(py_files: list[Path], findings: list[Finding]) -> int:
             continue
         if line_count > FILE_SIZE_WARN_LINES:
             large_count += 1
-            findings.append(Finding(
-                id="ARCH-LARGE-FILE",
-                severity="medium",
-                category="complexity",
-                title=f"Large file: {line_count} lines",
-                detail=(
-                    f"`{_relative(path)}` has {line_count} lines "
-                    f"(threshold: {FILE_SIZE_WARN_LINES}). "
-                    "Consider splitting into smaller, focused modules."
-                ),
-                file=_relative(path),
-                recommendation="Extract related functions into a submodule.",
-                effort_hours=1.0,
-            ))
+            findings.append(
+                Finding(
+                    id="ARCH-LARGE-FILE",
+                    severity="medium",
+                    category="complexity",
+                    title=f"Large file: {line_count} lines",
+                    detail=(
+                        f"`{_relative(path)}` has {line_count} lines "
+                        f"(threshold: {FILE_SIZE_WARN_LINES}). "
+                        "Consider splitting into smaller, focused modules."
+                    ),
+                    file=_relative(path),
+                    recommendation="Extract related functions into a submodule.",
+                    effort_hours=1.0,
+                )
+            )
     return large_count
 
 
@@ -226,40 +238,44 @@ def _scan_functions(py_files: list[Path], findings: list[Finding]) -> tuple[int,
 
             # --- Long function check ---
             if func_length > FUNCTION_SIZE_WARN_LINES:
-                findings.append(Finding(
-                    id="ARCH-LONG-FUNC",
-                    severity="medium",
-                    category="complexity",
-                    title=f"Long function: {func_name} ({func_length} lines)",
-                    detail=(
-                        f"`{func_name}` in `{rel_path}` spans {func_length} lines "
-                        f"(threshold: {FUNCTION_SIZE_WARN_LINES}). "
-                        "Long functions are harder to test and maintain."
-                    ),
-                    file=rel_path,
-                    line=start_line,
-                    recommendation="Extract helper functions or break into logical steps.",
-                    effort_hours=0.5,
-                ))
+                findings.append(
+                    Finding(
+                        id="ARCH-LONG-FUNC",
+                        severity="medium",
+                        category="complexity",
+                        title=f"Long function: {func_name} ({func_length} lines)",
+                        detail=(
+                            f"`{func_name}` in `{rel_path}` spans {func_length} lines "
+                            f"(threshold: {FUNCTION_SIZE_WARN_LINES}). "
+                            "Long functions are harder to test and maintain."
+                        ),
+                        file=rel_path,
+                        line=start_line,
+                        recommendation="Extract helper functions or break into logical steps.",
+                        effort_hours=0.5,
+                    )
+                )
 
             # --- Missing return type annotation ---
             if node.returns is None and not func_name.startswith("_"):
                 missing_hints += 1
                 # Only report public functions to keep noise down
-                findings.append(Finding(
-                    id="ARCH-NO-RTYPE",
-                    severity="low",
-                    category="type_safety",
-                    title=f"Missing return type: {func_name}",
-                    detail=(
-                        f"Public function `{func_name}` in `{rel_path}` "
-                        "has no return type annotation."
-                    ),
-                    file=rel_path,
-                    line=start_line,
-                    recommendation="Add a return type annotation (-> ReturnType).",
-                    auto_fixable=False,
-                ))
+                findings.append(
+                    Finding(
+                        id="ARCH-NO-RTYPE",
+                        severity="low",
+                        category="type_safety",
+                        title=f"Missing return type: {func_name}",
+                        detail=(
+                            f"Public function `{func_name}` in `{rel_path}` "
+                            "has no return type annotation."
+                        ),
+                        file=rel_path,
+                        line=start_line,
+                        recommendation="Add a return type annotation (-> ReturnType).",
+                        auto_fixable=False,
+                    )
+                )
 
     return total_functions, missing_hints
 
@@ -278,10 +294,13 @@ def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
     )
     secret_patterns = [
         # Strings that look like hardcoded API keys or passwords
-        re.compile(r"""['"]sk[-_][a-zA-Z0-9]{20,}['"]"""),       # Stripe-style sk-...
-        re.compile(r"""['"](?:password|secret|api_key)\s*=\s*['"][^'"]{8,}['"]""", re.IGNORECASE),
+        re.compile(r"""['"]sk[-_][a-zA-Z0-9]{20,}['"]"""),  # Stripe-style sk-...
+        re.compile(
+            r"""['"](?:password|secret|api_key)\s*=\s*['"][^'"]{8,}['"]""",
+            re.IGNORECASE,
+        ),
         re.compile(r"""['"](?:ghp_|github_pat_)[a-zA-Z0-9]{20,}['"]"""),  # GitHub PATs
-        re.compile(r"""['"](?:Bearer\s+)[a-zA-Z0-9._-]{20,}['"]"""),      # Bearer tokens
+        re.compile(r"""['"](?:Bearer\s+)[a-zA-Z0-9._-]{20,}['"]"""),  # Bearer tokens
     ]
 
     for path in py_files:
@@ -294,53 +313,59 @@ def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
         for lineno, line in enumerate(lines, start=1):
             # --- Naive datetime ---
             if naive_datetime_re.search(line):
-                findings.append(Finding(
-                    id="ARCH-NAIVE-DT",
-                    severity="medium",
-                    category="convention",
-                    title="datetime.now() without timezone",
-                    detail=(
-                        f"`datetime.now()` in `{rel_path}:{lineno}` — "
-                        "convention requires `datetime.now(timezone.utc)`."
-                    ),
-                    file=rel_path,
-                    line=lineno,
-                    recommendation="Use `datetime.now(timezone.utc)` for UTC timestamps.",
-                    auto_fixable=True,
-                ))
+                findings.append(
+                    Finding(
+                        id="ARCH-NAIVE-DT",
+                        severity="medium",
+                        category="convention",
+                        title="datetime.now() without timezone",
+                        detail=(
+                            f"`datetime.now()` in `{rel_path}:{lineno}` — "
+                            "convention requires `datetime.now(timezone.utc)`."
+                        ),
+                        file=rel_path,
+                        line=lineno,
+                        recommendation="Use `datetime.now(timezone.utc)` for UTC timestamps.",
+                        auto_fixable=True,
+                    )
+                )
 
             # --- Autoincrement IDs ---
             if autoincrement_re.search(line):
-                findings.append(Finding(
-                    id="ARCH-AUTOINC-ID",
-                    severity="medium",
-                    category="convention",
-                    title="Possible autoincrement integer ID",
-                    detail=(
-                        f"Integer primary key or autoincrement detected at "
-                        f"`{rel_path}:{lineno}`. Convention requires UUIDs."
-                    ),
-                    file=rel_path,
-                    line=lineno,
-                    recommendation="Use `Column(UUID, primary_key=True, default=uuid.uuid4)`.",
-                ))
+                findings.append(
+                    Finding(
+                        id="ARCH-AUTOINC-ID",
+                        severity="medium",
+                        category="convention",
+                        title="Possible autoincrement integer ID",
+                        detail=(
+                            f"Integer primary key or autoincrement detected at "
+                            f"`{rel_path}:{lineno}`. Convention requires UUIDs."
+                        ),
+                        file=rel_path,
+                        line=lineno,
+                        recommendation="Use `Column(UUID, primary_key=True, default=uuid.uuid4)`.",
+                    )
+                )
 
             # --- Hardcoded secrets ---
             for pat in secret_patterns:
                 if pat.search(line):
-                    findings.append(Finding(
-                        id="ARCH-HARDCODED-SECRET",
-                        severity="high",
-                        category="security",
-                        title="Possible hardcoded secret",
-                        detail=(
-                            f"String resembling a secret at `{rel_path}:{lineno}`. "
-                            "Secrets must be loaded from environment variables."
-                        ),
-                        file=rel_path,
-                        line=lineno,
-                        recommendation="Move to environment variable and load via os.environ.",
-                    ))
+                    findings.append(
+                        Finding(
+                            id="ARCH-HARDCODED-SECRET",
+                            severity="high",
+                            category="security",
+                            title="Possible hardcoded secret",
+                            detail=(
+                                f"String resembling a secret at `{rel_path}:{lineno}`. "
+                                "Secrets must be loaded from environment variables."
+                            ),
+                            file=rel_path,
+                            line=lineno,
+                            recommendation="Move to environment variable and load via os.environ.",
+                        )
+                    )
                     break  # One finding per line is enough
 
 
@@ -377,24 +402,26 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
                 # Check if call is <obj>.execute / <obj>.scalar / etc.
                 func = call_node.func if isinstance(call_node, ast.Call) else None
                 if isinstance(func, ast.Attribute) and func.attr in db_call_names:
-                    findings.append(Finding(
-                        id="ARCH-N+1",
-                        severity="high",
-                        category="performance",
-                        title=f"Potential N+1 query: {func.attr}() inside loop",
-                        detail=(
-                            f"Database call `{func.attr}()` found inside a loop at "
-                            f"`{rel_path}:{node.lineno}`. This may cause N+1 query "
-                            "performance issues."
-                        ),
-                        file=rel_path,
-                        line=node.lineno,
-                        recommendation=(
-                            "Batch the query outside the loop using `IN` clause, "
-                            "or use eager loading / joinedload."
-                        ),
-                        effort_hours=0.5,
-                    ))
+                    findings.append(
+                        Finding(
+                            id="ARCH-N+1",
+                            severity="high",
+                            category="performance",
+                            title=f"Potential N+1 query: {func.attr}() inside loop",
+                            detail=(
+                                f"Database call `{func.attr}()` found inside a loop at "
+                                f"`{rel_path}:{node.lineno}`. This may cause N+1 query "
+                                "performance issues."
+                            ),
+                            file=rel_path,
+                            line=node.lineno,
+                            recommendation=(
+                                "Batch the query outside the loop using `IN` clause, "
+                                "or use eager loading / joinedload."
+                            ),
+                            effort_hours=0.5,
+                        )
+                    )
                     break  # One finding per loop is enough
 
 
@@ -454,10 +481,13 @@ def scan() -> AgentReport:
 
     learning_updates: list[str] = []
     try:
-        learning.record_scan(AGENT_NAME, {
-            k: v for k, v in metrics.items() if isinstance(v, (int, float))
-        })
-        learning_updates.append(f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}")
+        learning.record_scan(
+            AGENT_NAME,
+            {k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        )
+        learning_updates.append(
+            f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}"
+        )
     except Exception as exc:
         logger.warning("Failed to record scan: %s", exc)
 
@@ -511,7 +541,9 @@ if __name__ == "__main__":
     for f in report.findings:
         sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
     summary_parts = [f"{v} {k}" for k, v in sorted(sev_counts.items())]
-    print(f"\nTotal: {len(report.findings)} findings ({', '.join(summary_parts) or 'clean'})")
+    print(
+        f"\nTotal: {len(report.findings)} findings ({', '.join(summary_parts) or 'clean'})"
+    )
 
     # Exit non-zero if critical or high findings exist
     if sev_counts.get("critical", 0) or sev_counts.get("high", 0):

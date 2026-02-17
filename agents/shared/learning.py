@@ -99,7 +99,9 @@ def get_trend(agent: str, metric: str, window_days: int = 30) -> str:
         return "insufficient_data"
 
     first_half = sum(recent[: len(recent) // 2]) / max(1, len(recent) // 2)
-    second_half = sum(recent[len(recent) // 2 :]) / max(1, len(recent) - len(recent) // 2)
+    second_half = sum(recent[len(recent) // 2 :]) / max(
+        1, len(recent) - len(recent) // 2
+    )
 
     if second_half > first_half * 1.1:
         return "up"
@@ -131,10 +133,12 @@ def record_scan(agent: str, metrics: dict[str, Any]) -> None:
     state = _load_state(agent)
     state["last_scan"] = datetime.now(timezone.utc).isoformat()
     state["total_scans"] = state.get("total_scans", 0) + 1
-    state["metrics_history"].append({
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "metrics": metrics,
-    })
+    state["metrics_history"].append(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "metrics": metrics,
+        }
+    )
     # Keep last 90 entries (~3 months of daily scans)
     state["metrics_history"] = state["metrics_history"][-90:]
     _save_state(agent, state)

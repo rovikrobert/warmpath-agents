@@ -35,16 +35,24 @@ SEVERITY_WEIGHTS = {
 MAX_FINDINGS_PER_BRIEF = 10
 
 # Thresholds
-COVERAGE_WARN_THRESHOLD = 80        # % line coverage below which we warn
-COVERAGE_CRITICAL_MODULES = 90      # % for high-risk modules
-FILE_SIZE_WARN_LINES = 300          # flag files larger than this
-FUNCTION_SIZE_WARN_LINES = 30       # flag functions longer than this
-TEST_SLOW_THRESHOLD_SECONDS = 2.0   # flag slow tests
-QUERIES_PER_REQUEST_WARN = 5        # potential N+1
-DEP_STALE_DAYS = 365                # flag deps not released in this many days
+COVERAGE_WARN_THRESHOLD = 80  # % line coverage below which we warn
+COVERAGE_CRITICAL_MODULES = 90  # % for high-risk modules
+FILE_SIZE_WARN_LINES = 300  # flag files larger than this
+FUNCTION_SIZE_WARN_LINES = 30  # flag functions longer than this
+TEST_SLOW_THRESHOLD_SECONDS = 2.0  # flag slow tests
+QUERIES_PER_REQUEST_WARN = 5  # potential N+1
+DEP_STALE_DAYS = 365  # flag deps not released in this many days
 
 # Skip directories during scanning
-SKIP_DIRS = {"__pycache__", ".venv", "venv", "node_modules", ".git", ".mypy_cache", ".pytest_cache"}
+SKIP_DIRS = {
+    "__pycache__",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+}
 
 # Intelligence cache TTL
 INTEL_CACHE_TTL_HOURS = 24

@@ -92,21 +92,23 @@ def _check_test_count(findings: list[Finding]) -> tuple[int, int | None]:
     if claimed_count is not None and actual_count != claimed_count:
         diff = actual_count - claimed_count
         direction = "more" if diff > 0 else "fewer"
-        findings.append(Finding(
-            id="DOC-TEST-COUNT",
-            severity="medium",
-            category="doc_sync",
-            title=f"Test count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
-            detail=(
-                f"CLAUDE.md states **{claimed_count} tests** but the codebase has "
-                f"{actual_count} test functions ({abs(diff)} {direction}). "
-                "Update the Current Status section in CLAUDE.md."
-            ),
-            file="CLAUDE.md",
-            recommendation=f"Update CLAUDE.md test count from {claimed_count} to {actual_count}.",
-            effort_hours=0.1,
-            auto_fixable=True,
-        ))
+        findings.append(
+            Finding(
+                id="DOC-TEST-COUNT",
+                severity="medium",
+                category="doc_sync",
+                title=f"Test count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
+                detail=(
+                    f"CLAUDE.md states **{claimed_count} tests** but the codebase has "
+                    f"{actual_count} test functions ({abs(diff)} {direction}). "
+                    "Update the Current Status section in CLAUDE.md."
+                ),
+                file="CLAUDE.md",
+                recommendation=f"Update CLAUDE.md test count from {claimed_count} to {actual_count}.",
+                effort_hours=0.1,
+                auto_fixable=True,
+            )
+        )
 
     return actual_count, claimed_count
 
@@ -141,20 +143,22 @@ def _check_test_file_count(findings: list[Finding]) -> tuple[int, int | None]:
     if claimed_count is not None and actual_count != claimed_count:
         diff = actual_count - claimed_count
         direction = "more" if diff > 0 else "fewer"
-        findings.append(Finding(
-            id="DOC-TEST-FILE-COUNT",
-            severity="medium",
-            category="doc_sync",
-            title=f"Test file count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
-            detail=(
-                f"CLAUDE.md states {claimed_count} test files but tests/ contains "
-                f"{actual_count} test files ({abs(diff)} {direction})."
-            ),
-            file="CLAUDE.md",
-            recommendation=f"Update CLAUDE.md test file count from {claimed_count} to {actual_count}.",
-            effort_hours=0.1,
-            auto_fixable=True,
-        ))
+        findings.append(
+            Finding(
+                id="DOC-TEST-FILE-COUNT",
+                severity="medium",
+                category="doc_sync",
+                title=f"Test file count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
+                detail=(
+                    f"CLAUDE.md states {claimed_count} test files but tests/ contains "
+                    f"{actual_count} test files ({abs(diff)} {direction})."
+                ),
+                file="CLAUDE.md",
+                recommendation=f"Update CLAUDE.md test file count from {claimed_count} to {actual_count}.",
+                effort_hours=0.1,
+                auto_fixable=True,
+            )
+        )
 
     return actual_count, claimed_count
 
@@ -178,12 +182,9 @@ def _check_table_count(findings: list[Finding]) -> tuple[int, int | None]:
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 for item in node.body:
-                    if (
-                        isinstance(item, ast.Assign)
-                        and any(
-                            isinstance(t, ast.Name) and t.id == "__tablename__"
-                            for t in item.targets
-                        )
+                    if isinstance(item, ast.Assign) and any(
+                        isinstance(t, ast.Name) and t.id == "__tablename__"
+                        for t in item.targets
                     ):
                         actual_count += 1
                         # Extract the table name string if possible
@@ -204,21 +205,23 @@ def _check_table_count(findings: list[Finding]) -> tuple[int, int | None]:
     if claimed_count is not None and actual_count != claimed_count:
         diff = actual_count - claimed_count
         direction = "more" if diff > 0 else "fewer"
-        findings.append(Finding(
-            id="DOC-TABLE-COUNT",
-            severity="medium",
-            category="doc_sync",
-            title=f"Table count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
-            detail=(
-                f"CLAUDE.md states {claimed_count} tables but app/models/ defines "
-                f"{actual_count} model classes with __tablename__ ({abs(diff)} {direction}). "
-                f"Tables found: {', '.join(sorted(table_names))}"
-            ),
-            file="CLAUDE.md",
-            recommendation=f"Update CLAUDE.md table count from {claimed_count} to {actual_count}.",
-            effort_hours=0.1,
-            auto_fixable=True,
-        ))
+        findings.append(
+            Finding(
+                id="DOC-TABLE-COUNT",
+                severity="medium",
+                category="doc_sync",
+                title=f"Table count mismatch: CLAUDE.md claims {claimed_count}, actual is {actual_count}",
+                detail=(
+                    f"CLAUDE.md states {claimed_count} tables but app/models/ defines "
+                    f"{actual_count} model classes with __tablename__ ({abs(diff)} {direction}). "
+                    f"Tables found: {', '.join(sorted(table_names))}"
+                ),
+                file="CLAUDE.md",
+                recommendation=f"Update CLAUDE.md table count from {claimed_count} to {actual_count}.",
+                effort_hours=0.1,
+                auto_fixable=True,
+            )
+        )
 
     return actual_count, claimed_count
 
@@ -271,21 +274,23 @@ def _check_endpoint_docstrings(findings: list[Finding]) -> tuple[int, int]:
             if docstring:
                 documented_endpoints += 1
             else:
-                findings.append(Finding(
-                    id="DOC-NO-DOCSTRING",
-                    severity="low",
-                    category="api_docs",
-                    title=f"Endpoint missing docstring: {node.name}",
-                    detail=(
-                        f"Router endpoint `{node.name}` in `{rel_path}` (line {node.lineno}) "
-                        "has no docstring. Docstrings serve as API documentation and appear "
-                        "in the auto-generated OpenAPI spec."
-                    ),
-                    file=rel_path,
-                    line=node.lineno,
-                    recommendation=f"Add a docstring to `{node.name}` describing its purpose and parameters.",
-                    effort_hours=0.1,
-                ))
+                findings.append(
+                    Finding(
+                        id="DOC-NO-DOCSTRING",
+                        severity="low",
+                        category="api_docs",
+                        title=f"Endpoint missing docstring: {node.name}",
+                        detail=(
+                            f"Router endpoint `{node.name}` in `{rel_path}` (line {node.lineno}) "
+                            "has no docstring. Docstrings serve as API documentation and appear "
+                            "in the auto-generated OpenAPI spec."
+                        ),
+                        file=rel_path,
+                        line=node.lineno,
+                        recommendation=f"Add a docstring to `{node.name}` describing its purpose and parameters.",
+                        effort_hours=0.1,
+                    )
+                )
 
     return total_endpoints, documented_endpoints
 
@@ -323,7 +328,10 @@ def _check_model_conventions(findings: list[Finding]) -> int:
                 # Find __tablename__
                 if isinstance(item, ast.Assign):
                     for target in item.targets:
-                        if isinstance(target, ast.Name) and target.id == "__tablename__":
+                        if (
+                            isinstance(target, ast.Name)
+                            and target.id == "__tablename__"
+                        ):
                             if isinstance(item.value, ast.Constant):
                                 tablename = item.value.value
 
@@ -353,19 +361,21 @@ def _check_model_conventions(findings: list[Finding]) -> int:
             if tablename == "audit_logs":
                 if not has_created_at:
                     violations += 1
-                    findings.append(Finding(
-                        id="DOC-CONVENTION-TS",
-                        severity="medium",
-                        category="convention",
-                        title=f"Model '{tablename}' missing created_at column",
-                        detail=(
-                            f"Model class in `{rel_path}` with table '{tablename}' "
-                            "is missing the created_at column. Convention requires "
-                            "all tables to have created_at."
-                        ),
-                        file=rel_path,
-                        recommendation="Add a created_at column with DateTime(timezone=True).",
-                    ))
+                    findings.append(
+                        Finding(
+                            id="DOC-CONVENTION-TS",
+                            severity="medium",
+                            category="convention",
+                            title=f"Model '{tablename}' missing created_at column",
+                            detail=(
+                                f"Model class in `{rel_path}` with table '{tablename}' "
+                                "is missing the created_at column. Convention requires "
+                                "all tables to have created_at."
+                            ),
+                            file=rel_path,
+                            recommendation="Add a created_at column with DateTime(timezone=True).",
+                        )
+                    )
                 continue
 
             # All other models need both
@@ -377,20 +387,22 @@ def _check_model_conventions(findings: list[Finding]) -> int:
 
             if missing:
                 violations += 1
-                findings.append(Finding(
-                    id="DOC-CONVENTION-TS",
-                    severity="medium",
-                    category="convention",
-                    title=f"Model '{tablename}' missing {', '.join(missing)}",
-                    detail=(
-                        f"Model class in `{rel_path}` with table '{tablename}' "
-                        f"is missing column(s): {', '.join(missing)}. "
-                        "Convention requires all tables to have created_at and updated_at "
-                        "(except audit_logs which only has created_at)."
-                    ),
-                    file=rel_path,
-                    recommendation=f"Add missing column(s) ({', '.join(missing)}) to the model.",
-                ))
+                findings.append(
+                    Finding(
+                        id="DOC-CONVENTION-TS",
+                        severity="medium",
+                        category="convention",
+                        title=f"Model '{tablename}' missing {', '.join(missing)}",
+                        detail=(
+                            f"Model class in `{rel_path}` with table '{tablename}' "
+                            f"is missing column(s): {', '.join(missing)}. "
+                            "Convention requires all tables to have created_at and updated_at "
+                            "(except audit_logs which only has created_at)."
+                        ),
+                        file=rel_path,
+                        recommendation=f"Add missing column(s) ({', '.join(missing)}) to the model.",
+                    )
+                )
 
     return violations
 
@@ -449,20 +461,22 @@ def _check_response_envelope(findings: list[Finding]) -> int:
 
                 if not has_data_key:
                     violations += 1
-                    findings.append(Finding(
-                        id="DOC-ENVELOPE",
-                        severity="low",
-                        category="convention",
-                        title=f"Response missing 'data' envelope in {node.name}",
-                        detail=(
-                            f"Endpoint `{node.name}` in `{rel_path}` (line {child.lineno}) "
-                            "returns a dict literal without a 'data' key. "
-                            'Convention requires responses to use {"data": ..., "meta": ...} envelope.'
-                        ),
-                        file=rel_path,
-                        line=child.lineno,
-                        recommendation='Wrap the response in {"data": ..., "meta": {...}} format.',
-                    ))
+                    findings.append(
+                        Finding(
+                            id="DOC-ENVELOPE",
+                            severity="low",
+                            category="convention",
+                            title=f"Response missing 'data' envelope in {node.name}",
+                            detail=(
+                                f"Endpoint `{node.name}` in `{rel_path}` (line {child.lineno}) "
+                                "returns a dict literal without a 'data' key. "
+                                'Convention requires responses to use {"data": ..., "meta": ...} envelope.'
+                            ),
+                            file=rel_path,
+                            line=child.lineno,
+                            recommendation='Wrap the response in {"data": ..., "meta": {...}} format.',
+                        )
+                    )
 
     return violations
 
@@ -491,21 +505,23 @@ def _check_password_storage(findings: list[Finding]) -> bool:
             break
 
     if not verified:
-        findings.append(Finding(
-            id="DOC-PRIVACY-PWD",
-            severity="high",
-            category="privacy_compliance",
-            title="Cannot verify bcrypt/passlib password hashing",
-            detail=(
-                "Privacy policy claims passwords are never stored in plaintext. "
-                "Could not find hash_password/verify_password functions using "
-                "passlib/bcrypt in app/utils/security.py or app/api/auth.py."
-            ),
-            recommendation=(
-                "Ensure password hashing uses passlib with bcrypt scheme and that "
-                "hash_password() and verify_password() functions are defined."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="DOC-PRIVACY-PWD",
+                severity="high",
+                category="privacy_compliance",
+                title="Cannot verify bcrypt/passlib password hashing",
+                detail=(
+                    "Privacy policy claims passwords are never stored in plaintext. "
+                    "Could not find hash_password/verify_password functions using "
+                    "passlib/bcrypt in app/utils/security.py or app/api/auth.py."
+                ),
+                recommendation=(
+                    "Ensure password hashing uses passlib with bcrypt scheme and that "
+                    "hash_password() and verify_password() functions are defined."
+                ),
+            )
+        )
 
     return verified
 
@@ -526,22 +542,24 @@ def _check_suppression_hashing(findings: list[Finding]) -> bool:
             verified = True
 
     if not verified:
-        findings.append(Finding(
-            id="DOC-PRIVACY-HASH",
-            severity="high",
-            category="privacy_compliance",
-            title="Cannot verify SHA-256 suppression list hashing",
-            detail=(
-                "CLAUDE.md and the privacy policy state that the suppression list "
-                "uses SHA-256 hashing. Could not confirm sha256 + hashlib usage "
-                "in app/utils/hashing.py."
-            ),
-            file="app/utils/hashing.py",
-            recommendation=(
-                "Ensure app/utils/hashing.py uses hashlib.sha256 for suppression "
-                "list matching on normalized inputs."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="DOC-PRIVACY-HASH",
+                severity="high",
+                category="privacy_compliance",
+                title="Cannot verify SHA-256 suppression list hashing",
+                detail=(
+                    "CLAUDE.md and the privacy policy state that the suppression list "
+                    "uses SHA-256 hashing. Could not confirm sha256 + hashlib usage "
+                    "in app/utils/hashing.py."
+                ),
+                file="app/utils/hashing.py",
+                recommendation=(
+                    "Ensure app/utils/hashing.py uses hashlib.sha256 for suppression "
+                    "list matching on normalized inputs."
+                ),
+            )
+        )
 
     return verified
 
@@ -657,10 +675,13 @@ def scan() -> AgentReport:
             file_finding_counts[f.file] = file_finding_counts.get(f.file, 0) + 1
 
     try:
-        learning.record_scan(AGENT_NAME, {
-            k: v for k, v in metrics.items() if isinstance(v, (int, float))
-        })
-        learning_updates.append(f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}")
+        learning.record_scan(
+            AGENT_NAME,
+            {k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        )
+        learning_updates.append(
+            f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}"
+        )
     except Exception as exc:
         logger.warning("Failed to record scan: %s", exc)
 
@@ -676,14 +697,17 @@ def scan() -> AgentReport:
 
     try:
         for f in findings:
-            learning.record_finding(AGENT_NAME, {
-                "id": f.id,
-                "severity": f.severity,
-                "category": f.category,
-                "file": f.file,
-                "line": f.line,
-                "title": f.title,
-            })
+            learning.record_finding(
+                AGENT_NAME,
+                {
+                    "id": f.id,
+                    "severity": f.severity,
+                    "category": f.category,
+                    "file": f.file,
+                    "line": f.line,
+                    "title": f.title,
+                },
+            )
     except Exception as exc:
         logger.warning("Failed to record findings: %s", exc)
 
@@ -729,7 +753,9 @@ if __name__ == "__main__":
     for f in report.findings:
         sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
     summary_parts = [f"{v} {k}" for k, v in sorted(sev_counts.items())]
-    print(f"\nTotal: {len(report.findings)} findings ({', '.join(summary_parts) or 'clean'})")
+    print(
+        f"\nTotal: {len(report.findings)} findings ({', '.join(summary_parts) or 'clean'})"
+    )
 
     # Exit non-zero if critical or high findings exist
     if sev_counts.get("critical", 0) or sev_counts.get("high", 0):

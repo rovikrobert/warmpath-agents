@@ -23,7 +23,6 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from agents.shared.config import AGENT_NAMES, REPORTS_DIR
 from agents.shared.report import AgentReport, merge_reports
 from agents.lead.lead import (
     generate_daily_brief,
@@ -69,7 +68,9 @@ def _run_agent(name: str) -> AgentReport | None:
         save_report(report)
         logger.info(
             "  %s: %d findings in %.1fs",
-            name, len(report.findings), report.scan_duration_seconds,
+            name,
+            len(report.findings),
+            report.scan_duration_seconds,
         )
         return report
     except Exception as exc:
@@ -137,10 +138,11 @@ def cmd_weekly() -> None:
 def cmd_intel_update() -> None:
     """Refresh external intelligence cache."""
     from agents.shared.intelligence import get_all_intelligence
+
     intel = get_all_intelligence()
     advisories = intel.get("advisories", [])
     deps = intel.get("dep_versions", {})
-    print(f"Intelligence updated:")
+    print("Intelligence updated:")
     print(f"  Advisories: {len(advisories)} found")
     print(f"  Dependencies checked: {len(deps)}")
     print(f"  API status: {len(intel.get('api_status', {}))} endpoints")
@@ -159,13 +161,21 @@ def main() -> None:
         epilog=__doc__,
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--all", action="store_true", help="Run all agents + daily brief")
+    group.add_argument(
+        "--all", action="store_true", help="Run all agents + daily brief"
+    )
     group.add_argument("--agent", type=str, help="Run a single agent by name")
-    group.add_argument("--lead-only", action="store_true", help="Brief from cached reports")
+    group.add_argument(
+        "--lead-only", action="store_true", help="Brief from cached reports"
+    )
     group.add_argument("--weekly", action="store_true", help="Weekly trend report")
-    group.add_argument("--intel-update", action="store_true", help="Refresh intelligence cache")
+    group.add_argument(
+        "--intel-update", action="store_true", help="Refresh intelligence cache"
+    )
 
-    parser.add_argument("--skip-tests", action="store_true", help="Skip test_engineer (faster)")
+    parser.add_argument(
+        "--skip-tests", action="store_true", help="Skip test_engineer (faster)"
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Debug logging")
 
     args = parser.parse_args()

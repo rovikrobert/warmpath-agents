@@ -46,15 +46,17 @@ def _convert_findings(raw: list[dict]) -> list[Finding]:
             candidate = f"{candidate}-{i}"
         seen_ids.add(candidate)
 
-        results.append(Finding(
-            id=candidate,
-            severity=severity,
-            category=category,
-            title=message[:120],
-            detail=message,
-            file=file_path,
-            line=line,
-        ))
+        results.append(
+            Finding(
+                id=candidate,
+                severity=severity,
+                category=category,
+                title=message[:120],
+                detail=message,
+                file=file_path,
+                line=line,
+            )
+        )
 
     return results
 
@@ -138,10 +140,17 @@ def scan() -> AgentReport:
     try:
         file_counts: dict[str, int] = {}
         for f in findings:
-            learning.record_finding(AGENT_NAME, {
-                "id": f.id, "severity": f.severity, "category": f.category,
-                "file": f.file, "line": f.line, "title": f.title,
-            })
+            learning.record_finding(
+                AGENT_NAME,
+                {
+                    "id": f.id,
+                    "severity": f.severity,
+                    "category": f.category,
+                    "file": f.file,
+                    "line": f.line,
+                    "title": f.title,
+                },
+            )
             if f.file:
                 file_counts[f.file] = file_counts.get(f.file, 0) + 1
 
@@ -154,10 +163,13 @@ def scan() -> AgentReport:
             if prev > 0:
                 f.recurrence_count = prev + 1
 
-        learning.record_scan(AGENT_NAME, {
-            k: v for k, v in metrics.items() if isinstance(v, (int, float))
-        })
-        learning_updates.append(f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}")
+        learning.record_scan(
+            AGENT_NAME,
+            {k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        )
+        learning_updates.append(
+            f"Recorded scan #{learning.get_total_scans(AGENT_NAME)}"
+        )
     except Exception as exc:
         logger.warning("Learning update failed: %s", exc)
 
@@ -177,12 +189,15 @@ def scan() -> AgentReport:
 # CLI
 if __name__ == "__main__":
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     report = scan()
     print(report.to_markdown())
     sev = {}
     for f in report.findings:
         sev[f.severity] = sev.get(f.severity, 0) + 1
-    print(f"\nTotal: {len(report.findings)} findings ({', '.join(f'{v} {k}' for k, v in sorted(sev.items())) or 'clean'})")
+    print(
+        f"\nTotal: {len(report.findings)} findings ({', '.join(f'{v} {k}' for k, v in sorted(sev.items())) or 'clean'})"
+    )
     if sev.get("critical", 0) or sev.get("high", 0):
         sys.exit(1)

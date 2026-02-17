@@ -71,7 +71,9 @@ class AgentReport:
     def to_markdown(self) -> str:
         lines: list[str] = []
         lines.append(f"# {self.agent} Report")
-        lines.append(f"*{self.timestamp}* — scanned in {self.scan_duration_seconds:.1f}s\n")
+        lines.append(
+            f"*{self.timestamp}* — scanned in {self.scan_duration_seconds:.1f}s\n"
+        )
 
         if not self.findings:
             lines.append("No findings.\n")
@@ -91,7 +93,9 @@ class AgentReport:
                 items = by_sev.get(sev, [])
                 if not items:
                     continue
-                lines.append(f"## {sev_icons.get(sev, '')} {sev.upper()} ({len(items)})\n")
+                lines.append(
+                    f"## {sev_icons.get(sev, '')} {sev.upper()} ({len(items)})\n"
+                )
                 for f in items:
                     loc = f"{f.file}:{f.line}" if f.file and f.line else (f.file or "")
                     lines.append(f"### [{f.id}] {f.title}")
@@ -101,7 +105,9 @@ class AgentReport:
                     if f.recommendation:
                         lines.append(f"**Recommendation:** {f.recommendation}")
                     if f.recurrence_count > 1:
-                        lines.append(f"*Seen {f.recurrence_count} times (first: {f.first_seen})*")
+                        lines.append(
+                            f"*Seen {f.recurrence_count} times (first: {f.first_seen})*"
+                        )
                     lines.append("")
 
         if self.metrics:

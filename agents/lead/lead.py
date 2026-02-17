@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from agents.shared.config import (
-    AGENTS_DIR,
     MAX_FINDINGS_PER_BRIEF,
     REPORTS_DIR,
     SEVERITY_WEIGHTS,
@@ -118,7 +116,11 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
     lines.append("### Critical (act now)")
     if critical:
         for f in critical[:2]:
-            loc = f" (`{f.file}:{f.line}`)" if f.file and f.line else (f" (`{f.file}`)" if f.file else "")
+            loc = (
+                f" (`{f.file}:{f.line}`)"
+                if f.file and f.line
+                else (f" (`{f.file}`)" if f.file else "")
+            )
             lines.append(f"- **[{f.id}]** {f.title}{loc}")
             if f.recommendation:
                 lines.append(f"  - {f.recommendation}")
@@ -131,7 +133,11 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
     attention = (high + medium)[:5]
     if attention:
         for f in attention:
-            loc = f" (`{f.file}:{f.line}`)" if f.file and f.line else (f" (`{f.file}`)" if f.file else "")
+            loc = (
+                f" (`{f.file}:{f.line}`)"
+                if f.file and f.line
+                else (f" (`{f.file}`)" if f.file else "")
+            )
             recur = f" *(seen {f.recurrence_count}x)*" if f.recurrence_count > 1 else ""
             lines.append(f"- **[{f.id}]** {f.title}{loc}{recur}")
             if f.recommendation:
@@ -147,7 +153,9 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
         healthy_notes.append("No critical findings")
     for r in reports:
         if not any(f.severity in ("critical", "high") for f in r.findings):
-            healthy_notes.append(f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)")
+            healthy_notes.append(
+                f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)"
+            )
     if not healthy_notes:
         healthy_notes.append("Some areas need attention — see above")
     for note in healthy_notes:
@@ -180,7 +188,9 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
 
     # Scan summary
     total_duration = sum(r.scan_duration_seconds for r in reports)
-    lines.append(f"- **Scan duration:** {total_duration:.1f}s across {len(reports)} agents")
+    lines.append(
+        f"- **Scan duration:** {total_duration:.1f}s across {len(reports)} agents"
+    )
     lines.append("")
 
     # Recommendations
@@ -237,7 +247,13 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
     lines.append("### Trends")
     debt_trend = learning.get_trend(AGENT_NAME, "debt_score")
     lines.append(f"- **Tech debt:** {debt_trend}")
-    for agent in ["test_engineer", "architect", "perf_monitor", "deps_manager", "doc_keeper"]:
+    for agent in [
+        "test_engineer",
+        "architect",
+        "perf_monitor",
+        "deps_manager",
+        "doc_keeper",
+    ]:
         total = learning.get_total_scans(agent)
         lines.append(f"- **{agent}:** {total} total scans")
     lines.append("")
@@ -248,7 +264,9 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
     recurring = [f for f in all_findings if f.recurrence_count >= 2]
     if recurring:
         for f in sorted(recurring, key=lambda x: -x.recurrence_count)[:5]:
-            lines.append(f"- [{f.id}] {f.title} — seen {f.recurrence_count}x since {f.first_seen}")
+            lines.append(
+                f"- [{f.id}] {f.title} — seen {f.recurrence_count}x since {f.first_seen}"
+            )
     else:
         lines.append("No recurring patterns detected yet.")
     lines.append("")
@@ -275,14 +293,17 @@ def record_brief_metrics(findings: list[Finding]) -> None:
     for f in findings:
         sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
 
-    learning.record_scan(AGENT_NAME, {
-        "debt_score": debt_score,
-        "total_findings": len(findings),
-        "critical_count": sev_counts.get("critical", 0),
-        "high_count": sev_counts.get("high", 0),
-        "medium_count": sev_counts.get("medium", 0),
-        "low_count": sev_counts.get("low", 0),
-    })
+    learning.record_scan(
+        AGENT_NAME,
+        {
+            "debt_score": debt_score,
+            "total_findings": len(findings),
+            "critical_count": sev_counts.get("critical", 0),
+            "high_count": sev_counts.get("high", 0),
+            "medium_count": sev_counts.get("medium", 0),
+            "low_count": sev_counts.get("low", 0),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +312,7 @@ def record_brief_metrics(findings: list[Finding]) -> None:
 
 if __name__ == "__main__":
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     mode = sys.argv[1] if len(sys.argv) > 1 else "daily"

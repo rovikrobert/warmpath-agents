@@ -10,7 +10,6 @@ import json
 import logging
 import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
 
 from agents.shared.config import INTEL_CACHE, INTEL_CACHE_TTL_HOURS, PROJECT_ROOT
 
@@ -72,13 +71,15 @@ def fetch_python_advisories() -> list[dict]:
             data = json.loads(result.stdout)
             for dep in data.get("dependencies", []):
                 for vuln in dep.get("vulns", []):
-                    advisories.append({
-                        "package": dep.get("name"),
-                        "installed": dep.get("version"),
-                        "advisory_id": vuln.get("id"),
-                        "description": vuln.get("description", "")[:200],
-                        "fix_versions": vuln.get("fix_versions", []),
-                    })
+                    advisories.append(
+                        {
+                            "package": dep.get("name"),
+                            "installed": dep.get("version"),
+                            "advisory_id": vuln.get("id"),
+                            "description": vuln.get("description", "")[:200],
+                            "fix_versions": vuln.get("fix_versions", []),
+                        }
+                    )
     except FileNotFoundError:
         logger.info("pip-audit not installed — skipping advisory check")
     except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
