@@ -14,10 +14,16 @@ import logging
 import sys
 from pathlib import Path
 
-# Ensure project root is on sys.path
+# Ensure project root is on sys.path and load .env
 _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(_project_root) / ".env")
+except ImportError:
+    pass
 
 from agents.shared.config import REPORTS_DIR
 from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary
