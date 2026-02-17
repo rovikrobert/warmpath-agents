@@ -365,12 +365,11 @@ def _check_security_posture(
     else:
         checks_failed.append("security_middleware")
 
-    # 2. JWT handling in app/utils/ or app/services/auth.py
+    # 2. JWT handling in app/api/auth.py or app/utils/security.py
     jwt_found = False
     for candidate in [
-        APP_DIR / "services" / "auth.py",
-        APP_DIR / "utils" / "auth.py",
-        APP_DIR / "utils" / "jwt.py",
+        APP_DIR / "api" / "auth.py",
+        APP_DIR / "utils" / "security.py",
     ]:
         content = _read_safe(candidate)
         if content and ("jwt" in content.lower() or "jose" in content.lower() or "JWT" in content):
