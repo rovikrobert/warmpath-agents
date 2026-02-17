@@ -116,14 +116,25 @@ def synthesize_daily(
 
 def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
     """Identify areas that are going well."""
+    _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
+    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
     progress: list[dict[str, Any]] = []
     for r in reports:
         critical_high = [
             f for f in r.findings if f.severity in ("critical", "high")
         ]
         if not critical_high:
+            if r.agent in _data_agents:
+                team = "data"
+            elif r.agent in _product_agents:
+                team = "product"
+            elif r.agent in _ops_agents:
+                team = "ops"
+            else:
+                team = "engineering"
             progress.append({
-                "team": "engineering",
+                "team": team,
                 "agent": r.agent,
                 "note": f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)",
             })
@@ -318,9 +329,11 @@ def synthesize_status(reports: list[AgentReport]) -> str:
     # Split reports by team
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
     _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents]
+    _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
+    ops_reports = [r for r in reports if r.agent in _ops_agents]
 
     lines.append("## Engineering")
     eng_findings = [f for r in eng_reports for f in r.findings]
@@ -376,6 +389,27 @@ def synthesize_status(reports: list[AgentReport]) -> str:
             f"{sum(1 for f in product_findings_all if f.severity in ('low', 'info'))} low"
         )
         for r in product_reports:
+            count = len(r.findings)
+            worst = "clean"
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if any(f.severity == sev for f in r.findings):
+                    worst = sev
+                    break
+            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
+        lines.append("")
+
+    if ops_reports:
+        lines.append("## Operations Team")
+        ops_findings_all = [f for r in ops_reports for f in r.findings]
+        ops_crit = sum(1 for f in ops_findings_all if f.severity == "critical")
+        ops_high = sum(1 for f in ops_findings_all if f.severity == "high")
+        lines.append(f"- Agents: {len(ops_reports)} reporting")
+        lines.append(
+            f"- Findings: {ops_crit} critical, {ops_high} high, "
+            f"{sum(1 for f in ops_findings_all if f.severity == 'medium')} medium, "
+            f"{sum(1 for f in ops_findings_all if f.severity in ('low', 'info'))} low"
+        )
+        for r in ops_reports:
             count = len(r.findings)
             worst = "clean"
             for sev in ("critical", "high", "medium", "low", "info"):

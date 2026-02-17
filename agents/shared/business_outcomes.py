@@ -48,6 +48,24 @@ CATEGORY_OUTCOME_MAP: dict[str, list[str]] = {
     "feature_coverage": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "user_research": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "product_strategy": [BILLION_DOLLAR, HELP_JOB_SEEKERS],
+    # Ops team categories
+    "coaching_effectiveness": [HELP_JOB_SEEKERS],
+    "supply_activation": [HELP_NETWORK_BUILDERS],
+    "user_satisfaction": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "marketplace_health": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    "ops_efficiency": [COST_EFFICIENCY],
+    "streaming": [HELP_JOB_SEEKERS, COST_EFFICIENCY],
+    "api_quality": [HELP_JOB_SEEKERS, BILLION_DOLLAR],
+    "error_handling": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "empty_state": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "journey_milestone": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "feedback_collection": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "coaching_quality": [HELP_JOB_SEEKERS],
+    "nh_journey": [HELP_NETWORK_BUILDERS],
+    "sharing_controls": [HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    "intro_facilitation": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "credit_economy": [HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
+    "marketplace_coverage": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS, BILLION_DOLLAR],
 }
 
 # Business impact templates by category + severity
@@ -99,6 +117,37 @@ _IMPACT_TEMPLATES: dict[str, dict[str, str]] = {
         "high": "Feature gap that prevents users from completing key workflows",
         "medium": "Feature coverage gap affecting secondary workflows",
         "low": "Minor feature enhancement opportunity",
+    },
+    # Ops team impact templates
+    "coaching_effectiveness": {
+        "critical": "Coaching service broken — job seekers get no guidance on referral strategy",
+        "high": "Coach response quality gap degrading job seeker conversion",
+        "medium": "Coaching improvement that would lift referral success rates",
+        "low": "Minor coaching quality enhancement",
+    },
+    "supply_activation": {
+        "critical": "NH journey broken — network holders cannot activate or earn from their network",
+        "high": "Supply-side gap reducing NH engagement and retention",
+        "medium": "NH experience issue affecting activation or retention",
+        "low": "Minor NH journey improvement",
+    },
+    "user_satisfaction": {
+        "critical": "User experience fundamentally broken — driving churn on both sides",
+        "high": "Satisfaction gap causing measurable drop-off in retention",
+        "medium": "Satisfaction issue affecting user NPS and engagement",
+        "low": "Minor satisfaction improvement opportunity",
+    },
+    "marketplace_health": {
+        "critical": "Marketplace economics broken — supply/demand imbalance threatens viability",
+        "high": "Marketplace health gap affecting liquidity or coverage",
+        "medium": "Marketplace metric that needs attention for healthy growth",
+        "low": "Minor marketplace optimization",
+    },
+    "ops_efficiency": {
+        "critical": "Operations overhead unsustainable at current scale",
+        "high": "Ops efficiency gap that increases manual intervention burden",
+        "medium": "Ops process that could be automated or streamlined",
+        "low": "Minor ops efficiency improvement",
     },
 }
 

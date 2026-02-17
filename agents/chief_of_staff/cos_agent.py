@@ -40,6 +40,12 @@ try:
 except ImportError:
     PRODUCT_TEAM_REPORTS_DIR = None
 
+# Ops team reports directory — resolved lazily, patchable by tests
+try:
+    from ops_team.shared.config import REPORTS_DIR as OPS_TEAM_REPORTS_DIR
+except ImportError:
+    OPS_TEAM_REPORTS_DIR = None
+
 
 # ---------------------------------------------------------------------------
 # Report loading
@@ -83,6 +89,16 @@ def _load_reports() -> list[AgentReport]:
             except (json.JSONDecodeError, OSError, KeyError, TypeError):
                 continue
 
+    # Ops team reports (if available)
+    if OPS_TEAM_REPORTS_DIR is not None and OPS_TEAM_REPORTS_DIR.is_dir():
+        for path in sorted(OPS_TEAM_REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                reports.append(AgentReport.from_dict(clean))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
     return reports
 
 
@@ -116,14 +132,18 @@ def run_daily() -> str:
     # Update learning state
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
     _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents]
+    _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
+    ops_reports = [r for r in reports if r.agent in _ops_agents]
     update_team_reliability("engineering", eng_reports)
     if data_reports:
         update_team_reliability("data", data_reports)
     if product_reports:
         update_team_reliability("product", product_reports)
+    if ops_reports:
+        update_team_reliability("ops", ops_reports)
     record_cost_snapshot(costs)
 
     return brief
