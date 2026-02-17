@@ -28,6 +28,12 @@ from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
 
 logger = logging.getLogger(__name__)
 
+# Data team reports directory — resolved lazily, patchable by tests
+try:
+    from data_team.shared.config import REPORTS_DIR as DATA_TEAM_REPORTS_DIR
+except ImportError:
+    DATA_TEAM_REPORTS_DIR = None
+
 
 # ---------------------------------------------------------------------------
 # Report loading
@@ -35,16 +41,32 @@ logger = logging.getLogger(__name__)
 
 
 def _load_reports() -> list[AgentReport]:
-    """Load cached *_latest.json reports from REPORTS_DIR."""
+    """Load cached *_latest.json reports from REPORTS_DIR and data team."""
     reports: list[AgentReport] = []
-    if not REPORTS_DIR.is_dir():
-        return reports
-    for path in sorted(REPORTS_DIR.glob("*_latest.json")):
-        try:
-            data = json.loads(path.read_text())
-            reports.append(AgentReport.from_dict(data))
-        except (json.JSONDecodeError, OSError, KeyError, TypeError):
-            continue
+
+    # Engineering reports
+    if REPORTS_DIR.is_dir():
+        for path in sorted(REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                reports.append(AgentReport.from_dict(data))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
+    # Data team reports (if available)
+    if DATA_TEAM_REPORTS_DIR is not None and DATA_TEAM_REPORTS_DIR.is_dir():
+        _AR_FIELDS = {
+            "agent", "timestamp", "scan_duration_seconds",
+            "findings", "metrics", "intelligence_applied", "learning_updates",
+        }
+        for path in sorted(DATA_TEAM_REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                reports.append(AgentReport.from_dict(clean))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
     return reports
 
 
@@ -76,7 +98,11 @@ def run_daily() -> str:
     brief = synthesize_daily(reports, kpi_snapshot, costs, alerts)
 
     # Update learning state
-    update_team_reliability("engineering", reports)
+    eng_reports = [r for r in reports if r.agent not in ("pipeline", "analyst", "model_engineer", "data_lead")]
+    data_reports = [r for r in reports if r.agent in ("pipeline", "analyst", "model_engineer", "data_lead")]
+    update_team_reliability("engineering", eng_reports)
+    if data_reports:
+        update_team_reliability("data", data_reports)
     record_cost_snapshot(costs)
 
     return brief

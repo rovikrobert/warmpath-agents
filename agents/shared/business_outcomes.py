@@ -36,6 +36,12 @@ CATEGORY_OUTCOME_MAP: dict[str, list[str]] = {
     "ai_matching": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "marketplace": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "csv_processing": [HELP_NETWORK_BUILDERS, COST_EFFICIENCY],
+    # Data team categories
+    "data_quality": [HELP_JOB_SEEKERS, BILLION_DOLLAR],
+    "instrumentation": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "model_calibration": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "schema_coverage": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "privacy_compliance": [HELP_JOB_SEEKERS, BILLION_DOLLAR],
 }
 
 # Business impact templates by category + severity
@@ -63,6 +69,18 @@ _IMPACT_TEMPLATES: dict[str, dict[str, str]] = {
         "high": "Insufficient coverage on key features",
         "medium": "Test quality issue that increases regression risk",
         "low": "Test improvement opportunity",
+    },
+    "data_quality": {
+        "critical": "Data integrity risk — analytics decisions based on incorrect/incomplete data",
+        "high": "Data quality gap that will produce misleading metrics when analytics goes live",
+        "medium": "Data quality issue to fix before scaling analytics",
+        "low": "Data hygiene improvement",
+    },
+    "model_calibration": {
+        "critical": "Warm score unreliable — job seekers routed to wrong contacts, destroying trust",
+        "high": "Model calibration gap that degrades match quality for job seekers",
+        "medium": "Calibration opportunity that would improve referral success rates",
+        "low": "Minor model tuning opportunity",
     },
 }
 

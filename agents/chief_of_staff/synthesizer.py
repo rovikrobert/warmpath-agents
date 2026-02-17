@@ -315,15 +315,23 @@ def synthesize_status(reports: list[AgentReport]) -> str:
     medium = sev_counts.get("medium", 0)
     low = sev_counts.get("low", 0) + sev_counts.get("info", 0)
 
+    # Split reports by team
+    _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents]
+    data_reports = [r for r in reports if r.agent in _data_agents]
+
     lines.append("## Engineering")
-    lines.append(f"- Agents: {len(reports)} reporting")
+    eng_findings = [f for r in eng_reports for f in r.findings]
+    eng_crit = sum(1 for f in eng_findings if f.severity == "critical")
+    eng_high = sum(1 for f in eng_findings if f.severity == "high")
+    lines.append(f"- Agents: {len(eng_reports)} reporting")
     lines.append(
-        f"- Findings: {critical} critical, {high} high, "
-        f"{medium} medium, {low} low"
+        f"- Findings: {eng_crit} critical, {eng_high} high, "
+        f"{sum(1 for f in eng_findings if f.severity == 'medium')} medium, "
+        f"{sum(1 for f in eng_findings if f.severity in ('low', 'info'))} low"
     )
 
-    # Per-agent one-liner
-    for r in reports:
+    for r in eng_reports:
         count = len(r.findings)
         worst = "clean"
         for sev in ("critical", "high", "medium", "low", "info"):
@@ -331,8 +339,28 @@ def synthesize_status(reports: list[AgentReport]) -> str:
                 worst = sev
                 break
         lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-
     lines.append("")
+
+    if data_reports:
+        lines.append("## Data Team")
+        data_findings_all = [f for r in data_reports for f in r.findings]
+        data_crit = sum(1 for f in data_findings_all if f.severity == "critical")
+        data_high = sum(1 for f in data_findings_all if f.severity == "high")
+        lines.append(f"- Agents: {len(data_reports)} reporting")
+        lines.append(
+            f"- Findings: {data_crit} critical, {data_high} high, "
+            f"{sum(1 for f in data_findings_all if f.severity == 'medium')} medium, "
+            f"{sum(1 for f in data_findings_all if f.severity in ('low', 'info'))} low"
+        )
+        for r in data_reports:
+            count = len(r.findings)
+            worst = "clean"
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if any(f.severity == sev for f in r.findings):
+                    worst = sev
+                    break
+            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
+        lines.append("")
 
     # Active teams
     active = [
