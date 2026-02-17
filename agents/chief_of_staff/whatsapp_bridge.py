@@ -42,6 +42,7 @@ class WhatsAppBridge:
         brief_data: dict[str, Any],
         costs: dict[str, Any],
         alerts: list[str],
+        notion_page_id: str = "",
     ) -> dict[str, Any]:
         """Generate and send the morning brief from synthesized data.
 
@@ -49,6 +50,7 @@ class WhatsAppBridge:
             brief_data: FounderBrief-like dict with decisions_needed, etc.
             costs: Cost summary from get_team_cost_summary()
             alerts: Budget alerts from check_budget_alerts()
+            notion_page_id: Notion page ID from push_daily_brief (for clickable link)
         """
         today = datetime.now(timezone.utc)
         date_str = today.strftime("%b %d")
@@ -65,12 +67,16 @@ class WhatsAppBridge:
         total_cost = costs.get("total_estimated_cost_usd", 0)
         cost_str = f"${total_cost:.2f}/day"
 
+        # Build Notion URL if page was synced
+        notion_url = WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
+
         # Generate the message
         message = self._formatter.morning_brief(
             date=date_str,
             team_status=team_status,
             decisions_needed=decisions,
             cost_yesterday=cost_str,
+            notion_url=notion_url,
         )
 
         # Append cost alert if any
@@ -123,8 +129,10 @@ class WhatsAppBridge:
         self,
         week_num: int,
         metrics: dict[str, Any],
+        notion_page_id: str = "",
     ) -> dict[str, Any]:
         """Generate and send the weekly summary (Sunday 8 PM SGT)."""
+        notion_url = WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
         message = self._formatter.weekly_summary(
             week_num=week_num,
             users_active=metrics.get("users_active", 0),
@@ -136,6 +144,7 @@ class WhatsAppBridge:
             daily_avg=metrics.get("daily_avg", "$0/day"),
             top_win=metrics.get("top_win", "No notable wins"),
             top_risk=metrics.get("top_risk", "No notable risks"),
+            notion_url=notion_url,
         )
         result = self._formatter.send(message, msg_type="weekly")
         logger.info("Weekly summary generated: %s", result.get("file"))

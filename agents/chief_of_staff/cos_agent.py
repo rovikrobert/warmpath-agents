@@ -218,10 +218,11 @@ def _push_daily_outputs(
             break
 
     # Notion sync
+    notion_page_id = ""
     try:
         notion = NotionSync()
         if notion.enabled:
-            notion.push_daily_brief(
+            result = notion.push_daily_brief(
                 date=today,
                 headline=headline,
                 team_status={},
@@ -230,17 +231,18 @@ def _push_daily_outputs(
                 cost_yesterday=f"${total_cost:.2f}",
                 brief_markdown=brief,
             )
+            notion_page_id = result.get("page_id", "")
     except Exception:
         logger.debug("Notion sync skipped (not configured or error)")
 
-    # WhatsApp message
+    # WhatsApp message (includes Notion link if available)
     try:
         wa = WhatsAppBridge()
         brief_data = {
             "decisions_needed": [],
             "progress": [],
         }
-        wa.generate_morning_brief(brief_data, costs, alerts)
+        wa.generate_morning_brief(brief_data, costs, alerts, notion_page_id=notion_page_id)
     except Exception:
         logger.debug("WhatsApp message generation skipped")
 

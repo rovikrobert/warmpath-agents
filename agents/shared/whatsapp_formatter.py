@@ -37,6 +37,11 @@ class WhatsAppFormatter:
     def twilio_enabled(self) -> bool:
         return self._twilio_enabled
 
+    @staticmethod
+    def notion_url(page_id: str) -> str:
+        """Convert a Notion page ID to a clickable URL."""
+        return f"https://notion.so/{page_id.replace('-', '')}"
+
     # -----------------------------------------------------------------
     # Message templates
     # -----------------------------------------------------------------
@@ -47,6 +52,7 @@ class WhatsAppFormatter:
         team_status: dict[str, dict[str, str]],
         decisions_needed: list[str],
         cost_yesterday: str,
+        notion_url: str = "",
     ) -> str:
         """Generate the daily morning brief (8 AM SGT).
 
@@ -55,6 +61,7 @@ class WhatsAppFormatter:
             team_status: {team: {"status": "green/yellow/red", "summary": "..."}}
             decisions_needed: List of decision strings
             cost_yesterday: Cost string (e.g., "$2.40/day")
+            notion_url: Optional Notion page URL for the full brief
         """
         status_icon = {"green": "[G]", "yellow": "[Y]", "red": "[R]"}
         lines = [f"WarmPath Daily — {date}", ""]
@@ -72,7 +79,12 @@ class WhatsAppFormatter:
                 lines.append(f"{i}. {d}")
             lines.append("")
             replies = ", ".join(f"{i}=yes" for i in range(1, min(len(decisions_needed), 4) + 1))
-            lines.append(f"Reply {replies}, or details in Notion")
+            detail_link = notion_url if notion_url else "Notion"
+            lines.append(f"Reply {replies}, or details: {detail_link}")
+
+        if notion_url and not decisions_needed:
+            lines.append("")
+            lines.append(f"Full brief: {notion_url}")
 
         return "\n".join(lines)
 
@@ -126,8 +138,10 @@ class WhatsAppFormatter:
         daily_avg: str,
         top_win: str,
         top_risk: str,
+        notion_url: str = "",
     ) -> str:
         """Generate the weekly summary (Sunday 8 PM SGT)."""
+        report_link = notion_url if notion_url else "Notion"
         return "\n".join([
             f"Week {week_num} Summary",
             "",
@@ -139,7 +153,7 @@ class WhatsAppFormatter:
             f"Top win: {top_win}",
             f"Top risk: {top_risk}",
             "",
-            "Full report in Notion",
+            f"Full report: {report_link}",
         ])
 
     def feature_shipped(
