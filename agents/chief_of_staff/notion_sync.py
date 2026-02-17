@@ -236,6 +236,7 @@ class NotionSync:
 
         if result.get("id"):
             self._state["last_daily_sync"] = date
+            self._state["last_daily_page_id"] = result["id"]
             self._save_state()
             logger.info("Daily brief synced to Notion: %s", result["id"])
             return {"synced": True, "page_id": result["id"]}

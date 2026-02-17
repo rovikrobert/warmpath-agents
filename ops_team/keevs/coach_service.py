@@ -5,6 +5,7 @@ credits, market trends) into a context snapshot, then generates personalized
 briefings and chat responses via Claude (or deterministic mocks).
 """
 
+import asyncio
 import json
 import logging
 import uuid
@@ -58,17 +59,103 @@ CONTEXT: You receive the user's data as a JSON snapshot. Use it to give personal
 # ---------------------------------------------------------------------------
 
 
+_CONTEXT_CACHE: dict[str, tuple[float, dict]] = {}
+_CONTEXT_CACHE_TTL = 300  # 5 minutes
+
+
 async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    """Build a context snapshot from all user data sources."""
+    """Build a context snapshot from all user data sources.
 
-    # 1. User + ConnectorProfile
-    result = await db.execute(
-        select(User)
-        .options(selectinload(User.connector_profile))
-        .where(User.id == user_id)
+    Cached for 5 minutes to avoid re-running 7 queries on every chat message.
+    Queries run in parallel via asyncio.gather for lower latency.
+    """
+    cache_key = str(user_id)
+    now_ts = datetime.now(timezone.utc).timestamp()
+
+    # Return cached context if fresh
+    if cache_key in _CONTEXT_CACHE:
+        cached_ts, cached_ctx = _CONTEXT_CACHE[cache_key]
+        if now_ts - cached_ts < _CONTEXT_CACHE_TTL:
+            return cached_ctx
+
+    # --- Run independent queries in parallel ---
+
+    async def _fetch_user():
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.connector_profile))
+            .where(User.id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def _fetch_prefs():
+        result = await db.execute(
+            select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def _fetch_pipeline():
+        result = await db.execute(
+            select(Application.status, func.count(Application.id))
+            .where(
+                Application.user_id == user_id,
+                Application.deleted_at.is_(None),
+            )
+            .group_by(Application.status)
+        )
+        return {row[0]: row[1] for row in result.all()}
+
+    async def _fetch_followups():
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(func.count(Application.id)).where(
+                Application.user_id == user_id,
+                Application.deleted_at.is_(None),
+                Application.follow_up_at.isnot(None),
+                Application.follow_up_at <= now,
+                Application.status.notin_(["rejected", "withdrawn", "offer_accepted"]),
+            )
+        )
+        return result.scalar() or 0
+
+    async def _fetch_searches():
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=30)
+        result = await db.execute(
+            select(SearchRequest.name, SearchRequest.status, SearchRequest.created_at)
+            .where(
+                SearchRequest.user_id == user_id,
+                SearchRequest.deleted_at.is_(None),
+                SearchRequest.created_at >= cutoff,
+            )
+            .order_by(SearchRequest.created_at.desc())
+            .limit(5)
+        )
+        return [
+            {
+                "name": row[0],
+                "status": row[1],
+                "created_at": row[2].isoformat() if row[2] else None,
+            }
+            for row in result.all()
+        ]
+
+    async def _fetch_credits():
+        return await get_balance(user_id, db)
+
+    # Run all 6 fast queries in parallel
+    user, prefs, status_counts, follow_ups_needed, recent_searches, credit_balance = (
+        await asyncio.gather(
+            _fetch_user(),
+            _fetch_prefs(),
+            _fetch_pipeline(),
+            _fetch_followups(),
+            _fetch_searches(),
+            _fetch_credits(),
+        )
     )
-    user = result.scalar_one_or_none()
 
+    # Build user context
     user_ctx: dict = {"name": None, "title": None, "company": None, "location": None}
     if user:
         user_ctx["name"] = user.full_name
@@ -77,12 +164,6 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
             user_ctx["title"] = profile.current_title
             user_ctx["company"] = profile.current_company
             user_ctx["location"] = profile.location
-
-    # 2. UserJobPreferences
-    prefs_result = await db.execute(
-        select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
-    )
-    prefs = prefs_result.scalar_one_or_none()
 
     prefs_ctx: dict | None = None
     if prefs:
@@ -95,85 +176,34 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
             "job_search_status": prefs.job_search_status,
         }
 
-    # 3. Network summary (reuse dashboard_insights)
+    # Network analysis — run separately (heavier, accesses dashboard_insights)
     network_ctx: dict | None = None
     try:
         network_ctx = await _get_network_analysis(user_id, db, prefs)
     except Exception:
         logger.exception("Coach: failed to get network analysis for %s", user_id)
 
-    # 4. Application pipeline
-    pipeline_result = await db.execute(
-        select(Application.status, func.count(Application.id))
-        .where(
-            Application.user_id == user_id,
-            Application.deleted_at.is_(None),
-        )
-        .group_by(Application.status)
-    )
-    status_counts = {row[0]: row[1] for row in pipeline_result.all()}
-    total_apps = sum(status_counts.values())
-
-    # Count follow-ups needed
-    now = datetime.now(timezone.utc)
-    followup_result = await db.execute(
-        select(func.count(Application.id)).where(
-            Application.user_id == user_id,
-            Application.deleted_at.is_(None),
-            Application.follow_up_at.isnot(None),
-            Application.follow_up_at <= now,
-            Application.status.notin_(["rejected", "withdrawn", "offer_accepted"]),
-        )
-    )
-    follow_ups_needed = followup_result.scalar() or 0
-
     pipeline_ctx = {
         "status_counts": status_counts,
         "follow_ups_needed": follow_ups_needed,
-        "total": total_apps,
+        "total": sum(status_counts.values()),
     }
 
-    # 5. Recent searches (last 5, within 30 days)
-    cutoff = now - timedelta(days=30)
-    searches_result = await db.execute(
-        select(SearchRequest.name, SearchRequest.status, SearchRequest.created_at)
-        .where(
-            SearchRequest.user_id == user_id,
-            SearchRequest.deleted_at.is_(None),
-            SearchRequest.created_at >= cutoff,
-        )
-        .order_by(SearchRequest.created_at.desc())
-        .limit(5)
-    )
-    recent_searches = [
-        {
-            "name": row[0],
-            "status": row[1],
-            "created_at": row[2].isoformat() if row[2] else None,
-        }
-        for row in searches_result.all()
-    ]
+    # Skip market trends in chat context (expensive, only needed for briefing)
+    # Briefing already caches its own result via generate_briefing()
 
-    # 6. Credit balance
-    credit_balance = await get_balance(user_id, db)
-
-    # 7. Market trends (reuse dashboard_insights, needs prefs)
-    market_ctx: dict | None = None
-    if prefs and prefs.target_role:
-        try:
-            market_ctx = await _get_job_market_trends(prefs, user_id, db)
-        except Exception:
-            logger.exception("Coach: failed to get market trends for %s", user_id)
-
-    return {
+    context = {
         "user": user_ctx,
         "preferences": prefs_ctx,
         "network": network_ctx,
         "pipeline": pipeline_ctx,
         "recent_searches": recent_searches,
         "credits": credit_balance,
-        "market": market_ctx,
+        "market": None,
     }
+
+    _CONTEXT_CACHE[cache_key] = (now_ts, context)
+    return context
 
 
 # ---------------------------------------------------------------------------

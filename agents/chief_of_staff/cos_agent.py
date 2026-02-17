@@ -35,6 +35,8 @@ from .notion_sync import NotionSync
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
 from .whatsapp_bridge import WhatsAppBridge
 
+from agents.shared.whatsapp_formatter import WHATSAPP_DIR
+
 logger = logging.getLogger(__name__)
 
 # Data team reports directory — resolved lazily, patchable by tests
@@ -204,7 +206,11 @@ def run_daily() -> str:
 def _push_daily_outputs(
     brief: str, costs: dict, alerts: list[str]
 ) -> None:
-    """Push daily brief to Notion and generate WhatsApp message (best-effort)."""
+    """Push daily brief to Notion and generate WhatsApp message (best-effort).
+
+    Idempotent: skips if today's brief has already been pushed (prevents
+    duplicate Notion pages and WhatsApp spam from multiple deploys/triggers).
+    """
     from datetime import datetime, timezone
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -217,25 +223,34 @@ def _push_daily_outputs(
             headline = line.lstrip("# ").strip()
             break
 
-    # Notion sync
+    # Notion sync (skip if already pushed today)
     notion_page_id = ""
     try:
         notion = NotionSync()
         if notion.enabled:
-            result = notion.push_daily_brief(
-                date=today,
-                headline=headline,
-                team_status={},
-                decisions_needed=[],
-                blockers=[],
-                cost_yesterday=f"${total_cost:.2f}",
-                brief_markdown=brief,
-            )
-            notion_page_id = result.get("page_id", "")
+            if notion._state.get("last_daily_sync") == today:
+                logger.info("Daily brief already synced to Notion for %s — skipping", today)
+                notion_page_id = notion._state.get("last_daily_page_id", "")
+            else:
+                result = notion.push_daily_brief(
+                    date=today,
+                    headline=headline,
+                    team_status={},
+                    decisions_needed=[],
+                    blockers=[],
+                    cost_yesterday=f"${total_cost:.2f}",
+                    brief_markdown=brief,
+                )
+                notion_page_id = result.get("page_id", "")
     except Exception:
         logger.debug("Notion sync skipped (not configured or error)")
 
-    # WhatsApp message (includes Notion link if available)
+    # WhatsApp message — skip if already sent today
+    wa_marker = WHATSAPP_DIR / f"whatsapp-daily-{today}.txt"
+    if wa_marker.exists():
+        logger.info("Daily WhatsApp already sent for %s — skipping", today)
+        return
+
     try:
         wa = WhatsAppBridge()
         brief_data = {
@@ -257,18 +272,24 @@ def run_weekly() -> str:
     costs = get_team_cost_summary(reports)
     brief = synthesize_weekly(reports, kpi_snapshot, costs)
 
-    # Push weekly WhatsApp summary (best-effort)
-    try:
-        wa = WhatsAppBridge()
-        wa.generate_weekly_summary(
-            week_num=_current_week_number(),
-            metrics={
-                "weekly_cost": f"${costs.get('total_estimated_cost_usd', 0) * 7:.2f}",
-                "daily_avg": f"${costs.get('total_estimated_cost_usd', 0):.2f}/day",
-            },
-        )
-    except Exception:
-        logger.debug("Weekly WhatsApp summary skipped")
+    # Push weekly WhatsApp summary (best-effort, skip if already sent this week)
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    wa_weekly_marker = WHATSAPP_DIR / f"whatsapp-weekly-{today}.txt"
+    if wa_weekly_marker.exists():
+        logger.info("Weekly WhatsApp already sent for %s — skipping", today)
+    else:
+        try:
+            wa = WhatsAppBridge()
+            wa.generate_weekly_summary(
+                week_num=_current_week_number(),
+                metrics={
+                    "weekly_cost": f"${costs.get('total_estimated_cost_usd', 0) * 7:.2f}",
+                    "daily_avg": f"${costs.get('total_estimated_cost_usd', 0):.2f}/day",
+                },
+            )
+        except Exception:
+            logger.debug("Weekly WhatsApp summary skipped")
 
     return brief
 
