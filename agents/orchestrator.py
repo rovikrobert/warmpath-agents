@@ -108,6 +108,41 @@ def cmd_all(skip_tests: bool = False) -> None:
     all_findings = merge_reports(reports)
     record_brief_metrics(all_findings)
 
+    # Record health snapshot
+    try:
+        from agents.shared.learning import get_learning_state
+        from agents.shared.config import SEVERITY_WEIGHTS, HEALTH_WEIGHTS
+
+        sev_counts: dict[str, int] = {}
+        for f in all_findings:
+            sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
+
+        # Compute health score (100 - weighted penalty)
+        penalty = sum(
+            SEVERITY_WEIGHTS.get(sev, 0) * count
+            for sev, count in sev_counts.items()
+        )
+        health_score = max(0.0, 100.0 - penalty)
+
+        lead_ls = get_learning_state("lead")
+        lead_ls.record_health_snapshot(health_score, sev_counts)
+        logger.info("Recorded health snapshot: %.1f", health_score)
+    except Exception as exc:
+        logger.warning("Failed to record health snapshot: %s", exc)
+
+    # Check intel freshness
+    try:
+        from agents.shared.config import INTEL_REFRESH_ON_SCAN
+        if INTEL_REFRESH_ON_SCAN:
+            from agents.shared.intelligence import ExternalIntelligence
+            ei = ExternalIntelligence()
+            freshness = ei.check_freshness()
+            stale = [k for k, v in freshness.items() if not v]
+            if stale:
+                logger.info("Stale intel categories: %s", ", ".join(stale[:5]))
+    except Exception:
+        pass
+
     # Generate and print brief
     brief = generate_daily_brief(reports)
     print("\n" + brief)
@@ -160,6 +195,144 @@ def cmd_intel_update() -> None:
     print(f"  Framework updates: {len(intel.get('framework_updates', []))} items")
 
 
+def cmd_intel_report() -> None:
+    """Print intel inventory, urgent items, and freshness status."""
+    from agents.shared.intelligence import ExternalIntelligence, INTEL_CATEGORIES
+
+    ei = ExternalIntelligence()
+    freshness = ei.check_freshness()
+    urgent = ei.get_urgent()
+    unadopted = ei.get_unadopted()
+
+    print("## Intelligence Report\n")
+
+    print("### Freshness Status")
+    for cat, is_fresh in sorted(freshness.items()):
+        status = "fresh" if is_fresh else "STALE"
+        ttl = INTEL_CATEGORIES.get(cat, {}).get("refresh_hours", "?")
+        print(f"  {cat}: {status} (TTL: {ttl}h)")
+    print()
+
+    print(f"### Urgent Items ({len(urgent)})")
+    if urgent:
+        for item in urgent:
+            print(f"  [{item.severity.upper()}] {item.title} ({item.category})")
+    else:
+        print("  None.")
+    print()
+
+    print(f"### Unadopted ({len(unadopted)})")
+    if unadopted:
+        for item in unadopted[:10]:
+            print(f"  - {item.title} ({item.category})")
+        if len(unadopted) > 10:
+            print(f"  ... and {len(unadopted) - 10} more")
+    else:
+        print("  All items adopted.")
+
+
+def cmd_learning_report() -> None:
+    """Print meta-learning summary for all agents."""
+    from agents.shared.learning import get_learning_state
+    from agents.shared.config import AGENT_NAMES
+
+    print("## Learning Report\n")
+
+    for agent in AGENT_NAMES + ["lead"]:
+        ls = get_learning_state(agent)
+        meta = ls.generate_meta_learning_report()
+
+        total_scans = meta.get("total_scans", 0)
+        if total_scans == 0:
+            continue
+
+        print(f"### {agent} ({total_scans} scans)")
+        print(f"  Findings tracked: {meta['total_findings_tracked']}")
+
+        # Health
+        trajectory = meta.get("health_trajectory", "insufficient_data")
+        if trajectory != "insufficient_data":
+            print(f"  Health trend: {trajectory}")
+
+        # Fix effectiveness
+        fix_rate = meta.get("fix_effectiveness_rate")
+        if fix_rate is not None:
+            print(f"  Fix effectiveness: {fix_rate:.0%}")
+
+        # Tool reliability
+        tool_rel = meta.get("tool_reliability", {})
+        if tool_rel:
+            rel_str = ", ".join(f"{t}: {r:.0%}" for t, r in tool_rel.items())
+            print(f"  Tool reliability: {rel_str}")
+
+        # Escalated patterns
+        escalated = meta.get("escalated_patterns", [])
+        if escalated:
+            print(f"  Escalated patterns: {len(escalated)}")
+            for p in escalated[:3]:
+                print(f"    - {p.get('category')}: {p.get('file', '?')} ({p.get('count')}x)")
+
+        # Systemic
+        systemic = meta.get("systemic_patterns", [])
+        if systemic:
+            print(f"  Systemic patterns: {len(systemic)}")
+
+        print()
+
+
+def cmd_research_agenda() -> None:
+    """Print prioritized research questions."""
+    from agents.shared.intelligence import ExternalIntelligence
+
+    ei = ExternalIntelligence()
+    agenda = ei.generate_research_agenda()
+
+    print("## Research Agenda\n")
+    if not agenda:
+        print("All intelligence categories are fresh. No research needed.")
+        return
+
+    for i, item in enumerate(agenda, 1):
+        priority = item.get("priority", "medium").upper()
+        print(f"{i}. [{priority}] {item['question']}")
+        print(f"   Source: {item['source']}")
+        agents_str = ", ".join(item.get("relevant_agents", []))
+        print(f"   Relevant agents: {agents_str}")
+        print()
+
+
+def cmd_health_trend() -> None:
+    """Print codebase health score timeline."""
+    from agents.shared.learning import get_learning_state
+
+    ls = get_learning_state("lead")
+    history = ls.state.get("codebase_health_history", [])
+
+    print("## Codebase Health Trend\n")
+
+    if not history:
+        print("No health snapshots recorded yet.")
+        print("Run `--all` to generate the first health snapshot.")
+        return
+
+    trajectory = ls.get_health_trajectory()
+    print(f"Trajectory: **{trajectory}**\n")
+
+    print("| Date       | Score | Critical | High | Medium | Low  |")
+    print("|------------|-------|----------|------|--------|------|")
+    for snap in history[-15:]:  # last 15 entries
+        ts = snap.get("timestamp", "")[:10]
+        score = snap.get("score", 0)
+        counts = snap.get("finding_counts", {})
+        print(
+            f"| {ts} | {score:5.1f} "
+            f"| {counts.get('critical', 0):8} "
+            f"| {counts.get('high', 0):4} "
+            f"| {counts.get('medium', 0):6} "
+            f"| {counts.get('low', 0):4} |"
+        )
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -183,6 +356,18 @@ def main() -> None:
     group.add_argument("--kpis", action="store_true", help="KPI dashboard from cached reports")
     group.add_argument(
         "--intel-update", action="store_true", help="Refresh intelligence cache"
+    )
+    group.add_argument(
+        "--intel-report", action="store_true", help="Intelligence inventory + freshness"
+    )
+    group.add_argument(
+        "--learning-report", action="store_true", help="Meta-learning summary for all agents"
+    )
+    group.add_argument(
+        "--research-agenda", action="store_true", help="Prioritized research questions"
+    )
+    group.add_argument(
+        "--health-trend", action="store_true", help="Codebase health score timeline"
     )
     group.add_argument(
         "--cos-daily", action="store_true", help="Chief of Staff daily brief"
@@ -219,6 +404,14 @@ def main() -> None:
         cmd_kpis()
     elif args.intel_update:
         cmd_intel_update()
+    elif args.intel_report:
+        cmd_intel_report()
+    elif args.learning_report:
+        cmd_learning_report()
+    elif args.research_agenda:
+        cmd_research_agenda()
+    elif args.health_trend:
+        cmd_health_trend()
     elif args.cos_daily:
         from agents.chief_of_staff.cos_agent import run_daily
         print(run_daily())

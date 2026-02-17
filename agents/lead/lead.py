@@ -222,6 +222,98 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
         lines.append(f"- {rec}")
     lines.append("")
 
+    # Learning Updates (never breaks the brief)
+    try:
+        from agents.shared.learning import get_learning_state, AgentLearningState
+
+        lead_ls = get_learning_state(AGENT_NAME)
+        meta = lead_ls.generate_meta_learning_report()
+
+        lines.append("### Learning Updates")
+
+        # Codebase health
+        trajectory = meta.get("health_trajectory", "insufficient_data")
+        lines.append(f"- **Codebase health trend:** {trajectory}")
+
+        # Hot spots
+        hot_spots = meta.get("hot_spots", [])
+        if hot_spots:
+            top = hot_spots[:3]
+            spots_str = ", ".join(
+                f"`{h['file']}` ({h['weight']:.1f})" for h in top
+            )
+            lines.append(f"- **Hot spots:** {spots_str}")
+
+        # Fix effectiveness
+        fix_rate = meta.get("fix_effectiveness_rate")
+        if fix_rate is not None:
+            lines.append(
+                f"- **Fix effectiveness:** {fix_rate:.0%} "
+                f"(sampled {meta.get('fix_records_sampled', 0)} resolutions)"
+            )
+
+        # Tool reliability
+        tool_rel = meta.get("tool_reliability", {})
+        if tool_rel:
+            rel_str = ", ".join(f"{t}: {r:.0%}" for t, r in tool_rel.items())
+            lines.append(f"- **Tool reliability:** {rel_str}")
+
+        # Severity calibration insight
+        sev_cal = meta.get("severity_calibration", {})
+        if sev_cal:
+            total_overrides = sum(v.get("overridden", 0) for v in sev_cal.values())
+            total_assessed = sum(v.get("total", 0) for v in sev_cal.values())
+            if total_assessed > 0:
+                lines.append(
+                    f"- **Severity calibration:** {total_overrides}/{total_assessed} "
+                    f"overridden ({total_overrides/total_assessed:.0%})"
+                )
+
+        # Recurring patterns
+        escalated = meta.get("escalated_patterns", [])
+        if escalated:
+            top_esc = escalated[:2]
+            for p in top_esc:
+                lines.append(
+                    f"- **Recurring:** {p.get('category', '?')} "
+                    f"in `{p.get('file', '?')}` ({p.get('count', 0)}x"
+                    f"{', systemic' if p.get('systemic') else ''})"
+                )
+
+        lines.append("")
+    except Exception:
+        pass
+
+    # External Intelligence (never breaks the brief)
+    try:
+        from agents.shared.intelligence import ExternalIntelligence
+
+        ei = ExternalIntelligence()
+
+        urgent = ei.get_urgent()
+        unadopted = ei.get_unadopted()
+        agenda = ei.generate_research_agenda()
+
+        if urgent or unadopted or agenda:
+            lines.append("### External Intelligence")
+
+            if urgent:
+                for item in urgent[:3]:
+                    lines.append(
+                        f"- **[{item.severity.upper()}]** {item.title} ({item.category})"
+                    )
+
+            if unadopted:
+                lines.append(f"- **Unadopted practices:** {len(unadopted)} pending review")
+
+            if agenda:
+                for a in agenda[:2]:
+                    lines.append(f"- **Research needed:** {a['question']}")
+
+            lines.append("")
+    except Exception:
+        pass
+
     # Low-priority items (collapsed)
     if low:
         lines.append(f"<details><summary>{len(low)} low-priority items</summary>\n")
@@ -287,6 +379,89 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
         for note in r.intelligence_applied:
             lines.append(f"- [{r.agent}] {note}")
     lines.append("")
+
+    # Learning Deep Dive (never breaks the weekly report)
+    try:
+        from agents.shared.learning import get_learning_state
+        from agents.shared.config import AGENT_NAMES
+
+        lines.append("### Learning Deep Dive")
+
+        # Health trajectory table
+        lead_ls = get_learning_state(AGENT_NAME)
+        health_history = lead_ls.state.get("codebase_health_history", [])
+        if health_history:
+            lines.append("")
+            lines.append("**Health Score Trajectory** (last 4 snapshots)")
+            lines.append("")
+            lines.append("| Date | Score | Critical | High | Medium | Low |")
+            lines.append("|------|-------|----------|------|--------|-----|")
+            for snap in health_history[-4:]:
+                ts = snap.get("timestamp", "")[:10]
+                score = snap.get("score", 0)
+                counts = snap.get("finding_counts", {})
+                lines.append(
+                    f"| {ts} | {score:.0f} "
+                    f"| {counts.get('critical', 0)} "
+                    f"| {counts.get('high', 0)} "
+                    f"| {counts.get('medium', 0)} "
+                    f"| {counts.get('low', 0)} |"
+                )
+            lines.append("")
+
+        # Severity calibration table
+        meta = lead_ls.generate_meta_learning_report()
+        sev_cal = meta.get("severity_calibration", {})
+        if sev_cal:
+            lines.append("**Severity Calibration**")
+            lines.append("")
+            lines.append("| Severity | Total | Overridden | Override Rate |")
+            lines.append("|----------|-------|------------|--------------|")
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if sev in sev_cal:
+                    data = sev_cal[sev]
+                    total = data.get("total", 0)
+                    overridden = data.get("overridden", 0)
+                    rate = f"{overridden/total:.0%}" if total > 0 else "n/a"
+                    lines.append(f"| {sev} | {total} | {overridden} | {rate} |")
+            lines.append("")
+
+        # Tool reliability table
+        tool_rel = meta.get("tool_reliability", {})
+        if tool_rel:
+            lines.append("**Tool Reliability**")
+            lines.append("")
+            lines.append("| Tool | Reliability |")
+            lines.append("|------|------------|")
+            for tool, score in sorted(tool_rel.items(), key=lambda x: x[1]):
+                lines.append(f"| {tool} | {score:.0%} |")
+            lines.append("")
+
+        # Fix effectiveness
+        fix_rate = meta.get("fix_effectiveness_rate")
+        if fix_rate is not None:
+            lines.append(
+                f"**Fix Effectiveness Rate:** {fix_rate:.0%} "
+                f"(from {meta.get('fix_records_sampled', 0)} sampled resolutions)"
+            )
+            lines.append("")
+
+        # Attention weight evolution (top 5)
+        hot_spots = meta.get("hot_spots", [])
+        if hot_spots:
+            lines.append("**Attention Hot Spots** (top 5 files)")
+            lines.append("")
+            lines.append("| File | Weight | Reason |")
+            lines.append("|------|--------|--------|")
+            for h in hot_spots[:5]:
+                lines.append(
+                    f"| `{h['file']}` | {h['weight']:.2f} | {h.get('reason', '')} |"
+                )
+            lines.append("")
+
+        lines.append("")
+    except Exception:
+        pass
 
     # KPI trends (supplementary — don't break the weekly report if it fails)
     try:

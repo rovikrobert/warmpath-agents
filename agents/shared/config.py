@@ -57,6 +57,13 @@ SKIP_DIRS = {
 # Intelligence cache TTL
 INTEL_CACHE_TTL_HOURS = 24
 
+# Self-learning thresholds
+RECURRING_PATTERN_THRESHOLD = 5      # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10      # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05        # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30   # look-back for fix effectiveness
+INTEL_REFRESH_ON_SCAN = True         # check intel freshness during --all
+
 # Agent names (canonical)
 AGENT_NAMES = [
     "architect",
