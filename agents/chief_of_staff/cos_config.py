@@ -15,6 +15,7 @@ COS_CONFIG: dict = {
         "cos_daily_max_tokens": 3000,
         "total_daily_max_tokens": 25000,
         "data_team_daily_max_tokens": 15000,
+        "product_team_daily_max_tokens": 15000,
         "alert_threshold_pct": 150,
     },
     "teams": {
@@ -26,7 +27,10 @@ COS_CONFIG: dict = {
             "active": True,
             "report_dir": "data_team/reports",
         },
-        "product": {"active": False},
+        "product": {
+            "active": True,
+            "report_dir": "product_team/reports",
+        },
         "strategy": {"active": False},
         "finance": {"active": False},
     },

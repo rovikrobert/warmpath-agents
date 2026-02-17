@@ -42,6 +42,12 @@ CATEGORY_OUTCOME_MAP: dict[str, list[str]] = {
     "model_calibration": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
     "schema_coverage": [BILLION_DOLLAR, COST_EFFICIENCY],
     "privacy_compliance": [HELP_JOB_SEEKERS, BILLION_DOLLAR],
+    # Product team categories
+    "ux_quality": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "design_system": [BILLION_DOLLAR, COST_EFFICIENCY],
+    "feature_coverage": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "user_research": [HELP_JOB_SEEKERS, HELP_NETWORK_BUILDERS],
+    "product_strategy": [BILLION_DOLLAR, HELP_JOB_SEEKERS],
 }
 
 # Business impact templates by category + severity
@@ -81,6 +87,18 @@ _IMPACT_TEMPLATES: dict[str, dict[str, str]] = {
         "high": "Model calibration gap that degrades match quality for job seekers",
         "medium": "Calibration opportunity that would improve referral success rates",
         "low": "Minor model tuning opportunity",
+    },
+    "ux_quality": {
+        "critical": "Major UX barrier — users cannot complete core referral flow",
+        "high": "UX friction causing drop-off in search-to-referral conversion",
+        "medium": "UX issue that degrades user experience and satisfaction",
+        "low": "Minor UX improvement opportunity",
+    },
+    "feature_coverage": {
+        "critical": "Core feature missing — critical user journey is broken",
+        "high": "Feature gap that prevents users from completing key workflows",
+        "medium": "Feature coverage gap affecting secondary workflows",
+        "low": "Minor feature enhancement opportunity",
     },
 }
 

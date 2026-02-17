@@ -34,6 +34,12 @@ try:
 except ImportError:
     DATA_TEAM_REPORTS_DIR = None
 
+# Product team reports directory — resolved lazily, patchable by tests
+try:
+    from product_team.shared.config import REPORTS_DIR as PRODUCT_TEAM_REPORTS_DIR
+except ImportError:
+    PRODUCT_TEAM_REPORTS_DIR = None
+
 
 # ---------------------------------------------------------------------------
 # Report loading
@@ -54,12 +60,22 @@ def _load_reports() -> list[AgentReport]:
                 continue
 
     # Data team reports (if available)
+    _AR_FIELDS = {
+        "agent", "timestamp", "scan_duration_seconds",
+        "findings", "metrics", "intelligence_applied", "learning_updates",
+    }
     if DATA_TEAM_REPORTS_DIR is not None and DATA_TEAM_REPORTS_DIR.is_dir():
-        _AR_FIELDS = {
-            "agent", "timestamp", "scan_duration_seconds",
-            "findings", "metrics", "intelligence_applied", "learning_updates",
-        }
         for path in sorted(DATA_TEAM_REPORTS_DIR.glob("*_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                reports.append(AgentReport.from_dict(clean))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+
+    # Product team reports (if available)
+    if PRODUCT_TEAM_REPORTS_DIR is not None and PRODUCT_TEAM_REPORTS_DIR.is_dir():
+        for path in sorted(PRODUCT_TEAM_REPORTS_DIR.glob("*_latest.json")):
             try:
                 data = json.loads(path.read_text())
                 clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
@@ -98,11 +114,16 @@ def run_daily() -> str:
     brief = synthesize_daily(reports, kpi_snapshot, costs, alerts)
 
     # Update learning state
-    eng_reports = [r for r in reports if r.agent not in ("pipeline", "analyst", "model_engineer", "data_lead")]
-    data_reports = [r for r in reports if r.agent in ("pipeline", "analyst", "model_engineer", "data_lead")]
+    _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
+    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents]
+    data_reports = [r for r in reports if r.agent in _data_agents]
+    product_reports = [r for r in reports if r.agent in _product_agents]
     update_team_reliability("engineering", eng_reports)
     if data_reports:
         update_team_reliability("data", data_reports)
+    if product_reports:
+        update_team_reliability("product", product_reports)
     record_cost_snapshot(costs)
 
     return brief

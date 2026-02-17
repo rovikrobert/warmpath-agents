@@ -317,8 +317,10 @@ def synthesize_status(reports: list[AgentReport]) -> str:
 
     # Split reports by team
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents]
+    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents]
     data_reports = [r for r in reports if r.agent in _data_agents]
+    product_reports = [r for r in reports if r.agent in _product_agents]
 
     lines.append("## Engineering")
     eng_findings = [f for r in eng_reports for f in r.findings]
@@ -353,6 +355,27 @@ def synthesize_status(reports: list[AgentReport]) -> str:
             f"{sum(1 for f in data_findings_all if f.severity in ('low', 'info'))} low"
         )
         for r in data_reports:
+            count = len(r.findings)
+            worst = "clean"
+            for sev in ("critical", "high", "medium", "low", "info"):
+                if any(f.severity == sev for f in r.findings):
+                    worst = sev
+                    break
+            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
+        lines.append("")
+
+    if product_reports:
+        lines.append("## Product Team")
+        product_findings_all = [f for r in product_reports for f in r.findings]
+        product_crit = sum(1 for f in product_findings_all if f.severity == "critical")
+        product_high = sum(1 for f in product_findings_all if f.severity == "high")
+        lines.append(f"- Agents: {len(product_reports)} reporting")
+        lines.append(
+            f"- Findings: {product_crit} critical, {product_high} high, "
+            f"{sum(1 for f in product_findings_all if f.severity == 'medium')} medium, "
+            f"{sum(1 for f in product_findings_all if f.severity in ('low', 'info'))} low"
+        )
+        for r in product_reports:
             count = len(r.findings)
             worst = "clean"
             for sev in ("critical", "high", "medium", "low", "info"):
