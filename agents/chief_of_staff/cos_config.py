@@ -19,7 +19,27 @@ COS_CONFIG: dict = {
         "ops_team_daily_max_tokens": 15000,
         "finance_team_daily_max_tokens": 15000,
         "gtm_team_daily_max_tokens": 15000,
+        "daily_cost_cap_usd": 3.0,
+        "per_team_cost_cap_usd": {
+            "engineering": 1.50,
+            "data": 0.30,
+            "product": 0.30,
+            "ops": 0.30,
+            "finance": 0.30,
+            "gtm": 0.30,
+        },
         "alert_threshold_pct": 150,
+    },
+    "notion": {
+        "daily_briefs_db_env": "NOTION_DAILY_BRIEFS_DB",
+        "decision_log_db_env": "NOTION_DECISION_LOG_DB",
+        "founder_briefs_db_env": "NOTION_FOUNDER_BRIEFS_DB",
+    },
+    "whatsapp": {
+        "morning_brief_time": "08:00",
+        "weekly_summary_day": "sunday",
+        "weekly_summary_time": "20:00",
+        "max_message_lines": 15,
     },
     "teams": {
         "engineering": {
@@ -50,6 +70,16 @@ COS_CONFIG: dict = {
     },
 }
 
+# Team registry — canonical agent names per team for report classification
+TEAM_REGISTRY: dict[str, list[str]] = {
+    "engineering": ["architect", "test_engineer", "perf_monitor", "deps_manager", "doc_keeper"],
+    "data": ["pipeline", "analyst", "model_engineer", "data_lead"],
+    "product": ["user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"],
+    "ops": ["keevs", "treb", "naiv", "marsh", "ops_lead"],
+    "finance": ["finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"],
+    "gtm": ["stratops", "monetization", "marketing", "partnerships", "gtm_lead"],
+}
+
 # Severity weights (reuse from shared config, but accessible here for scoring)
 SEVERITY_WEIGHT: dict[str, float] = {
     "critical": 10.0,
@@ -61,9 +91,10 @@ SEVERITY_WEIGHT: dict[str, float] = {
 
 # Decision principle hierarchy — first item wins in a tie
 DECISION_PRINCIPLES = [
-    "safety_privacy",      # Safety/Privacy always wins
-    "help_job_seekers",    # Core mission — demand side
-    "network_builders",    # Supply side
-    "billion_dollar",      # Scale infrastructure
-    "cost_efficiency",     # Optimize spend
+    "safety_privacy",      # User safety and privacy — never compromise
+    "data_integrity",      # Protect the vault model
+    "user_experience",     # Job seekers first, then network holders
+    "speed_to_market",     # Ship fast, iterate
+    "cost_efficiency",     # Optimize, don't overspend
+    "technical_elegance",  # Nice to have, never a blocker
 ]

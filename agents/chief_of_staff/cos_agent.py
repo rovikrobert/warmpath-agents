@@ -1,9 +1,10 @@
 """Chief of Staff agent — synthesizes team reports into founder-facing briefs.
 
 Usage:
-    python -m agents.chief_of_staff.cos_agent daily    # Daily founder brief
-    python -m agents.chief_of_staff.cos_agent weekly   # Weekly synthesis
-    python -m agents.chief_of_staff.cos_agent status   # Quick status snapshot
+    python -m agents.chief_of_staff.cos_agent daily                  # Daily founder brief
+    python -m agents.chief_of_staff.cos_agent weekly                 # Weekly synthesis
+    python -m agents.chief_of_staff.cos_agent status                 # Quick status snapshot
+    python -m agents.chief_of_staff.cos_agent setup-notion <page_id> # One-time Notion setup
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ from agents.shared.report import AgentReport
 
 from .cos_config import COS_CONFIG
 from .cos_learning import record_cost_snapshot, update_team_reliability
+from .notion_sync import NotionSync
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
+from .whatsapp_bridge import WhatsAppBridge
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +154,7 @@ def _get_kpi_snapshot(reports: list[AgentReport]) -> str:
 
 
 def run_daily() -> str:
-    """Daily cycle: load reports -> synthesize -> output brief."""
+    """Daily cycle: load reports -> synthesize -> output brief -> Notion + WhatsApp."""
     reports = _load_reports()
     if not reports:
         return "# Founder Daily Brief\n\nNo engineering reports available. Run agent scans first."
@@ -186,7 +189,54 @@ def run_daily() -> str:
         update_team_reliability("gtm", gtm_reports)
     record_cost_snapshot(costs)
 
+    # Push to Notion and generate WhatsApp message
+    _push_daily_outputs(brief, costs, alerts)
+
     return brief
+
+
+def _push_daily_outputs(
+    brief: str, costs: dict, alerts: list[str]
+) -> None:
+    """Push daily brief to Notion and generate WhatsApp message (best-effort)."""
+    from datetime import datetime, timezone
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total_cost = costs.get("total_estimated_cost_usd", 0)
+
+    # Extract headline from brief (first heading line)
+    headline = "Daily brief generated"
+    for line in brief.split("\n"):
+        if line.startswith("# "):
+            headline = line.lstrip("# ").strip()
+            break
+
+    # Notion sync
+    try:
+        notion = NotionSync()
+        if notion.enabled:
+            notion.push_daily_brief(
+                date=today,
+                headline=headline,
+                team_status={},
+                decisions_needed=[],
+                blockers=[],
+                cost_yesterday=f"${total_cost:.2f}",
+                brief_markdown=brief,
+            )
+    except Exception:
+        logger.debug("Notion sync skipped (not configured or error)")
+
+    # WhatsApp message
+    try:
+        wa = WhatsAppBridge()
+        brief_data = {
+            "decisions_needed": [],
+            "progress": [],
+        }
+        wa.generate_morning_brief(brief_data, costs, alerts)
+    except Exception:
+        logger.debug("WhatsApp message generation skipped")
 
 
 def run_weekly() -> str:
@@ -197,7 +247,22 @@ def run_weekly() -> str:
 
     kpi_snapshot = _get_kpi_snapshot(reports)
     costs = get_team_cost_summary(reports)
-    return synthesize_weekly(reports, kpi_snapshot, costs)
+    brief = synthesize_weekly(reports, kpi_snapshot, costs)
+
+    # Push weekly WhatsApp summary (best-effort)
+    try:
+        wa = WhatsAppBridge()
+        wa.generate_weekly_summary(
+            week_num=_current_week_number(),
+            metrics={
+                "weekly_cost": f"${costs.get('total_estimated_cost_usd', 0) * 7:.2f}",
+                "daily_avg": f"${costs.get('total_estimated_cost_usd', 0):.2f}/day",
+            },
+        )
+    except Exception:
+        logger.debug("Weekly WhatsApp summary skipped")
+
+    return brief
 
 
 def run_status() -> str:
@@ -206,6 +271,34 @@ def run_status() -> str:
     if not reports:
         return "# Status Snapshot\n\nNo engineering reports available."
     return synthesize_status(reports)
+
+
+def _current_week_number() -> int:
+    """Return ISO week number for the current date."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isocalendar()[1]
+
+
+# ---------------------------------------------------------------------------
+# Notion setup
+# ---------------------------------------------------------------------------
+
+
+def setup_notion(parent_page_id: str) -> None:
+    """One-time Notion workspace setup — creates databases under a parent page."""
+    notion = NotionSync()
+    if not notion.enabled:
+        print("Error: NOTION_API_KEY not set. Cannot create databases.")
+        return
+    db_ids = notion.setup_databases(parent_page_id)
+    if db_ids:
+        print("Notion databases created:")
+        for name, db_id in db_ids.items():
+            print(f"  {name}: {db_id}")
+        print("\nAdd these IDs to your .env or cos_config for future runs.")
+    else:
+        print("No databases were created. Check your Notion API key and parent page ID.")
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +319,11 @@ def main() -> None:
         print(run_weekly())
     elif mode == "status":
         print(run_status())
+    elif mode == "setup-notion":
+        if len(sys.argv) < 3:
+            print("Usage: python -m agents.chief_of_staff.cos_agent setup-notion <parent_page_id>")
+            sys.exit(1)
+        setup_notion(sys.argv[2])
     else:
         print(run_daily())
 
