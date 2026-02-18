@@ -980,7 +980,7 @@ def _check_deletion_verification(
 
     # Check for deleted users via audit logs
     deleted_users = qe.execute_raw(
-        "SELECT DISTINCT (metadata_->>'user_id')::text AS user_id "
+        "SELECT DISTINCT (metadata->>'user_id')::text AS user_id "
         "FROM audit_logs WHERE action = 'account_deletion' "
         "AND created_at >= NOW() - INTERVAL '90 days' LIMIT 10",
         context="finance:deletion_audit_lookup",

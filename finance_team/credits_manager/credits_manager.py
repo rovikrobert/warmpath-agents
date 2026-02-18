@@ -700,10 +700,11 @@ def _check_credit_distribution_live(
         metrics["credit_distribution_buckets"] = bucket_counts
 
         bucket_values = {
-            "zero_or_negative": 0,
-            "low_1_50": 25,
-            "medium_51_200": 125,
-            "high_200_plus": 300,
+            "0": 0,
+            "1-50": 25,
+            "51-200": 125,
+            "201-500": 350,
+            "500+": 600,
         }
         values = []
         for bucket, count in bucket_counts.items():

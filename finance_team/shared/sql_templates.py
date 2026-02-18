@@ -64,7 +64,7 @@ FROM (
             ELSE '500+'
         END AS balance_bucket
     FROM credit_transactions
-    WHERE created_at >= :start_date
+    WHERE expires_at IS NULL OR expires_at > NOW()
     GROUP BY user_id
 ) sub
 GROUP BY balance_bucket
