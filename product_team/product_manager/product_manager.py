@@ -131,11 +131,11 @@ def _map_feature_coverage(
         ],
         "contacts": ["ContactsPage"],
         "search": ["NewSearch", "SearchResults", "FindReferrals", "ReferralResults"],
-        "marketplace": ["MarketplaceDashboard", "SharingSettings"],
+        "marketplace": ["MarketplaceOverview", "SharingSettings"],
         "credits": ["CreditsPage"],
         "applications": ["ApplicationsPage"],
         "intro": ["MyRequests"],
-        "profile": ["EditProfile", "Dashboard"],
+        "profile": ["EditProfile", "CoachPage"],
         "onboarding": ["OnboardingPage"],
         "privacy": ["PrivacyPage"],
     }

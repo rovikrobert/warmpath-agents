@@ -48,7 +48,7 @@ PERSONAS: dict[str, dict] = {
         "description": "Mid-career tech professional (3-10 yr exp) actively hunting",
         "motivation": "Get employee referrals instead of applying cold",
         "key_pages": [
-            "Dashboard",
+            "CoachPage",
             "FindReferrals",
             "ReferralResults",
             "ApplicationsPage",
@@ -62,10 +62,10 @@ PERSONAS: dict[str, dict] = {
         "description": "Employee at desirable company with LinkedIn connections to share",
         "motivation": "Capture referral bonuses, build reputation, bank credits",
         "key_pages": [
-            "Dashboard",
+            "CoachPage",
             "ContactsPage",
             "SharingSettings",
-            "MarketplaceDashboard",
+            "MarketplaceOverview",
             "CreditsPage",
         ],
         "tier": "supply",
@@ -78,15 +78,15 @@ PERSONAS: dict[str, dict] = {
 
 PERSONA_JOURNEYS: dict[str, list[list[str]]] = {
     "job_seeker": [
-        ["AuthPage", "OnboardingPage", "Dashboard", "FindReferrals", "ReferralResults"],
-        ["AuthPage", "OnboardingPage", "Dashboard", "NewSearch", "SearchResults"],
-        ["Dashboard", "ApplicationsPage"],
-        ["Dashboard", "CreditsPage"],
+        ["AuthPage", "OnboardingPage", "CoachPage", "FindReferrals", "ReferralResults"],
+        ["AuthPage", "OnboardingPage", "CoachPage", "NewSearch", "SearchResults"],
+        ["CoachPage", "ApplicationsPage"],
+        ["CoachPage", "CreditsPage"],
     ],
     "network_holder": [
-        ["AuthPage", "OnboardingPage", "Dashboard", "ContactsPage", "SharingSettings"],
-        ["Dashboard", "MarketplaceDashboard"],
-        ["Dashboard", "CreditsPage"],
+        ["AuthPage", "OnboardingPage", "CoachPage", "ContactsPage", "SharingSettings"],
+        ["CoachPage", "MarketplaceOverview"],
+        ["CoachPage", "CreditsPage"],
     ],
 }
 

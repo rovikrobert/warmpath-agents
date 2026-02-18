@@ -490,12 +490,12 @@ def _check_empty_states(
         "ContactsPage",
         "ApplicationsPage",
         "CreditsPage",
-        "Dashboard",
+        "CoachPage",
         "FindReferrals",
         "SearchResults",
         "ReferralResults",
         "MyRequests",
-        "MarketplaceDashboard",
+        "MarketplaceOverview",
     }
 
     for path in jsx_files:

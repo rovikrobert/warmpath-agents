@@ -192,9 +192,9 @@ def _check_landing_page_readiness(
     metrics: dict,
 ) -> None:
     """Check for homepage value proposition, CTA buttons, social proof elements."""
-    # Look for the main Dashboard / landing page
+    # Look for the main Coach / landing page
     landing_candidates = [
-        "Dashboard.jsx",
+        "CoachPage.jsx",
         "LandingPage.jsx",
         "HomePage.jsx",
         "AuthPage.jsx",
