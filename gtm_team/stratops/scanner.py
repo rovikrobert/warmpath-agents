@@ -450,6 +450,159 @@ def _scan_competitor_updates(
         )
 
 
+FEATURE_CATEGORIES = [
+    "csv_upload",
+    "linkedin_integration",
+    "referral_tracking",
+    "ai_matching",
+    "warm_scoring",
+    "cultural_context",
+    "marketplace",
+    "credit_economy",
+    "privacy_vault",
+    "anonymization",
+    "intro_facilitation",
+    "mobile_app",
+    "browser_extension",
+    "api_access",
+    "team_features",
+    "analytics_dashboard",
+]
+
+
+def _analyze_competitor_features(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict[str, Any],
+) -> None:
+    """Build a structured feature comparison matrix across top competitors."""
+    competitor_data = []
+    for comp_name in TRACKED_COMPETITORS[:5]:
+        search_query = f"{comp_name} features pricing referral platform 2026"
+        results = web_search(search_query, max_results=3)
+
+        features_found: dict[str, bool] = {}
+        for result in results:
+            content = result.snippet.lower()
+            for feature in FEATURE_CATEGORIES:
+                readable = feature.replace("_", " ")
+                if readable in content or feature in content:
+                    features_found[feature] = True
+
+        competitor_data.append({"name": comp_name, "features": features_found})
+
+    # Build matrix
+    all_features: set[str] = set()
+    for cd in competitor_data:
+        all_features.update(cd["features"].keys())
+
+    matrix = {
+        cd["name"]: {f: cd["features"].get(f, False) for f in sorted(all_features)}
+        for cd in competitor_data
+    }
+    metrics["comparison_matrix"] = matrix
+    metrics["competitors_analyzed"] = len(competitor_data)
+
+    # WarmPath advantages
+    warmpath_features = {
+        "csv_upload",
+        "ai_matching",
+        "warm_scoring",
+        "cultural_context",
+        "marketplace",
+        "credit_economy",
+        "privacy_vault",
+        "anonymization",
+        "intro_facilitation",
+    }
+    competitor_only = all_features - warmpath_features
+    warmpath_unique = warmpath_features - all_features
+
+    insights.append(
+        MarketInsight(
+            id="strat-insight-features",
+            category="competitive",
+            title=f"Feature comparison: {len(all_features)} features across {len(competitor_data)} competitors",
+            evidence=(
+                f"WarmPath unique: {', '.join(sorted(warmpath_unique)) if warmpath_unique else 'none'}. "
+                f"Competitor-only: {', '.join(sorted(list(competitor_only)[:5])) if competitor_only else 'none'}."
+            ),
+            strategic_impact="Feature gaps may affect competitive positioning",
+            recommended_response="Review competitor-only features for roadmap consideration",
+            urgency="this_week",
+            confidence="medium",
+        )
+    )
+
+
+def _assess_threat_levels(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict[str, Any],
+) -> None:
+    """Score each tracked competitor on threat dimensions using heuristics."""
+    threat_assessment: dict[str, dict[str, Any]] = {}
+    for comp_name in TRACKED_COMPETITORS:
+        name_lower = comp_name.lower()
+        scores = {
+            "feature_overlap": 20
+            if name_lower in ("linkedin", "the swarm", "refer.me")
+            else 15
+            if name_lower in ("teamable", "drafted")
+            else 10,
+            "market_overlap": 22
+            if name_lower in ("the swarm", "refer.me", "lunchclub")
+            else 18
+            if name_lower == "linkedin"
+            else 12,
+            "funding_resources": 20
+            if name_lower == "linkedin"
+            else 15
+            if name_lower == "handshake"
+            else 8,
+            "growth_trajectory": 8,
+            "positioning_similarity": 13
+            if name_lower in ("the swarm", "refer.me")
+            else 10
+            if name_lower in ("lunchclub", "drafted")
+            else 5,
+        }
+        total = sum(scores.values())
+        level = (
+            "critical"
+            if total >= 70
+            else "high"
+            if total >= 50
+            else "medium"
+            if total >= 30
+            else "low"
+        )
+        threat_assessment[comp_name] = {
+            "scores": scores,
+            "total": total,
+            "level": level,
+        }
+
+    metrics["threat_assessment"] = threat_assessment
+
+    critical = [
+        n for n, d in threat_assessment.items() if d["level"] in ("critical", "high")
+    ]
+    if critical:
+        insights.append(
+            MarketInsight(
+                id="strat-insight-threats",
+                category="competitive",
+                title=f"{len(critical)} high/critical competitive threats identified",
+                evidence=f"High-threat competitors: {', '.join(critical)}",
+                strategic_impact="These competitors most directly threaten WarmPath's market position",
+                recommended_response="Prioritize differentiation against top threats",
+                urgency="this_week",
+                confidence="medium",
+            )
+        )
+
+
 def _check_referral_rails_thesis(
     docs: dict[str, str],
     findings: list[Finding],
@@ -597,6 +750,10 @@ def scan() -> GTMTeamReport:
         _check_geographic_readiness(docs, findings, insights, metrics)
         _check_positioning_strength(docs, findings, insights, metrics)
         _check_referral_rails_thesis(docs, findings, insights, metrics)
+
+    # Structural competitive analysis
+    _analyze_competitor_features(findings, insights, metrics)
+    _assess_threat_levels(findings, insights, metrics)
 
     # Live competitive intelligence from web
     _scan_competitor_updates(findings, insights, metrics)

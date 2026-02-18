@@ -718,6 +718,171 @@ def _check_content_infrastructure(
         )
 
 
+FUNNEL_EVENTS = [
+    "signup_completed",
+    "email_verified",
+    "csv_uploaded",
+    "search_performed",
+    "intro_requested",
+    "intro_approved",
+]
+
+
+def _check_analytics_integration(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Scan frontend source files for PostHog integration."""
+    main_jsx = PROJECT_ROOT / "frontend" / "src" / "main.jsx"
+    analytics_js = PROJECT_ROOT / "frontend" / "src" / "utils" / "analytics.js"
+
+    has_posthog_init = False
+    has_analytics_util = analytics_js.exists()
+
+    if main_jsx.exists():
+        content = _read_safe(main_jsx)
+        has_posthog_init = "posthog" in content.lower()
+
+    # Count trackEvent calls across all JSX files
+    track_count = 0
+    pages_dir = PROJECT_ROOT / "frontend" / "src" / "pages"
+    if pages_dir.exists():
+        for jsx in pages_dir.rglob("*.jsx"):
+            if "trackEvent" in _read_safe(jsx):
+                track_count += 1
+
+    metrics["posthog_initialized"] = has_posthog_init
+    metrics["analytics_util_exists"] = has_analytics_util
+    metrics["pages_with_tracking"] = track_count
+
+    if not has_posthog_init:
+        findings.append(
+            Finding(
+                id="MKT-NO-ANALYTICS",
+                severity="high",
+                category="analytics",
+                title="PostHog analytics not initialized",
+                detail="frontend/src/main.jsx does not initialize PostHog",
+                recommendation="Add PostHog initialization with VITE_POSTHOG_KEY",
+                effort_hours=0.5,
+            )
+        )
+
+    insights.append(
+        MarketInsight(
+            id="mkt-insight-analytics",
+            category="channel",
+            title=f"Analytics: PostHog {'active' if has_posthog_init else 'not configured'}, {track_count} pages tracked",
+            evidence=f"PostHog init: {has_posthog_init}, analytics.js: {has_analytics_util}, tracked pages: {track_count}",
+            strategic_impact="Analytics coverage determines funnel visibility",
+            recommended_response="Ensure all key funnel steps have trackEvent calls"
+            if track_count < 5
+            else "Good coverage",
+            urgency="this_week" if not has_posthog_init else "monitor",
+            confidence="high",
+        )
+    )
+
+
+def _check_conversion_funnel(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Check that key funnel events are tracked in frontend code."""
+    tracked_events: set[str] = set()
+    src_dir = PROJECT_ROOT / "frontend" / "src"
+    if src_dir.exists():
+        for jsx in src_dir.rglob("*.jsx"):
+            content = _read_safe(jsx)
+            for event in FUNNEL_EVENTS:
+                if event in content:
+                    tracked_events.add(event)
+
+    missing = set(FUNNEL_EVENTS) - tracked_events
+    metrics["funnel_events_tracked"] = len(tracked_events)
+    metrics["funnel_events_missing"] = list(missing)
+
+    if missing:
+        findings.append(
+            Finding(
+                id="MKT-FUNNEL-GAPS",
+                severity="medium",
+                category="analytics",
+                title=f"Conversion funnel: {len(missing)} events not tracked",
+                detail=f"Missing events: {', '.join(sorted(missing))}",
+                recommendation="Add trackEvent() calls for missing funnel steps",
+                effort_hours=1.0,
+            )
+        )
+
+    insights.append(
+        MarketInsight(
+            id="mkt-insight-funnel",
+            category="channel",
+            title=f"Funnel tracking: {len(tracked_events)}/{len(FUNNEL_EVENTS)} events instrumented",
+            evidence=f"Tracked: {', '.join(sorted(tracked_events))}. Missing: {', '.join(sorted(missing)) if missing else 'none'}.",
+            strategic_impact="Funnel visibility enables conversion optimization",
+            recommended_response="Instrument remaining events"
+            if missing
+            else "Full funnel coverage achieved",
+            urgency="this_week" if len(missing) > 2 else "monitor",
+            confidence="high",
+        )
+    )
+
+
+def _check_seo_readiness(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Extended SEO check: structured data, canonical URLs, and sitemap."""
+    index_html = PROJECT_ROOT / "frontend" / "index.html"
+    content = _read_safe(index_html) if index_html.exists() else ""
+
+    seo_signals = {
+        "has_meta_description": 'meta name="description"' in content.lower(),
+        "has_og_tags": 'property="og:' in content.lower(),
+        "has_canonical": 'rel="canonical"' in content.lower(),
+        "has_robots_txt": (
+            PROJECT_ROOT / "frontend" / "public" / "robots.txt"
+        ).exists(),
+        "has_sitemap": (PROJECT_ROOT / "frontend" / "public" / "sitemap.xml").exists(),
+    }
+
+    metrics["seo_signals"] = seo_signals
+    metrics["seo_score"] = sum(seo_signals.values()) / len(seo_signals) * 100
+
+    missing_seo = [k.replace("has_", "") for k, v in seo_signals.items() if not v]
+    if missing_seo:
+        findings.append(
+            Finding(
+                id="MKT-SEO-GAPS",
+                severity="medium",
+                category="seo",
+                title=f"SEO: {len(missing_seo)} signals missing",
+                detail=f"Missing: {', '.join(missing_seo)}",
+                recommendation="Add missing SEO elements for search visibility",
+                effort_hours=1.5,
+            )
+        )
+
+    insights.append(
+        MarketInsight(
+            id="mkt-insight-seo",
+            category="channel",
+            title=f"SEO readiness: {metrics['seo_score']:.0f}% ({len(seo_signals) - len(missing_seo)}/{len(seo_signals)} signals)",
+            evidence=f"Present: {', '.join(k.replace('has_', '') for k, v in seo_signals.items() if v)}",
+            strategic_impact="SEO signals affect organic search visibility",
+            recommended_response="Add missing signals for better search rankings",
+            urgency="this_month" if missing_seo else "monitor",
+            confidence="high",
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -754,6 +919,11 @@ def scan() -> GTMTeamReport:
         )
         _check_onboarding_conversion(jsx_files, findings, insights, metrics)
         _check_content_infrastructure(jsx_files, findings, insights, metrics)
+
+    # Analytics, funnel, and SEO checks
+    _check_analytics_integration(findings, insights, metrics)
+    _check_conversion_funnel(findings, insights, metrics)
+    _check_seo_readiness(findings, insights, metrics)
 
     # Live competitor marketing intelligence
     _scan_competitor_marketing(findings, insights, metrics)

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.shared.report import Finding
+from agents.shared.web_tools import web_search
 from gtm_team.shared.config import (
     API_DIR,
     MODELS_DIR,
@@ -22,7 +23,7 @@ from gtm_team.shared.config import (
     SERVICES_DIR,
 )
 from gtm_team.shared.learning import GTMLearningState
-from gtm_team.shared.report import GTMTeamReport, MarketInsight
+from gtm_team.shared.report import GTMTeamReport, MarketInsight, PricingExperiment
 from gtm_team.shared.strategy_context import (
     extract_pricing_info,
     load_strategy_docs,
@@ -540,6 +541,162 @@ def _check_marketplace_monetization(
     )
 
 
+BENCHMARK_COMPANIES = [
+    ("LinkedIn Premium", "referral_platform"),
+    ("Refer.me", "referral_platform"),
+    ("Handshake", "job_board"),
+    ("The Muse", "job_board"),
+    ("AngelList", "job_board"),
+    ("Hired", "hr_tech"),
+    ("Teamable", "hr_tech"),
+    ("Drafted", "referral_platform"),
+    ("Lunchclub", "networking"),
+    ("Blind", "networking"),
+    ("BetterUp", "career_coaching"),
+    ("CoachHub", "career_coaching"),
+]
+
+
+def _benchmark_pricing(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict[str, Any],
+) -> None:
+    """Web-search 10+ SaaS companies for pricing data."""
+    benchmarks = []
+    for company, category in BENCHMARK_COMPANIES:
+        results = web_search(f"{company} pricing plans 2026", max_results=2)
+        pricing_signals: dict[str, Any] = {}
+        for r in results:
+            snippet = r.snippet.lower()
+            if "free" in snippet:
+                pricing_signals["has_free_tier"] = True
+            if "$" in snippet:
+                pricing_signals["has_pricing"] = True
+            # Extract price patterns like $X/mo or $X/month
+            prices = re.findall(r"\$(\d+)", snippet)
+            if prices:
+                pricing_signals["detected_prices"] = [int(p) for p in prices]
+        benchmarks.append(
+            {"company": company, "category": category, "signals": pricing_signals}
+        )
+
+    metrics["pricing_benchmarks"] = benchmarks
+    metrics["benchmark_companies_scanned"] = len(benchmarks)
+
+    # Summarize
+    all_prices: list[int] = []
+    for b in benchmarks:
+        all_prices.extend(b["signals"].get("detected_prices", []))
+
+    if all_prices:
+        avg = sum(all_prices) / len(all_prices)
+        below_warmpath = sum(1 for p in all_prices if p <= 25)
+        percentile = below_warmpath / len(all_prices) * 100
+        metrics["benchmark_avg_price"] = round(avg, 2)
+        metrics["warmpath_pricing_percentile"] = round(percentile, 1)
+
+    insights.append(
+        MarketInsight(
+            id="monet-insight-benchmarks",
+            category="pricing",
+            title=f"Pricing benchmarks: {len(benchmarks)} companies analyzed",
+            evidence=(
+                f"Detected {len(all_prices)} price points across {len(benchmarks)} companies"
+                + (
+                    f", avg ${metrics.get('benchmark_avg_price', 'N/A')}/mo"
+                    if all_prices
+                    else ""
+                )
+            ),
+            strategic_impact="External pricing data informs WarmPath's positioning",
+            recommended_response="Compare WarmPath's $20-30/mo against benchmark distribution",
+            urgency="this_week",
+            confidence="low",
+        )
+    )
+
+
+def _analyze_pricing_position(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict[str, Any],
+) -> None:
+    """Produce a positioning insight based on benchmark data."""
+    avg_price = metrics.get("benchmark_avg_price")
+    percentile = metrics.get("warmpath_pricing_percentile")
+    benchmarks_scanned = metrics.get("benchmark_companies_scanned", 0)
+
+    if avg_price is not None and percentile is not None:
+        warmpath_low = 20
+        warmpath_high = 30
+        if avg_price > warmpath_high:
+            position = "below average"
+            recommendation = "Consider testing higher price points"
+        elif avg_price < warmpath_low:
+            position = "above average"
+            recommendation = "Ensure value justifies premium positioning"
+        else:
+            position = "in line with market"
+            recommendation = "Pricing is competitive — differentiate on value"
+
+        metrics["pricing_position"] = position
+
+        insights.append(
+            MarketInsight(
+                id="monet-insight-position",
+                category="pricing",
+                title=f"Pricing position: WarmPath is {position} (avg ${avg_price}/mo, {percentile:.0f}th percentile)",
+                evidence=f"WarmPath $20-30/mo vs market avg ${avg_price}/mo across {benchmarks_scanned} benchmarks",
+                strategic_impact="Price positioning affects conversion and perceived value",
+                recommended_response=recommendation,
+                urgency="this_month",
+                confidence="low",
+            )
+        )
+    else:
+        metrics["pricing_position"] = "insufficient_data"
+        insights.append(
+            MarketInsight(
+                id="monet-insight-position",
+                category="pricing",
+                title="Pricing position: insufficient benchmark data",
+                evidence=f"Scanned {benchmarks_scanned} companies but no price points extracted",
+                strategic_impact="Cannot assess competitive pricing without benchmark data",
+                recommended_response="Manually research competitor pricing pages",
+                urgency="this_month",
+                confidence="low",
+            )
+        )
+
+
+def _design_experiments(
+    findings: list[Finding],
+    pricing_experiments: list[PricingExperiment],
+    metrics: dict[str, Any],
+) -> None:
+    """Propose 2-3 pricing A/B tests."""
+    pricing_experiments.append(
+        PricingExperiment(
+            id="exp-price-tiers",
+            hypothesis="Testing $19/mo vs $29/mo vs $39/mo will identify optimal price point",
+            test_design="3-arm test: redirect new signups to different pricing pages",
+            metrics_to_track=["conversion_rate", "revenue_per_user", "churn_30d"],
+            status="designed",
+        )
+    )
+    pricing_experiments.append(
+        PricingExperiment(
+            id="exp-annual-discount",
+            hypothesis="Offering 20% annual discount will increase LTV by reducing churn",
+            test_design="Show annual vs monthly toggle to 50% of new users",
+            metrics_to_track=["annual_adoption_rate", "ltv_12mo", "monthly_churn"],
+            status="designed",
+        )
+    )
+    metrics["experiments_designed"] = len(pricing_experiments)
+
+
 # ---------------------------------------------------------------------------
 # Readiness score
 # ---------------------------------------------------------------------------
@@ -595,6 +752,7 @@ def scan() -> GTMTeamReport:
     start = time.time()
     findings: list[Finding] = []
     insights: list[MarketInsight] = []
+    pricing_experiments: list[PricingExperiment] = []
     metrics: dict[str, Any] = {}
     learning_updates: list[str] = []
 
@@ -608,6 +766,11 @@ def scan() -> GTMTeamReport:
     _check_feature_gating(docs, findings, insights, metrics)
     _check_revenue_model(docs, findings, insights, metrics)
     _check_marketplace_monetization(docs, findings, insights, metrics)
+
+    # External pricing benchmarks and experiments
+    _benchmark_pricing(findings, insights, metrics)
+    _analyze_pricing_position(findings, insights, metrics)
+    _design_experiments(findings, pricing_experiments, metrics)
 
     # Compute readiness score
     readiness = _compute_monetization_readiness(metrics)
@@ -671,6 +834,7 @@ def scan() -> GTMTeamReport:
         scan_duration_seconds=round(duration, 2),
         findings=findings,
         market_insights=insights,
+        pricing_experiments=pricing_experiments,
         metrics=metrics,
         learning_updates=learning_updates,
     )

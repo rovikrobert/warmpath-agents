@@ -578,6 +578,138 @@ def _check_network_holder_value_prop(
         )
 
 
+def _check_pipeline_infrastructure(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Check that the partnership pipeline API/model infrastructure exists."""
+    model_file = PROJECT_ROOT / "app" / "models" / "gtm.py"
+    api_file = PROJECT_ROOT / "app" / "api" / "partnerships.py"
+    service_file = PROJECT_ROOT / "app" / "services" / "gtm_service.py"
+
+    has_model = model_file.exists() and "PartnershipOpportunity" in _read_safe(
+        model_file
+    )
+    has_api = api_file.exists()
+    has_service = (
+        service_file.exists() and "partnership" in _read_safe(service_file).lower()
+    )
+
+    metrics["pipeline_model_exists"] = has_model
+    metrics["pipeline_api_exists"] = has_api
+    metrics["pipeline_service_exists"] = has_service
+
+    if not has_model:
+        findings.append(
+            Finding(
+                id="PART-NO-PIPELINE-MODEL",
+                severity="high",
+                category="partnership",
+                title="Partnership pipeline DB model missing",
+                detail="No PartnershipOpportunity model in app/models/gtm.py",
+                recommendation="Create partnership_opportunities table for CRM-style pipeline tracking",
+                effort_hours=2.0,
+            )
+        )
+
+    # Check for dynamic (not hardcoded) partner types
+    scanner_content = _read_safe(Path(__file__))
+    hardcoded_types = (
+        scanner_content.count("bootcamp")
+        + scanner_content.count("university")
+        + scanner_content.count("career_coach")
+    )
+    metrics["partnership_types_hardcoded"] = hardcoded_types > 3
+
+    pipeline_status = (
+        "full"
+        if (has_model and has_api and has_service)
+        else "partial"
+        if any([has_model, has_api, has_service])
+        else "none"
+    )
+
+    insights.append(
+        MarketInsight(
+            id="part-insight-pipeline",
+            category="partnership",
+            title=f"Partnership pipeline infrastructure: {pipeline_status}",
+            evidence=f"Model: {has_model}, API: {has_api}, Service: {has_service}",
+            strategic_impact="Pipeline tracking enables partnership velocity measurement",
+            recommended_response="Pipeline infrastructure is in place"
+            if pipeline_status == "full"
+            else "Complete pipeline setup",
+            urgency="monitor" if pipeline_status == "full" else "this_week",
+            confidence="high",
+        )
+    )
+
+
+def _check_supply_activation_data(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Check that data sources exist for NH activation metrics."""
+    models_content = _read_safe(PROJECT_ROOT / "app" / "models" / "marketplace.py")
+    sharing_prefs = (
+        "NetworkSharingPreferences" in models_content
+        or "network_sharing_preferences" in models_content
+    )
+    marketplace_listings = "MarketplaceListing" in models_content
+
+    contacts_content = _read_safe(PROJECT_ROOT / "app" / "models" / "contact.py")
+    csv_uploads = "CsvUpload" in contacts_content
+
+    usage_content = _read_safe(PROJECT_ROOT / "app" / "models" / "enrichment.py")
+    usage_logs = "UsageLog" in usage_content
+
+    activation_sources = {
+        "csv_uploads": csv_uploads,
+        "sharing_preferences": sharing_prefs,
+        "marketplace_listings": marketplace_listings,
+        "usage_logs": usage_logs,
+    }
+
+    metrics["activation_data_sources"] = activation_sources
+    metrics["activation_data_coverage"] = (
+        sum(activation_sources.values()) / len(activation_sources) * 100
+    )
+
+    missing = [k for k, v in activation_sources.items() if not v]
+    if missing:
+        findings.append(
+            Finding(
+                id="PART-ACTIVATION-DATA-GAPS",
+                severity="medium",
+                category="partnership",
+                title=f"Supply-side activation: {len(missing)} data sources missing",
+                detail=f"Missing: {', '.join(missing)}",
+                recommendation="Ensure all activation metric data sources are available",
+                effort_hours=1.0,
+            )
+        )
+
+    insights.append(
+        MarketInsight(
+            id="part-insight-activation",
+            category="partnership",
+            title=f"Supply-side data: {metrics['activation_data_coverage']:.0f}% sources available",
+            evidence=(
+                f"Available: {', '.join(k for k, v in activation_sources.items() if v)}. "
+                f"Missing: {', '.join(missing) if missing else 'none'}."
+            ),
+            strategic_impact="Activation data enables NH churn prediction and engagement optimization",
+            recommended_response="All key data sources available"
+            if not missing
+            else "Add missing data collection",
+            urgency="monitor" if not missing else "this_week",
+            confidence="high",
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -599,6 +731,10 @@ def scan() -> GTMTeamReport:
     _check_community_infrastructure(jsx_files, findings, insights, metrics)
     _check_partnership_integration_points(findings, partnerships, metrics)
     _check_network_holder_value_prop(jsx_files, findings, insights, metrics)
+
+    # Pipeline infrastructure and supply-side activation data
+    _check_pipeline_infrastructure(findings, insights, metrics)
+    _check_supply_activation_data(findings, insights, metrics)
 
     # Compute partnership readiness score
     score_components = {
