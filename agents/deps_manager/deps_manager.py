@@ -9,6 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from agents.shared.config import PROJECT_ROOT, SKIP_DIRS
+from agents.shared.pypi_client import check_package_updates
 from agents.shared.report import Finding, AgentReport
 from agents.shared import learning
 
@@ -636,6 +637,40 @@ def scan() -> AgentReport:
     stale_findings = _check_stale_packages(deps)
     findings.extend(stale_findings)
 
+    # -- Phase 4b: PyPI version check (live) ------------------------------------
+    pypi_updates = check_package_updates(requirements_path)
+    pypi_outdated = 0
+    pypi_major = 0
+    for upd in pypi_updates:
+        if upd.is_major:
+            pypi_major += 1
+            findings.append(
+                Finding(
+                    id=f"DEP-PYPI-MAJOR-{upd.name.upper()}",
+                    severity="medium",
+                    category="dependency-update",
+                    title=f"Major update available: {upd.name} {upd.current} -> {upd.latest}",
+                    detail=f"{upd.summary or 'No description'}. Major version change may include breaking changes.",
+                    file="requirements.txt",
+                    recommendation=f"Review changelog for {upd.name} {upd.latest} before upgrading.",
+                    effort_hours=1.0,
+                )
+            )
+        else:
+            pypi_outdated += 1
+            findings.append(
+                Finding(
+                    id=f"DEP-PYPI-MINOR-{upd.name.upper()}",
+                    severity="low",
+                    category="dependency-update",
+                    title=f"Update available: {upd.name} {upd.current} -> {upd.latest}",
+                    detail=upd.summary or "No description",
+                    file="requirements.txt",
+                    recommendation=f"Upgrade: {upd.name}>={upd.latest}",
+                    effort_hours=0.2,
+                )
+            )
+
     # -- Phase 5: Import cross-check ------------------------------------------
     import_findings, missing_deps, dead_deps = _check_imports(deps, app_dir)
     findings.extend(import_findings)
@@ -658,6 +693,8 @@ def scan() -> AgentReport:
         "missing_deps": missing_deps,
         "dead_deps": dead_deps,
         "license_issues": len(license_findings),
+        "pypi_outdated": pypi_outdated,
+        "pypi_major_updates": pypi_major,
         "total_findings": len(findings),
     }
 

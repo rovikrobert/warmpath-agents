@@ -48,6 +48,8 @@ class FounderBrief(BaseModel):
     decisions_needed: list[dict[str, Any]] = Field(default_factory=list)
     key_updates: list[dict[str, Any]] = Field(default_factory=list)
     progress: list[dict[str, Any]] = Field(default_factory=list)
+    cross_team_requests: list[dict[str, Any]] = Field(default_factory=list)
+    operational_health: list[dict[str, Any]] = Field(default_factory=list)
     cost_summary: dict[str, Any] = Field(default_factory=dict)
     kpi_snapshot: str = ""
 

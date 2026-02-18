@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.shared.report import Finding
+from agents.shared.web_tools import web_search
 from gtm_team.shared.config import (
     PROJECT_ROOT,
     REPORTS_DIR,
@@ -393,6 +394,60 @@ def _check_positioning_strength(
     )
 
 
+def _scan_competitor_updates(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict[str, Any],
+) -> None:
+    """Search the web for recent competitor news and product updates."""
+    results_by_competitor: dict[str, list] = {}
+    total_results = 0
+
+    for competitor in TRACKED_COMPETITORS[:5]:  # Top 5 to stay within rate limits
+        results = web_search(f"{competitor} referral platform news 2025 2026", max_results=3)
+        results_by_competitor[competitor] = results
+        total_results += len(results)
+
+    metrics["web_competitor_results"] = total_results
+    metrics["web_competitors_searched"] = len(results_by_competitor)
+
+    active_competitors: list[str] = []
+    for comp, results in results_by_competitor.items():
+        if results:
+            active_competitors.append(comp)
+
+    if active_competitors:
+        evidence_parts = []
+        for comp in active_competitors[:3]:
+            top = results_by_competitor[comp][0]
+            evidence_parts.append(f"{comp}: {top.title[:80]}")
+
+        insights.append(
+            MarketInsight(
+                id="strat-insight-web-comp",
+                category="competitive",
+                title=f"Live competitor intel: {len(active_competitors)} competitors with recent activity",
+                evidence="; ".join(evidence_parts),
+                strategic_impact="Active competitor moves may require strategic response",
+                recommended_response="Review competitor updates for positioning implications",
+                urgency="this_week" if len(active_competitors) > 2 else "this_month",
+                confidence="medium",
+            )
+        )
+    else:
+        insights.append(
+            MarketInsight(
+                id="strat-insight-web-comp",
+                category="competitive",
+                title="Live competitor intel: no recent activity found (or network unavailable)",
+                evidence="Web search returned no competitor results",
+                strategic_impact="Cannot assess real-time competitive landscape without web access",
+                urgency="monitor",
+                confidence="low",
+            )
+        )
+
+
 def _check_referral_rails_thesis(
     docs: dict[str, str],
     findings: list[Finding],
@@ -540,6 +595,9 @@ def scan() -> GTMTeamReport:
         _check_geographic_readiness(docs, findings, insights, metrics)
         _check_positioning_strength(docs, findings, insights, metrics)
         _check_referral_rails_thesis(docs, findings, insights, metrics)
+
+    # Live competitive intelligence from web
+    _scan_competitor_updates(findings, insights, metrics)
 
     # Compute readiness score
     readiness = _compute_strategic_readiness(metrics)

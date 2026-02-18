@@ -691,3 +691,132 @@ def record_resolution(agent: str, finding_id: str, resolution_type: str) -> None
 def get_total_scans(agent: str) -> int:
     state = _load_state(agent)
     return state.get("total_scans", 0)
+
+
+# ---------------------------------------------------------------------------
+# Global resolved-issues registry
+# ---------------------------------------------------------------------------
+
+_RESOLVED_REGISTRY_PATH = AGENTS_DIR / "shared" / "resolved_registry.json"
+
+
+def _load_resolved_registry() -> dict[str, dict]:
+    """Load the global resolved-issues registry."""
+    if _RESOLVED_REGISTRY_PATH.exists():
+        try:
+            return json.loads(_RESOLVED_REGISTRY_PATH.read_text())
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Corrupt resolved registry, returning empty")
+    return {}
+
+
+def _save_resolved_registry(registry: dict[str, dict]) -> None:
+    """Persist the global resolved-issues registry."""
+    _RESOLVED_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _RESOLVED_REGISTRY_PATH.write_text(json.dumps(registry, indent=2, default=str))
+
+
+def resolve_issue(
+    finding_id: str,
+    resolution_type: str,
+    reason: str = "",
+    skip_days: int | None = 30,
+) -> None:
+    """Mark a finding as resolved in the global registry.
+
+    Args:
+        finding_id: The finding ID (e.g. "ARCH-N+1", "pipe-001").
+        resolution_type: One of "fixed", "false_positive", "wont_fix", "deferred".
+        reason: Human-readable explanation.
+        skip_days: Days to suppress re-reporting (None = permanent for wont_fix/false_positive).
+    """
+    registry = _load_resolved_registry()
+    now = datetime.now(timezone.utc)
+
+    entry: dict[str, Any] = {
+        "resolution_type": resolution_type,
+        "resolved_at": now.isoformat(),
+        "reason": reason,
+    }
+
+    if resolution_type in ("wont_fix", "false_positive"):
+        entry["skip_until"] = None  # permanent
+    elif skip_days is not None:
+        entry["skip_until"] = (now + timedelta(days=skip_days)).isoformat()
+
+    registry[finding_id] = entry
+    _save_resolved_registry(registry)
+    logger.info("Resolved %s as %s: %s", finding_id, resolution_type, reason)
+
+
+def unresolve_issue(finding_id: str) -> bool:
+    """Remove a finding from the resolved registry. Returns True if found."""
+    registry = _load_resolved_registry()
+    if finding_id in registry:
+        del registry[finding_id]
+        _save_resolved_registry(registry)
+        return True
+    return False
+
+
+def is_resolved(finding_id: str) -> bool:
+    """Check if a finding is currently resolved (and within skip window)."""
+    registry = _load_resolved_registry()
+    entry = registry.get(finding_id)
+    if not entry:
+        return False
+
+    skip_until = entry.get("skip_until")
+    if skip_until is None:
+        # Permanent (wont_fix / false_positive)
+        return True
+
+    try:
+        skip_dt = datetime.fromisoformat(skip_until)
+        if skip_dt.tzinfo is None:
+            skip_dt = skip_dt.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < skip_dt
+    except (ValueError, TypeError):
+        return False
+
+
+def list_resolved() -> dict[str, dict]:
+    """Return all entries in the resolved registry."""
+    return _load_resolved_registry()
+
+
+def filter_resolved_findings(findings: list) -> list:
+    """Remove findings that are in the resolved registry.
+
+    Works with both Finding dataclass instances and dicts.
+    Matches on finding.id.
+    """
+    registry = _load_resolved_registry()
+    if not registry:
+        return findings
+
+    now = datetime.now(timezone.utc)
+    result = []
+    for f in findings:
+        fid = f.id if hasattr(f, "id") else f.get("id", "")
+        entry = registry.get(fid)
+        if entry is None:
+            result.append(f)
+            continue
+
+        skip_until = entry.get("skip_until")
+        if skip_until is None:
+            # Permanently resolved
+            continue
+
+        try:
+            skip_dt = datetime.fromisoformat(skip_until)
+            if skip_dt.tzinfo is None:
+                skip_dt = skip_dt.replace(tzinfo=timezone.utc)
+            if now < skip_dt:
+                continue  # Still within skip window
+        except (ValueError, TypeError):
+            pass
+
+        result.append(f)
+    return result

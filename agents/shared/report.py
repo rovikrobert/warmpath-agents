@@ -130,8 +130,14 @@ class AgentReport:
 # ---------------------------------------------------------------------------
 
 
-def merge_reports(reports: list[AgentReport]) -> list[Finding]:
-    """Merge findings from multiple reports, deduplicating by file + line + category."""
+def merge_reports(
+    reports: list[AgentReport], *, skip_resolved: bool = True
+) -> list[Finding]:
+    """Merge findings from multiple reports, deduplicating by file + line + category.
+
+    When skip_resolved=True (default), findings that appear in the global
+    resolved-issues registry are silently dropped.
+    """
     seen: dict[str, Finding] = {}
     for report in reports:
         for f in report.findings:
@@ -148,4 +154,12 @@ def merge_reports(reports: list[AgentReport]) -> list[Finding]:
                     existing.recurrence_count += 1
             else:
                 seen[key] = f
-    return sorted(seen.values(), key=lambda f: f.sort_key)
+
+    merged = sorted(seen.values(), key=lambda f: f.sort_key)
+
+    if skip_resolved:
+        from agents.shared.learning import filter_resolved_findings
+
+        merged = filter_resolved_findings(merged)
+
+    return merged

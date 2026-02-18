@@ -304,6 +304,54 @@ def cmd_research_agenda() -> None:
         print()
 
 
+def cmd_resolve(finding_id: str, resolution_type: str, reason: str) -> None:
+    """Mark a finding as resolved in the global registry."""
+    from agents.shared.learning import resolve_issue
+
+    valid_types = ("fixed", "false_positive", "wont_fix", "deferred")
+    if resolution_type not in valid_types:
+        print(f"Invalid resolution type: {resolution_type}")
+        print(f"Valid types: {', '.join(valid_types)}")
+        sys.exit(1)
+
+    skip_days = None if resolution_type in ("wont_fix", "false_positive") else 30
+    resolve_issue(finding_id, resolution_type, reason, skip_days=skip_days)
+    print(f"Resolved [{finding_id}] as {resolution_type}: {reason}")
+    if skip_days:
+        print(f"  Will re-check after {skip_days} days")
+    else:
+        print("  Permanently suppressed (unresolve with --unresolve)")
+
+
+def cmd_unresolve(finding_id: str) -> None:
+    """Remove a finding from the resolved registry."""
+    from agents.shared.learning import unresolve_issue
+
+    if unresolve_issue(finding_id):
+        print(f"Unresolved [{finding_id}] — agents will report it again")
+    else:
+        print(f"[{finding_id}] was not in the resolved registry")
+
+
+def cmd_resolved() -> None:
+    """List all resolved findings."""
+    from agents.shared.learning import list_resolved
+
+    registry = list_resolved()
+    if not registry:
+        print("No resolved findings.")
+        return
+
+    print("## Resolved Findings\n")
+    print(f"| {'ID':<25} | {'Type':<15} | {'Resolved':<12} | Reason |")
+    print(f"|{'-'*27}|{'-'*17}|{'-'*14}|--------|")
+    for fid, entry in sorted(registry.items()):
+        res_type = entry.get("resolution_type", "?")
+        resolved_at = entry.get("resolved_at", "")[:10]
+        reason = entry.get("reason", "")
+        print(f"| {fid:<25} | {res_type:<15} | {resolved_at:<12} | {reason} |")
+
+
 def cmd_health_trend() -> None:
     """Print codebase health score timeline."""
     from agents.shared.learning import get_learning_state
@@ -385,6 +433,21 @@ def main() -> None:
     group.add_argument(
         "--cos-status", action="store_true", help="Chief of Staff status snapshot"
     )
+    group.add_argument(
+        "--resolve",
+        nargs=3,
+        metavar=("FINDING_ID", "TYPE", "REASON"),
+        help="Mark finding as resolved (types: fixed, false_positive, wont_fix, deferred)",
+    )
+    group.add_argument(
+        "--unresolve",
+        type=str,
+        metavar="FINDING_ID",
+        help="Remove a finding from the resolved registry",
+    )
+    group.add_argument(
+        "--resolved", action="store_true", help="List all resolved findings"
+    )
 
     parser.add_argument(
         "--skip-tests", action="store_true", help="Skip test_engineer (faster)"
@@ -431,6 +494,12 @@ def main() -> None:
         from agents.chief_of_staff.cos_agent import run_status
 
         print(run_status())
+    elif args.resolve:
+        cmd_resolve(*args.resolve)
+    elif args.unresolve:
+        cmd_unresolve(args.unresolve)
+    elif args.resolved:
+        cmd_resolved()
 
 
 if __name__ == "__main__":

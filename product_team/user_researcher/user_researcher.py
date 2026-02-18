@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from agents.shared.report import Finding
+from agents.shared.web_tools import web_search
 from product_team.shared.config import (
     API_DIR,
     FRONTEND_SRC,
@@ -150,6 +151,55 @@ def _check_persona_balance(
     )
 
 
+def _scan_user_sentiment(
+    insights: list[ProductInsight],
+    findings: list[Finding],
+    metrics: dict,
+) -> None:
+    """Search web for user sentiment about referral platforms and job search tools."""
+    queries = [
+        "employee referral platform review site:reddit.com",
+        "warm introduction job search tool",
+        "referral marketplace job seekers",
+    ]
+    total_results = 0
+    sentiment_snippets: list[str] = []
+
+    for query in queries:
+        results = web_search(query, max_results=3)
+        total_results += len(results)
+        for r in results:
+            sentiment_snippets.append(f"{r.title}: {r.snippet[:120]}")
+
+    metrics["web_sentiment_results"] = total_results
+    metrics["web_sentiment_queries"] = len(queries)
+
+    if total_results > 0:
+        insights.append(
+            ProductInsight(
+                id="ur-insight-sentiment",
+                category="research",
+                title=f"Web sentiment scan: {total_results} results across {len(queries)} queries",
+                evidence="; ".join(sentiment_snippets[:5]),
+                impact="External user sentiment informs product positioning and feature prioritization",
+                recommendation="Review sentiment trends for unmet needs in referral job search",
+                confidence=0.6,
+            )
+        )
+    else:
+        insights.append(
+            ProductInsight(
+                id="ur-insight-sentiment",
+                category="research",
+                title="Web sentiment scan: no results (network may be unavailable)",
+                evidence="Web search returned 0 results — may be offline or rate-limited",
+                impact="Cannot assess external user sentiment without web access",
+                recommendation="Retry when network is available",
+                confidence=0.3,
+            )
+        )
+
+
 def _catalog_research_sources(
     insights: list[ProductInsight],
     metrics: dict,
@@ -231,6 +281,7 @@ def scan() -> ProductTeamReport:
         _scan_page_content(page_files, insights, metrics)
 
     _catalog_research_sources(insights, metrics)
+    _scan_user_sentiment(insights, findings, metrics)
 
     duration = time.time() - start
 

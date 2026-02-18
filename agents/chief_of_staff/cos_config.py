@@ -107,6 +107,17 @@ SEVERITY_WEIGHT: dict[str, float] = {
     "info": 0.0,
 }
 
+# Recommended scan order — engineering first (fixes code), then downstream teams.
+# Later teams benefit from seeing resolved engineering issues.
+SCAN_ORDER: list[str] = [
+    "engineering",  # Code fixes, dependency updates, security patches
+    "data",         # Schema/instrumentation audits (see engineering fixes)
+    "product",      # UX/journey audits (see fixed pages)
+    "ops",          # Marketplace health, coaching (see updated services)
+    "finance",      # Credit economy, compliance (see credit service updates)
+    "gtm",          # Marketing, competitive (see positioning changes)
+]
+
 # Decision principle hierarchy — first item wins in a tie
 DECISION_PRINCIPLES = [
     "safety_privacy",  # User safety and privacy — never compromise

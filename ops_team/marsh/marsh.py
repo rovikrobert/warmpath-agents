@@ -14,6 +14,7 @@ import re
 import time
 from pathlib import Path
 
+from agents.shared.api_client import check_health
 from agents.shared.report import Finding
 from ops_team.shared.config import (
     API_DIR,
@@ -688,6 +689,77 @@ def _check_suppression_impact(
 # ---------------------------------------------------------------------------
 
 
+def _check_live_health(
+    findings: list[Finding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Check production API health via live HTTP call."""
+    status = check_health()
+    metrics["live_api_healthy"] = status.healthy
+    metrics["live_api_status_code"] = status.status_code
+    metrics["live_api_response_ms"] = status.response_ms
+
+    if not status.healthy and status.status_code == 0:
+        # Network failure — API unreachable
+        insights.append(
+            OpsInsight(
+                id="marsh-insight-health-offline",
+                category="marketplace_health",
+                title="Production API unreachable",
+                evidence=f"Health check failed: status_code={status.status_code}, response_ms={status.response_ms}",
+                impact="Cannot verify marketplace is operational — may be a network issue or outage",
+                recommendation="Check Railway deployment status and logs",
+                confidence=0.7,
+                persona="both",
+                actionable_by="engineering",
+            )
+        )
+    elif not status.healthy:
+        findings.append(
+            Finding(
+                id="marsh-health-001",
+                severity="critical",
+                category="marketplace_health",
+                title=f"Production API unhealthy (HTTP {status.status_code})",
+                detail=f"Health endpoint returned {status.status_code} in {status.response_ms:.0f}ms",
+                recommendation="Investigate Railway deployment — marketplace is degraded or down",
+            )
+        )
+    else:
+        severity = "info"
+        if status.response_ms > 2000:
+            severity = "medium"
+        elif status.response_ms > 5000:
+            severity = "high"
+
+        insights.append(
+            OpsInsight(
+                id="marsh-insight-health-ok",
+                category="marketplace_health",
+                title=f"Production API healthy ({status.response_ms:.0f}ms)",
+                evidence=f"HTTP {status.status_code} in {status.response_ms:.0f}ms",
+                impact="Marketplace is operational and responsive",
+                recommendation="No action needed" if status.response_ms < 2000 else "Response time is elevated — investigate",
+                confidence=0.95,
+                persona="both",
+                actionable_by="engineering",
+            )
+        )
+
+        if status.response_ms > 2000:
+            findings.append(
+                Finding(
+                    id="marsh-health-002",
+                    severity=severity,
+                    category="marketplace_health",
+                    title=f"Production API slow ({status.response_ms:.0f}ms)",
+                    detail=f"Health endpoint responded in {status.response_ms:.0f}ms (target: <2000ms)",
+                    recommendation="Check Railway resource allocation and database connection pool",
+                )
+            )
+
+
 def _check_coverage_signals(
     model_source: str,
     findings: list[Finding],
@@ -865,6 +937,9 @@ def scan() -> OpsTeamReport:
         model_source, marketplace_api_source, findings, mkt_findings, metrics
     )
     _check_coverage_signals(model_source, findings, insights, metrics)
+
+    # Live production health check
+    _check_live_health(findings, insights, metrics)
 
     duration = time.time() - start
 

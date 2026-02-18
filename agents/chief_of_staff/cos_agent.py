@@ -76,20 +76,15 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 
-def _load_reports() -> list[AgentReport]:
-    """Load cached *_latest.json reports from REPORTS_DIR and data team."""
+def _load_reports() -> tuple[list[AgentReport], list[dict]]:
+    """Load cached *_latest.json reports from all team REPORTS_DIRs.
+
+    Returns (reports, cross_team_requests) — cross-team requests are extracted
+    from team reports and surfaced separately for the daily brief.
+    """
     reports: list[AgentReport] = []
+    cross_team_requests: list[dict] = []
 
-    # Engineering reports
-    if REPORTS_DIR.is_dir():
-        for path in sorted(REPORTS_DIR.glob("*_latest.json")):
-            try:
-                data = json.loads(path.read_text())
-                reports.append(AgentReport.from_dict(data))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
-                continue
-
-    # Data team reports (if available)
     _AR_FIELDS = {
         "agent",
         "timestamp",
@@ -99,56 +94,33 @@ def _load_reports() -> list[AgentReport]:
         "intelligence_applied",
         "learning_updates",
     }
-    if DATA_TEAM_REPORTS_DIR is not None and DATA_TEAM_REPORTS_DIR.is_dir():
-        for path in sorted(DATA_TEAM_REPORTS_DIR.glob("*_latest.json")):
+
+    def _load_dir(reports_dir: Path | None, is_engineering: bool = False) -> None:
+        if reports_dir is None or not reports_dir.is_dir():
+            return
+        for path in sorted(reports_dir.glob("*_latest.json")):
             try:
                 data = json.loads(path.read_text())
-                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
-                reports.append(AgentReport.from_dict(clean))
+                # Extract cross-team requests before stripping fields
+                for req in data.get("cross_team_requests", []):
+                    req["source_agent"] = data.get("agent", "unknown")
+                    cross_team_requests.append(req)
+                if is_engineering:
+                    reports.append(AgentReport.from_dict(data))
+                else:
+                    clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                    reports.append(AgentReport.from_dict(clean))
             except (json.JSONDecodeError, OSError, KeyError, TypeError):
                 continue
 
-    # Product team reports (if available)
-    if PRODUCT_TEAM_REPORTS_DIR is not None and PRODUCT_TEAM_REPORTS_DIR.is_dir():
-        for path in sorted(PRODUCT_TEAM_REPORTS_DIR.glob("*_latest.json")):
-            try:
-                data = json.loads(path.read_text())
-                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
-                reports.append(AgentReport.from_dict(clean))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
-                continue
+    _load_dir(REPORTS_DIR, is_engineering=True)
+    _load_dir(DATA_TEAM_REPORTS_DIR)
+    _load_dir(PRODUCT_TEAM_REPORTS_DIR)
+    _load_dir(OPS_TEAM_REPORTS_DIR)
+    _load_dir(FINANCE_TEAM_REPORTS_DIR)
+    _load_dir(GTM_TEAM_REPORTS_DIR)
 
-    # Ops team reports (if available)
-    if OPS_TEAM_REPORTS_DIR is not None and OPS_TEAM_REPORTS_DIR.is_dir():
-        for path in sorted(OPS_TEAM_REPORTS_DIR.glob("*_latest.json")):
-            try:
-                data = json.loads(path.read_text())
-                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
-                reports.append(AgentReport.from_dict(clean))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
-                continue
-
-    # Finance team reports (if available)
-    if FINANCE_TEAM_REPORTS_DIR is not None and FINANCE_TEAM_REPORTS_DIR.is_dir():
-        for path in sorted(FINANCE_TEAM_REPORTS_DIR.glob("*_latest.json")):
-            try:
-                data = json.loads(path.read_text())
-                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
-                reports.append(AgentReport.from_dict(clean))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
-                continue
-
-    # GTM team reports (if available)
-    if GTM_TEAM_REPORTS_DIR is not None and GTM_TEAM_REPORTS_DIR.is_dir():
-        for path in sorted(GTM_TEAM_REPORTS_DIR.glob("*_latest.json")):
-            try:
-                data = json.loads(path.read_text())
-                clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
-                reports.append(AgentReport.from_dict(clean))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
-                continue
-
-    return reports
+    return reports, cross_team_requests
 
 
 def _get_kpi_snapshot(reports: list[AgentReport]) -> str:
@@ -169,14 +141,16 @@ def _get_kpi_snapshot(reports: list[AgentReport]) -> str:
 
 def run_daily() -> str:
     """Daily cycle: load reports -> synthesize -> output brief -> Notion + WhatsApp."""
-    reports = _load_reports()
+    reports, cross_team_requests = _load_reports()
     if not reports:
         return "# Founder Daily Brief\n\nNo engineering reports available. Run agent scans first."
 
     kpi_snapshot = _get_kpi_snapshot(reports)
     costs = get_team_cost_summary(reports)
     alerts = check_budget_alerts(costs, COS_CONFIG["cost_budget"])
-    brief = synthesize_daily(reports, kpi_snapshot, costs, alerts)
+    brief, brief_data = synthesize_daily(
+        reports, kpi_snapshot, costs, alerts, cross_team_requests
+    )
 
     # Update learning state
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
@@ -224,12 +198,14 @@ def run_daily() -> str:
     record_cost_snapshot(costs)
 
     # Push to Notion and generate WhatsApp message
-    _push_daily_outputs(brief, costs, alerts)
+    _push_daily_outputs(brief, costs, alerts, brief_data)
 
     return brief
 
 
-def _push_daily_outputs(brief: str, costs: dict, alerts: list[str]) -> None:
+def _push_daily_outputs(
+    brief: str, costs: dict, alerts: list[str], brief_data: dict | None = None
+) -> None:
     """Push daily brief to Notion and generate WhatsApp message (best-effort).
 
     Idempotent: skips if today's brief has already been pushed (prevents
@@ -258,11 +234,17 @@ def _push_daily_outputs(brief: str, costs: dict, alerts: list[str]) -> None:
                 )
                 notion_page_id = notion._state.get("last_daily_page_id", "")
             else:
+                _bd = brief_data or {}
                 result = notion.push_daily_brief(
                     date=today,
                     headline=headline,
-                    team_status={},
-                    decisions_needed=[],
+                    team_status={
+                        p.get("team", "engineering"): p.get("note", "Clean scan")
+                        for p in _bd.get("progress", [])
+                    },
+                    decisions_needed=[
+                        d.get("summary", "") for d in _bd.get("decisions_needed", [])
+                    ],
                     blockers=[],
                     cost_yesterday=f"${total_cost:.2f}",
                     brief_markdown=brief,
@@ -279,12 +261,9 @@ def _push_daily_outputs(brief: str, costs: dict, alerts: list[str]) -> None:
 
     try:
         wa = WhatsAppBridge()
-        brief_data = {
-            "decisions_needed": [],
-            "progress": [],
-        }
+        wa_data = brief_data or {"decisions_needed": [], "progress": []}
         wa.generate_morning_brief(
-            brief_data, costs, alerts, notion_page_id=notion_page_id
+            wa_data, costs, alerts, notion_page_id=notion_page_id
         )
     except Exception:
         logger.debug("WhatsApp message generation skipped")
@@ -292,7 +271,7 @@ def _push_daily_outputs(brief: str, costs: dict, alerts: list[str]) -> None:
 
 def run_weekly() -> str:
     """Weekly cycle: deeper analysis + self-learning."""
-    reports = _load_reports()
+    reports, _cross_team = _load_reports()
     if not reports:
         return "# Weekly Synthesis\n\nNo engineering reports available. Run agent scans first."
 
@@ -325,7 +304,7 @@ def run_weekly() -> str:
 
 def run_status() -> str:
     """Quick cross-team status snapshot."""
-    reports = _load_reports()
+    reports, _cross_team = _load_reports()
     if not reports:
         return "# Status Snapshot\n\nNo engineering reports available."
     return synthesize_status(reports)

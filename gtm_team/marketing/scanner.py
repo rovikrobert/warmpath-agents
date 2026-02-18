@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from agents.shared.report import Finding
+from agents.shared.web_tools import web_fetch, web_search
 from gtm_team.shared.config import (
     APP_DIR,
     API_DIR,
@@ -585,6 +586,70 @@ def _check_onboarding_conversion(
         )
 
 
+def _scan_competitor_marketing(
+    findings: list[Finding],
+    insights: list[MarketInsight],
+    metrics: dict,
+) -> None:
+    """Search for competitor landing pages and marketing approaches."""
+    competitor_queries = [
+        "employee referral platform landing page",
+        "get referred to jobs site",
+        "referral marketplace for job seekers",
+    ]
+    total_results = 0
+    competitor_pages: list[str] = []
+
+    for query in competitor_queries:
+        results = web_search(query, max_results=3)
+        total_results += len(results)
+        for r in results:
+            competitor_pages.append(f"{r.title} ({r.url[:60]})")
+
+    metrics["web_marketing_results"] = total_results
+    metrics["web_marketing_queries"] = len(competitor_queries)
+
+    # Fetch top result for messaging analysis if available
+    if total_results > 0:
+        all_results = []
+        for query in competitor_queries:
+            all_results.extend(web_search(query, max_results=1))
+
+        top_url = all_results[0].url if all_results else None
+        messaging_sample = ""
+        if top_url:
+            content = web_fetch(top_url, max_chars=3000)
+            # Extract first 500 chars of meaningful content for analysis
+            messaging_sample = content[:500] if content else ""
+
+        metrics["competitor_messaging_sample_length"] = len(messaging_sample)
+
+        insights.append(
+            MarketInsight(
+                id="mkt-web-insight-001",
+                category="competitive",
+                title=f"Competitor marketing scan: {total_results} results",
+                evidence="; ".join(competitor_pages[:4]),
+                strategic_impact="Competitor messaging reveals positioning gaps and differentiation opportunities",
+                recommended_response="Compare WarmPath's messaging against competitor landing pages",
+                urgency="this_month",
+                confidence="medium",
+            )
+        )
+    else:
+        insights.append(
+            MarketInsight(
+                id="mkt-web-insight-001",
+                category="competitive",
+                title="Competitor marketing scan: no results (network may be unavailable)",
+                evidence="Web search returned 0 results",
+                strategic_impact="Cannot benchmark marketing against competitors without web access",
+                urgency="monitor",
+                confidence="low",
+            )
+        )
+
+
 def _check_content_infrastructure(
     jsx_files: list[Path],
     findings: list[Finding],
@@ -692,6 +757,9 @@ def scan() -> GTMTeamReport:
         )
         _check_onboarding_conversion(jsx_files, findings, insights, metrics)
         _check_content_infrastructure(jsx_files, findings, insights, metrics)
+
+    # Live competitor marketing intelligence
+    _scan_competitor_marketing(findings, insights, metrics)
 
     # Compute marketing readiness score
     score_components = {
