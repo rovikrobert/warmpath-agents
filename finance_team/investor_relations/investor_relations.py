@@ -90,19 +90,42 @@ def _check_test_count_claims(
         metrics["test_count_delta_pct"] = None
         return
 
-    # Count actual test functions/classes across tests/ directory
-    test_files = list(TESTS_DIR.glob("test_*.py")) + list(
-        TESTS_DIR.glob("**/test_*.py")
+    # Count actual tests using pytest --collect-only for ground truth.
+    # Falls back to regex counting if pytest is unavailable.
+    import subprocess
+
+    actual_count: int | None = None
+    try:
+        result = subprocess.run(
+            ["python3", "-m", "pytest", "--collect-only", "-q", str(TESTS_DIR)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(PROJECT_ROOT),
+        )
+        # Last line of -q output: "N tests collected" or "N selected"
+        for line in result.stdout.strip().splitlines()[-5:]:
+            m = re.search(r"(\d+)\s+test", line)
+            if m:
+                actual_count = int(m.group(1))
+                break
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        logger.warning("pytest collect failed, falling back to regex: %s", exc)
+
+    if actual_count is None:
+        # Fallback: regex count of def test_ functions
+        test_files = list(TESTS_DIR.glob("test_*.py")) + list(
+            TESTS_DIR.glob("**/test_*.py")
+        )
+        test_files = list(set(test_files))
+        actual_count = 0
+        for test_file in test_files:
+            content = _read_safe(test_file)
+            actual_count += len(re.findall(r"def test_", content))
+
+    metrics["test_file_count"] = len(
+        list(set(list(TESTS_DIR.glob("test_*.py")) + list(TESTS_DIR.glob("**/test_*.py"))))
     )
-    test_files = list(set(test_files))  # deduplicate
-    metrics["test_file_count"] = len(test_files)
-
-    actual_count = 0
-    for test_file in test_files:
-        content = _read_safe(test_file)
-        # Count only def test_ functions (class Test* are containers, not tests)
-        actual_count += len(re.findall(r"def test_", content))
-
     metrics["test_count_actual"] = actual_count
 
     if claimed_count == 0:
