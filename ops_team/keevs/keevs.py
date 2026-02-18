@@ -542,8 +542,10 @@ def _check_live_coaching_quality(
 
     for message, scenario_name in test_scenarios:
         try:
-            response = _mock_chat_response(message, test_context)
-            length = len(response)
+            result = _mock_chat_response(message, test_context)
+            # _mock_chat_response returns (response_text, topic) tuple
+            response_text = result[0] if isinstance(result, tuple) else result
+            length = len(response_text)
             total_length += length
             if length >= 50:
                 passed += 1

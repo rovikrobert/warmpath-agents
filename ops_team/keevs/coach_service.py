@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.models.coaching import CoachingSession
 from app.models.enrichment import UsageLog
 from app.models.job import Application, UserJobPreferences
 from app.models.search_request import SearchRequest
@@ -251,22 +252,178 @@ def get_suggested_prompts(context: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Session management (P4 foundation)
+# ---------------------------------------------------------------------------
+
+# Coaching stages (P1)
+STAGE_ONBOARDING = "onboarding"
+STAGE_ACTIVE_SEARCH = "active_search"
+STAGE_NETWORK_BUILDING = "network_building"
+STAGE_STALLED = "stalled"
+
+# Session gap threshold: if >6 hours since last message, start new session
+_SESSION_GAP_HOURS = 6
+
+
+def _determine_coaching_stage(context: dict) -> str:
+    """Determine user's coaching stage from their activity (P1)."""
+    network = context.get("network")
+    pipeline = context.get("pipeline", {})
+    prefs = context.get("preferences")
+    total_contacts = (network or {}).get("total_contacts", 0)
+    total_apps = pipeline.get("total", 0)
+    recent_searches = context.get("recent_searches") or []
+
+    # No contacts uploaded → onboarding
+    if total_contacts == 0:
+        return STAGE_ONBOARDING
+
+    # Has contacts but no preferences or apps → network building
+    if not prefs or not prefs.get("target_role"):
+        return STAGE_NETWORK_BUILDING
+
+    # Has contacts + prefs but no apps and no recent searches → stalled
+    if total_apps == 0 and len(recent_searches) == 0:
+        return STAGE_STALLED
+
+    # Actively searching/applying
+    return STAGE_ACTIVE_SEARCH
+
+
+async def _get_or_create_session(
+    user_id: uuid.UUID, db: AsyncSession, context: dict
+) -> CoachingSession:
+    """Get current session or create a new one.
+
+    A new session starts if:
+    - No previous session exists
+    - Last session's last_message_at is >6 hours ago
+    """
+    # Get most recent session
+    result = await db.execute(
+        select(CoachingSession)
+        .where(CoachingSession.user_id == user_id)
+        .order_by(CoachingSession.started_at.desc())
+        .limit(1)
+    )
+    latest = result.scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    stage = _determine_coaching_stage(context)
+
+    if latest is not None:
+        # Check if session is still active (within gap threshold)
+        last_activity = latest.last_message_at or latest.started_at
+        if (now - last_activity) < timedelta(hours=_SESSION_GAP_HOURS):
+            # Update stage if changed
+            if latest.coaching_stage != stage:
+                latest.coaching_stage = stage
+            return latest
+
+    # Count previous sessions to determine session_number
+    count_result = await db.execute(
+        select(func.count()).select_from(CoachingSession).where(
+            CoachingSession.user_id == user_id
+        )
+    )
+    prev_count = count_result.scalar() or 0
+
+    # Create new session
+    session = CoachingSession(
+        user_id=user_id,
+        session_number=prev_count + 1,
+        coaching_stage=stage,
+        topics_covered={},
+        message_count=0,
+        started_at=now,
+    )
+    db.add(session)
+    await db.flush()
+    return session
+
+
+async def _record_topic(
+    coaching_session: CoachingSession, topic: str, db: AsyncSession
+) -> None:
+    """Record that a topic was discussed in the current session (P4)."""
+    topics = dict(coaching_session.topics_covered or {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if topic not in topics:
+        topics[topic] = {"first_discussed": now_iso, "count": 1}
+    else:
+        topics[topic]["count"] = topics[topic].get("count", 0) + 1
+    coaching_session.topics_covered = topics
+    # Trigger SQLAlchemy dirty flag for JSONB
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(coaching_session, "topics_covered")
+
+
+async def _get_recent_topics(user_id: uuid.UUID, db: AsyncSession) -> set[str]:
+    """Get topics covered in the last 3 sessions (for anti-repetition)."""
+    result = await db.execute(
+        select(CoachingSession.topics_covered)
+        .where(CoachingSession.user_id == user_id)
+        .order_by(CoachingSession.started_at.desc())
+        .limit(3)
+    )
+    rows = result.scalars().all()
+    topics: set[str] = set()
+    for tc in rows:
+        if tc:
+            topics.update(tc.keys())
+    return topics
+
+
+# ---------------------------------------------------------------------------
 # Mock functions
 # ---------------------------------------------------------------------------
 
 
-def _mock_briefing(context: dict) -> str:
-    """Generate a deterministic briefing from context data."""
+def _mock_briefing(context: dict, session_number: int = 1, stage: str = STAGE_ONBOARDING) -> str:
+    """Generate a stage-aware, session-count-branched briefing (P1+P2+P3)."""
     user = context.get("user", {})
     name = user.get("name") or "there"
     first_name = name.split()[0] if name != "there" else "there"
 
-    parts: list[str] = [f"Hey {first_name}, here's your daily briefing."]
-
     pipeline = context.get("pipeline", {})
     total_apps = pipeline.get("total", 0)
     follow_ups = pipeline.get("follow_ups_needed", 0)
+    network = context.get("network")
+    total_contacts = (network or {}).get("total_contacts", 0)
+    prefs = context.get("preferences")
+    recent_searches = context.get("recent_searches") or []
 
+    parts: list[str] = []
+
+    # --- Greeting varies by session count (P2: quick win) ---
+    if session_number == 1:
+        parts.append(f"Welcome to WarmPath, {first_name}! I'm Keevs, your career coach.")
+    elif session_number <= 2:
+        parts.append(f"Good to see you again, {first_name}. Let's pick up where we left off.")
+    elif session_number <= 5:
+        parts.append(f"Hey {first_name}, session #{session_number} — you're building momentum.")
+    else:
+        parts.append(f"Hey {first_name}, welcome back (session #{session_number}).")
+
+    # --- Stage-aware content (P1) ---
+    if stage == STAGE_ONBOARDING and session_number <= 2:
+        # Orientation: explain the platform
+        parts.append(
+            "Here's how WarmPath works: upload your LinkedIn contacts, "
+            "set your job preferences, and I'll find warm referral paths "
+            "to your target companies."
+        )
+        parts.append("[Upload your LinkedIn CSV](/contacts) to get started.")
+    elif stage == STAGE_ONBOARDING:
+        # Returning user who still hasn't uploaded — nudge without re-explaining
+        parts.append(
+            "You still haven't uploaded contacts — that's the key to unlocking "
+            "referral paths. [Upload your CSV](/contacts) when you're ready."
+        )
+
+    # --- Action-based dynamic sections (P3) ---
+
+    # Pipeline: only show if user has apps (skip if onboarding)
     if total_apps > 0:
         status_counts = pipeline.get("status_counts", {})
         active = sum(
@@ -276,130 +433,225 @@ def _mock_briefing(context: dict) -> str:
             f"You have {active} active application{'s' if active != 1 else ''} in your pipeline."
         )
 
+    # Follow-ups: always show if due
     if follow_ups > 0:
         parts.append(
             f"**{follow_ups} follow-up{'s' if follow_ups != 1 else ''}** "
             f"{'are' if follow_ups != 1 else 'is'} due — check your [applications](/applications)."
         )
 
-    network = context.get("network")
-    if network:
-        total = network.get("total_contacts", 0)
+    # Network: only show upload prompt if they haven't uploaded (P3)
+    if network and total_contacts > 0:
         top = network.get("top_companies", [])
-        if top:
-            top_name = top[0]["company"]
-            top_count = top[0]["count"]
-            parts.append(
-                f"Your network has {total} contacts — strongest at {top_name} ({top_count})."
-            )
+        if session_number <= 5:
+            # Early sessions: show network summary
+            if top:
+                top_name = top[0]["company"]
+                top_count = top[0]["count"]
+                parts.append(
+                    f"Your network has {total_contacts} contacts — strongest at {top_name} ({top_count})."
+                )
+            else:
+                parts.append(f"Your network has {total_contacts} contacts.")
         else:
-            parts.append(f"Your network has {total} contacts.")
-    else:
+            # Later sessions: skip basic network recap, focus on changes
+            if top and len(recent_searches) > 0:
+                parts.append(
+                    f"You've searched {len(recent_searches)} companies recently. "
+                    "[Find more referral paths](/referrals)."
+                )
+
+    # Preferences: only prompt if missing AND early session (P3)
+    if not prefs and session_number <= 3:
         parts.append(
-            "You haven't uploaded contacts yet — [upload your LinkedIn CSV](/contacts) to get started."
+            "Set your [job preferences](/preferences) so I can give you targeted advice."
+        )
+    elif not prefs and session_number > 3:
+        parts.append("Reminder: [set your preferences](/preferences) to unlock personalized matching.")
+
+    # Stalled users: give a gentle push (P1)
+    if stage == STAGE_STALLED and session_number > 3:
+        parts.append(
+            "Looks like your search has slowed down. Want to [explore new companies](/referrals) "
+            "or review your [network for untapped connections](/contacts)?"
         )
 
+    # Market data (unchanged — only show if available)
     market = context.get("market")
     if market and market.get("summary"):
         parts.append(market["summary"])
 
-    prefs = context.get("preferences")
-    if not prefs:
-        parts.append(
-            "Set your [job preferences](/preferences) so I can give you targeted advice."
-        )
-
     return " ".join(parts)
 
 
-def _mock_chat_response(message: str, context: dict) -> str:
-    """Generate keyword-based mock chat responses."""
+def _detect_topic(message: str) -> str | None:
+    """Detect which topic a message is about (for topic tracking)."""
+    msg_lower = message.lower()
+    topic_keywords = {
+        "follow_ups": ("follow-up", "follow up", "followup"),
+        "network": ("network", "contact", "connection"),
+        "targeting": ("company", "target", "should i"),
+        "credits": ("credit", "balance"),
+        "getting_started": ("start", "begin", "how do i", "getting started"),
+        "pipeline": ("pipeline", "application"),
+    }
+    for topic, keywords in topic_keywords.items():
+        if any(kw in msg_lower for kw in keywords):
+            return topic
+    return None
+
+
+def _mock_chat_response(
+    message: str, context: dict, recent_topics: set[str] | None = None
+) -> tuple[str, str | None]:
+    """Generate keyword-based mock chat responses with anti-repetition (P4).
+
+    Returns (response_text, topic_name_or_none).
+    """
     msg_lower = message.lower()
     network = context.get("network")
     pipeline = context.get("pipeline", {})
     prefs = context.get("preferences")
+    topic = _detect_topic(message)
+    seen = recent_topics or set()
 
-    if any(kw in msg_lower for kw in ("follow-up", "follow up", "followup")):
+    if topic == "follow_ups":
         follow_ups = pipeline.get("follow_ups_needed", 0)
         if follow_ups > 0:
+            if "follow_ups" in seen:
+                # Vary response when topic was recently discussed
+                return (
+                    f"Still {follow_ups} follow-up{'s' if follow_ups != 1 else ''} pending. "
+                    "Remember: the best follow-ups reference something specific — "
+                    "a recent company announcement, a shared connection, or a project you admire. "
+                    "Check your [applications](/applications).",
+                    topic,
+                )
             return (
                 f"You have {follow_ups} follow-up{'s' if follow_ups != 1 else ''} due. "
                 "Head to your [applications](/applications) to see which ones need attention. "
                 "A good follow-up is short: restate your interest, add one new insight about "
-                "the company, and ask about timeline."
+                "the company, and ask about timeline.",
+                topic,
             )
         return (
             "No follow-ups due right now. Keep your pipeline moving by "
-            "[finding new referral paths](/referrals)."
+            "[finding new referral paths](/referrals).",
+            topic,
         )
 
-    if any(kw in msg_lower for kw in ("network", "contact", "connection")):
+    if topic == "network":
         if network:
             total = network.get("total_contacts", 0)
             top = network.get("top_companies", [])
             top_str = ", ".join(f"{c['company']} ({c['count']})" for c in top[:3])
+            if "network" in seen:
+                return (
+                    f"Your network ({total} contacts) hasn't changed since we last discussed it. "
+                    "To strengthen your position, try [searching for referrals](/referrals) "
+                    "at companies where you have 3+ contacts — those are your highest-probability paths.",
+                    topic,
+                )
             return (
                 f"Your network has {total} contacts. Strongest at: {top_str}. "
                 "To find referral paths at specific companies, head to "
-                "[find referrals](/referrals)."
+                "[find referrals](/referrals).",
+                topic,
             )
         return (
             "You haven't uploaded contacts yet. [Upload your LinkedIn CSV](/contacts) "
-            "and I can help you identify the best referral paths."
+            "and I can help you identify the best referral paths.",
+            topic,
         )
 
-    if any(kw in msg_lower for kw in ("company", "target", "should i")):
+    if topic == "targeting":
         if prefs and prefs.get("target_role"):
             role = prefs["target_role"]
+            if "targeting" in seen:
+                return (
+                    f"You're targeting {role} roles. Since we've covered targeting before, "
+                    "here's a deeper tip: look beyond obvious companies. Mid-size firms "
+                    "(500-2000 employees) often have less competition and faster hiring. "
+                    "[Search your network](/referrals) for hidden gems.",
+                    topic,
+                )
             return (
                 f"Based on your target role ({role}), I'd focus on companies where you "
                 "already have contacts. Check your [network](/contacts) for companies with "
                 "3+ connections — those give you the best referral odds. Then "
-                "[search for referrals](/referrals) at those companies."
+                "[search for referrals](/referrals) at those companies.",
+                topic,
             )
         return (
             "I don't have your target role yet. "
-            "[Set your preferences](/preferences) and I can give you specific guidance."
+            "[Set your preferences](/preferences) and I can give you specific guidance.",
+            topic,
         )
 
-    if any(kw in msg_lower for kw in ("credit", "balance")):
+    if topic == "credits":
         balance = context.get("credits", 0)
+        if "credits" in seen:
+            return (
+                f"Your balance is still {balance} credits. Quick reminder: "
+                "uploading contacts earns 100, facilitating intros earns 50. "
+                "Credits expire after 12 months. [View history](/credits).",
+                topic,
+            )
         return (
             f"You have {balance} credits. Credits are used for cross-network searches (5) "
             "and intro requests (20). Earn more by uploading contacts (100) or "
-            "facilitating intros (50). Check your [credit history](/credits)."
+            "facilitating intros (50). Check your [credit history](/credits).",
+            topic,
         )
 
-    if any(kw in msg_lower for kw in ("start", "begin", "how do i", "getting started")):
+    if topic == "getting_started":
+        if "getting_started" in seen:
+            return (
+                "We've covered the basics before. Where are you stuck? "
+                "If you've already uploaded contacts, try [searching for referrals](/referrals). "
+                "If you need help with a specific company or role, just ask.",
+                topic,
+            )
         return (
             "Here's your game plan:\n\n"
             "1. [Upload your LinkedIn CSV](/contacts) — this maps your network.\n"
             "2. [Set your job preferences](/preferences) — target role, seniority, locations.\n"
             "3. [Search for referrals](/referrals) — I'll find warm paths to your target companies.\n\n"
             "The key insight: referrals convert at 10-40% vs 1-3% for cold applications. "
-            "Your existing network is more valuable than you think."
+            "Your existing network is more valuable than you think.",
+            topic,
         )
 
-    if any(kw in msg_lower for kw in ("pipeline", "application")):
+    if topic == "pipeline":
         total = pipeline.get("total", 0)
         if total > 0:
             status_counts = pipeline.get("status_counts", {})
             parts = [f"{v} {k}" for k, v in status_counts.items()]
+            if "pipeline" in seen:
+                return (
+                    f"Pipeline update: {total} applications ({', '.join(parts)}). "
+                    "Focus on moving your strongest prospects forward — quality over quantity. "
+                    "[View details](/applications).",
+                    topic,
+                )
             return (
                 f"Your pipeline has {total} applications: {', '.join(parts)}. "
                 "View details in your [applications](/applications). "
-                "Keep targeting 5-10 companies deeply rather than spreading thin."
+                "Keep targeting 5-10 companies deeply rather than spreading thin.",
+                topic,
             )
         return (
             "No applications tracked yet. Once you find referral paths, "
-            "start tracking applications in your [pipeline](/applications)."
+            "start tracking applications in your [pipeline](/applications).",
+            topic,
         )
 
     # Fallback
     return (
         "I can help with your job search strategy, network analysis, "
         "follow-up timing, and referral approach. Try asking about your "
-        "network, pipeline, or what to focus on next."
+        "network, pipeline, or what to focus on next.",
+        None,
     )
 
 
@@ -409,7 +661,7 @@ def _mock_chat_response(message: str, context: dict) -> str:
 
 
 async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    """Generate (or return cached) daily briefing."""
+    """Generate (or return cached) daily briefing with session tracking."""
     cache_key = f"keevs_briefing:{user_id}"
 
     # Check cache
@@ -420,11 +672,16 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
     # Assemble context
     context = await _assemble_context(user_id, db)
 
+    # Get or create coaching session
+    coaching_session = await _get_or_create_session(user_id, db, context)
+    session_number = coaching_session.session_number
+    stage = coaching_session.coaching_stage
+
     # Generate briefing
     if settings.AI_MOCK_MODE:
-        briefing_text = _mock_briefing(context)
+        briefing_text = _mock_briefing(context, session_number, stage)
     else:
-        briefing_text = await _generate_briefing_via_claude(context)
+        briefing_text = await _generate_briefing_via_claude(context, session_number, stage)
 
     suggested = get_suggested_prompts(context)
 
@@ -433,6 +690,8 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
         "context_snapshot": context,
         "suggested_prompts": suggested,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "session_number": session_number,
+        "coaching_stage": stage,
     }
 
     # Cache and flush so it persists on the connection
@@ -442,14 +701,19 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
     return result
 
 
-async def _generate_briefing_via_claude(context: dict) -> str:
+async def _generate_briefing_via_claude(
+    context: dict, session_number: int = 1, stage: str = STAGE_ONBOARDING
+) -> str:
     """Call Claude API for briefing generation."""
     try:
         client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
         user_prompt = (
-            "Generate my daily career briefing based on this data:\n\n"
-            f"{json.dumps(context, default=str, indent=2)}"
+            f"Generate my daily career briefing. This is session #{session_number}, "
+            f"coaching stage: {stage}. "
+            f"{'First visit — orient the user.' if session_number == 1 else ''}"
+            f"{'Returning user — skip basics, focus on progress.' if session_number > 5 else ''}\n\n"
+            f"Data:\n{json.dumps(context, default=str, indent=2)}"
         )
 
         message = await client.messages.create(
@@ -477,17 +741,30 @@ async def generate_chat_response(
     context_snapshot: dict | None,
     db: AsyncSession,
 ) -> dict:
-    """Generate a chat response from Keevs."""
+    """Generate a chat response from Keevs with topic tracking (P4)."""
     # If no context provided, assemble fresh
     if not context_snapshot:
         context_snapshot = await _assemble_context(user_id, db)
 
+    # Get coaching session + recent topics for anti-repetition
+    coaching_session = await _get_or_create_session(user_id, db, context_snapshot)
+    recent_topics = await _get_recent_topics(user_id, db)
+
     if settings.AI_MOCK_MODE:
-        response_text = _mock_chat_response(message, context_snapshot)
+        response_text, topic = _mock_chat_response(message, context_snapshot, recent_topics)
     else:
         response_text = await _generate_chat_via_claude(
             message, conversation_history or [], context_snapshot
         )
+        topic = _detect_topic(message)
+
+    # Track topic in session (P4)
+    if topic:
+        await _record_topic(coaching_session, topic, db)
+
+    # Update session activity
+    coaching_session.message_count += 1
+    coaching_session.last_message_at = datetime.now(timezone.utc)
 
     # Log usage
     db.add(
@@ -495,7 +772,7 @@ async def generate_chat_response(
             user_id=user_id,
             action="coach_chat",
             resource_type="coach",
-            metadata_={"message_length": len(message)},
+            metadata_={"message_length": len(message), "topic": topic},
         )
     )
 
@@ -560,7 +837,8 @@ async def _generate_chat_via_claude(
         return response.content[0].text.strip()
     except Exception as exc:
         logger.error("Claude chat API failed: %s — falling back to mock", exc)
-        return _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context)
+        return text
 
 
 async def generate_chat_response_stream(
@@ -570,7 +848,8 @@ async def generate_chat_response_stream(
 ):
     """Yield text chunks as they arrive from Claude. Mock mode yields full text at once."""
     if settings.AI_MOCK_MODE:
-        yield _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context)
+        yield text
         return
 
     try:
@@ -587,4 +866,5 @@ async def generate_chat_response_stream(
                 yield text
     except Exception as exc:
         logger.error("Claude stream API failed: %s — falling back to mock", exc)
-        yield _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context)
+        yield text
