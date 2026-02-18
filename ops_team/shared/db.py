@@ -15,10 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 def get_session() -> Session | None:
-    """Return a sync SQLAlchemy session, or None if DB is unavailable."""
-    db_url = os.environ.get("DATABASE_URL", "")
+    """Return a sync SQLAlchemy session, or None if DB is unavailable.
+
+    Tries DATABASE_URL first (Railway internal), then DATABASE_PUBLIC_URL
+    (TCP proxy for local/external access).
+    """
+    db_url = os.environ.get("DATABASE_URL", "") or os.environ.get(
+        "DATABASE_PUBLIC_URL", ""
+    )
     if not db_url:
-        logger.info("ops db: DATABASE_URL not set — live checks disabled")
+        logger.info("ops db: no DATABASE_URL or DATABASE_PUBLIC_URL — live checks disabled")
         return None
     try:
         from app.database import _get_sync_engine
