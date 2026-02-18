@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ast
+import copy
 import json
 import logging
+import random
 import re
 import subprocess
 import time
@@ -703,6 +705,400 @@ def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Mypy type checking
+# ---------------------------------------------------------------------------
+
+
+def _scan_mypy(findings: list[Finding]) -> dict[str, object]:
+    """Run mypy on app/ and create findings from type errors.
+
+    Returns metrics dict with error counts by category.
+    """
+    metrics: dict[str, object] = {}
+
+    result = _run_tool(
+        ["mypy", "app/", "--no-error-summary", "--no-color"],
+        timeout=60,
+    )
+    if result is None:
+        findings.append(
+            Finding(
+                id="ARCH-MYPY-UNAVAIL",
+                severity="info",
+                category="tooling",
+                title="mypy not available",
+                detail=(
+                    "Could not run mypy. Install with: pip install mypy. "
+                    "Type checking helps catch bugs before runtime."
+                ),
+            )
+        )
+        metrics["mypy_available"] = False
+        return metrics
+
+    metrics["mypy_available"] = True
+
+    # Parse mypy output: file:line: severity: message  [error-code]
+    error_re = re.compile(
+        r"^(.+?):(\d+):\s+(error|warning|note):\s+(.+?)(?:\s+\[(.+?)\])?$"
+    )
+
+    errors_by_code: dict[str, int] = {}
+    errors_by_file: dict[str, int] = {}
+    total_errors = 0
+    total_warnings = 0
+
+    for line in (result.stdout or "").splitlines():
+        m = error_re.match(line.strip())
+        if not m:
+            continue
+
+        filepath, lineno, severity, message, code = m.groups()
+        code = code or "unknown"
+
+        if severity == "error":
+            total_errors += 1
+            errors_by_code[code] = errors_by_code.get(code, 0) + 1
+            errors_by_file[filepath] = errors_by_file.get(filepath, 0) + 1
+        elif severity == "warning":
+            total_warnings += 1
+
+    metrics["mypy_errors"] = total_errors
+    metrics["mypy_warnings"] = total_warnings
+    metrics["mypy_error_codes"] = dict(
+        sorted(errors_by_code.items(), key=lambda x: -x[1])[:10]
+    )
+
+    # Create findings based on severity thresholds
+    if total_errors > 50:
+        # Top offending files
+        worst_files = sorted(errors_by_file.items(), key=lambda x: -x[1])[:5]
+        worst_str = ", ".join(f"`{f}` ({n})" for f, n in worst_files)
+        findings.append(
+            Finding(
+                id="ARCH-MYPY-ERRORS",
+                severity="medium",
+                category="type_safety",
+                title=f"mypy reports {total_errors} type errors",
+                detail=(
+                    f"mypy found {total_errors} errors across "
+                    f"{len(errors_by_file)} files. "
+                    f"Top error codes: {errors_by_code}. "
+                    f"Worst files: {worst_str}."
+                ),
+                recommendation=(
+                    "Focus on the most common error code first. "
+                    "Consider adding a mypy pre-commit hook to prevent regression."
+                ),
+                effort_hours=4.0,
+            )
+        )
+    elif total_errors > 10:
+        findings.append(
+            Finding(
+                id="ARCH-MYPY-ERRORS",
+                severity="low",
+                category="type_safety",
+                title=f"mypy reports {total_errors} type errors",
+                detail=(
+                    f"mypy found {total_errors} errors. "
+                    f"Error codes: {errors_by_code}."
+                ),
+                recommendation="Gradually address type errors to improve safety.",
+                effort_hours=2.0,
+            )
+        )
+    elif total_errors == 0:
+        findings.append(
+            Finding(
+                id="ARCH-MYPY-CLEAN",
+                severity="info",
+                category="type_safety",
+                title="mypy: zero type errors",
+                detail="mypy reports no type errors. Type safety is strong.",
+            )
+        )
+
+    return metrics
+
+
+# ---------------------------------------------------------------------------
+# Mutation testing (lightweight built-in sampler)
+# ---------------------------------------------------------------------------
+
+# Critical service files to mutation-test (most business logic)
+_MUTATION_TARGETS = [
+    "app/services/warm_scorer.py",
+    "app/services/credits.py",
+    "app/services/marketplace.py",
+    "app/utils/security.py",
+    "app/utils/encryption.py",
+]
+
+# Simple AST mutations: swap comparison operators
+_OPERATOR_SWAPS: dict[type, type] = {
+    ast.Eq: ast.NotEq,
+    ast.NotEq: ast.Eq,
+    ast.Lt: ast.GtE,
+    ast.GtE: ast.Lt,
+    ast.Gt: ast.LtE,
+    ast.LtE: ast.Gt,
+}
+
+
+class _MutationVisitor(ast.NodeTransformer):
+    """Apply a single mutation at a target location."""
+
+    def __init__(self, target_line: int, mutation_type: str) -> None:
+        self.target_line = target_line
+        self.mutation_type = mutation_type
+        self.applied = False
+
+    def visit_Compare(self, node: ast.Compare) -> ast.AST:
+        if (
+            not self.applied
+            and node.lineno == self.target_line
+            and self.mutation_type == "compare_swap"
+            and node.ops
+        ):
+            op_type = type(node.ops[0])
+            swap_to = _OPERATOR_SWAPS.get(op_type)
+            if swap_to:
+                new_node = copy.deepcopy(node)
+                new_node.ops[0] = swap_to()
+                self.applied = True
+                return new_node
+        return self.generic_visit(node)
+
+    def visit_Return(self, node: ast.Return) -> ast.AST:
+        if (
+            not self.applied
+            and node.lineno == self.target_line
+            and self.mutation_type == "return_none"
+            and node.value is not None
+        ):
+            new_node = copy.deepcopy(node)
+            new_node.value = ast.Constant(value=None)
+            self.applied = True
+            return ast.fix_missing_locations(new_node)
+        return self.generic_visit(node)
+
+
+def _collect_mutation_sites(source: str) -> list[tuple[int, str]]:
+    """Find lines where we can apply mutations. Returns [(line, type), ...]."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    sites: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare) and node.ops:
+            op_type = type(node.ops[0])
+            if op_type in _OPERATOR_SWAPS:
+                sites.append((node.lineno, "compare_swap"))
+        elif isinstance(node, ast.Return) and node.value is not None:
+            sites.append((node.lineno, "return_none"))
+    return sites
+
+
+def _apply_mutation(source: str, line: int, mutation_type: str) -> str | None:
+    """Apply a single mutation and return the mutated source, or None on failure."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+
+    visitor = _MutationVisitor(line, mutation_type)
+    new_tree = visitor.visit(tree)
+    if not visitor.applied:
+        return None
+
+    try:
+        return ast.unparse(ast.fix_missing_locations(new_tree))
+    except Exception:
+        return None
+
+
+def _restore_mutation_backups() -> None:
+    """Restore any source files left mutated by a previous interrupted run.
+
+    Uses a journaling pattern: before mutating a file we write the original
+    to ``<file>.mutation_backup``. If that backup still exists on the next
+    scan, the previous run was interrupted mid-mutation and we restore.
+    """
+    for rel_path in _MUTATION_TARGETS:
+        backup = PROJECT_ROOT / (rel_path + ".mutation_backup")
+        target = PROJECT_ROOT / rel_path
+        if backup.exists():
+            try:
+                target.write_text(backup.read_text(encoding="utf-8"), encoding="utf-8")
+                backup.unlink()
+                logger.warning("Restored %s from mutation backup", rel_path)
+            except OSError as exc:
+                logger.error("Failed to restore %s from backup: %s", rel_path, exc)
+
+
+def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
+    """Run lightweight mutation sampling on critical service files.
+
+    For each target file:
+    1. Collect mutation sites (operator swaps, return-None)
+    2. Sample up to 5 mutations per file
+    3. Apply each, run tests, check if tests catch it
+    4. Report mutation kill rate
+
+    Returns metrics dict.
+    """
+    # Recover from any interrupted previous run
+    _restore_mutation_backups()
+
+    metrics: dict[str, object] = {}
+    total_tested = 0
+    total_killed = 0
+    total_survived = 0
+    file_results: dict[str, dict[str, int]] = {}
+
+    for rel_path in _MUTATION_TARGETS:
+        target = PROJECT_ROOT / rel_path
+        if not target.exists():
+            continue
+
+        try:
+            original = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        sites = _collect_mutation_sites(original)
+        if not sites:
+            continue
+
+        # Write backup before any mutations (journal)
+        backup = PROJECT_ROOT / (rel_path + ".mutation_backup")
+        try:
+            backup.write_text(original, encoding="utf-8")
+        except OSError:
+            continue  # skip file if we can't create a safety backup
+
+        # Sample up to 5 mutations per file
+        sampled = random.sample(sites, min(5, len(sites)))
+        killed = 0
+        survived = 0
+
+        for line, mut_type in sampled:
+            mutated = _apply_mutation(original, line, mut_type)
+            if mutated is None:
+                continue
+
+            total_tested += 1
+
+            # Write mutation, run tests, restore
+            try:
+                target.write_text(mutated, encoding="utf-8")
+                result = _run_tool(
+                    [
+                        "python3", "-m", "pytest", "tests/", "-x", "-q",
+                        "--timeout=10", "--no-header", "-p", "no:warnings",
+                    ],
+                    timeout=30,
+                )
+                if result is not None and result.returncode != 0:
+                    killed += 1
+                    total_killed += 1
+                else:
+                    survived += 1
+                    total_survived += 1
+            except Exception:
+                survived += 1
+                total_survived += 1
+            finally:
+                # Always restore original
+                target.write_text(original, encoding="utf-8")
+
+        # All mutations done for this file — remove backup journal
+        try:
+            backup.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+        file_results[rel_path] = {
+            "sites": len(sites),
+            "tested": len(sampled),
+            "killed": killed,
+            "survived": survived,
+        }
+
+    metrics["mutation_files_tested"] = len(file_results)
+    metrics["mutation_total_tested"] = total_tested
+    metrics["mutation_killed"] = total_killed
+    metrics["mutation_survived"] = total_survived
+    if total_tested > 0:
+        kill_rate = total_killed / total_tested
+        metrics["mutation_kill_rate"] = round(kill_rate, 2)
+
+        if kill_rate < 0.60:
+            # Identify weak files
+            weak = [
+                f for f, r in file_results.items()
+                if r["tested"] > 0 and r["killed"] / r["tested"] < 0.5
+            ]
+            weak_str = ", ".join(f"`{f}`" for f in weak) if weak else "see details"
+            findings.append(
+                Finding(
+                    id="ARCH-MUTATION-WEAK",
+                    severity="medium",
+                    category="test_quality",
+                    title=f"Mutation kill rate: {kill_rate:.0%} ({total_survived} survived)",
+                    detail=(
+                        f"Tested {total_tested} mutations across "
+                        f"{len(file_results)} critical files. "
+                        f"{total_killed} killed, {total_survived} survived. "
+                        f"Weak files: {weak_str}. "
+                        f"Surviving mutations indicate test gaps."
+                    ),
+                    recommendation=(
+                        "Add assertions for edge cases in surviving mutation files. "
+                        "Focus on boundary conditions and return value checks."
+                    ),
+                    effort_hours=3.0,
+                )
+            )
+        elif kill_rate < 0.80:
+            findings.append(
+                Finding(
+                    id="ARCH-MUTATION-OK",
+                    severity="low",
+                    category="test_quality",
+                    title=f"Mutation kill rate: {kill_rate:.0%}",
+                    detail=(
+                        f"Tested {total_tested} mutations, killed {total_killed}. "
+                        f"Room for improvement — {total_survived} mutations survived."
+                    ),
+                    recommendation="Review surviving mutations to identify test gaps.",
+                    effort_hours=2.0,
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    id="ARCH-MUTATION-STRONG",
+                    severity="info",
+                    category="test_quality",
+                    title=f"Mutation kill rate: {kill_rate:.0%} — strong",
+                    detail=(
+                        f"Tested {total_tested} mutations, killed {total_killed}. "
+                        f"Tests are effective at catching code mutations."
+                    ),
+                )
+            )
+    else:
+        metrics["mutation_kill_rate"] = None
+
+    metrics["mutation_file_details"] = file_results
+    return metrics
+
+
+# ---------------------------------------------------------------------------
 # Main scan entry point
 # ---------------------------------------------------------------------------
 
@@ -755,7 +1151,15 @@ def scan() -> AgentReport:
     dead_count = _scan_dead_code(py_files, findings)
     metrics["dead_functions_detected"] = dead_count
 
-    # -- 10. External intelligence --
+    # -- 10. Mypy type checking --
+    mypy_metrics = _scan_mypy(findings)
+    metrics.update(mypy_metrics)
+
+    # -- 11. Mutation testing (sampled) --
+    mutation_metrics = _scan_mutation_testing(findings)
+    metrics.update(mutation_metrics)
+
+    # -- 12. External intelligence --
     try:
         from agents.shared.intelligence import ExternalIntelligence
 
@@ -766,7 +1170,7 @@ def scan() -> AgentReport:
     except Exception:
         pass
 
-    # -- 11. Record historical recurrence --
+    # -- 13. Record historical recurrence --
     for f in findings:
         prev = learning.get_recurrence_count(AGENT_NAME, f.category, f.file)
         if prev > 0:
