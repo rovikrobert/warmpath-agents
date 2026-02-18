@@ -31,7 +31,7 @@ from app.services.dashboard_insights import (
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = settings.CLAUDE_MODEL
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -144,15 +144,20 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
         return await get_balance(user_id, db)
 
     # Run all 6 fast queries in parallel
-    user, prefs, status_counts, follow_ups_needed, recent_searches, credit_balance = (
-        await asyncio.gather(
-            _fetch_user(),
-            _fetch_prefs(),
-            _fetch_pipeline(),
-            _fetch_followups(),
-            _fetch_searches(),
-            _fetch_credits(),
-        )
+    (
+        user,
+        prefs,
+        status_counts,
+        follow_ups_needed,
+        recent_searches,
+        credit_balance,
+    ) = await asyncio.gather(
+        _fetch_user(),
+        _fetch_prefs(),
+        _fetch_pipeline(),
+        _fetch_followups(),
+        _fetch_searches(),
+        _fetch_credits(),
     )
 
     # Build user context

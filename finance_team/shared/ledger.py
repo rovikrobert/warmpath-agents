@@ -14,16 +14,16 @@ from __future__ import annotations
 CREDIT_EARN_RULES: dict[str, int] = {
     "csv_upload": 100,
     "intro_facilitation": 50,
-    "data_freshness": 10,       # per quarter
-    "welcome_bonus": 0,         # optional, defined per campaign
-    "purchase": -1,             # variable ($1 = 5 credits)
+    "data_freshness": 10,  # per quarter
+    "welcome_bonus": 0,  # optional, defined per campaign
+    "purchase": -1,  # variable ($1 = 5 credits)
 }
 
 CREDIT_SPEND_RULES: dict[str, int] = {
     "cross_network_search": 5,
     "marketplace_search": 5,
     "request_intro": 20,
-    "intro_request": 20,        # alias
+    "intro_request": 20,  # alias
 }
 
 CREDIT_EXPIRY_MONTHS = 12
@@ -92,13 +92,13 @@ FINANCIAL_MODEL_FILES: list[str] = [
 # ---------------------------------------------------------------------------
 
 MONEY_TRANSMITTER_RISK_SIGNALS: list[str] = [
-    "transfer_credits",           # credits must be non-transferable
-    "cash_out",                   # no cash-out allowed
-    "exchange_rate",              # no exchange rates
-    "convert_to_cash",            # no cash conversion
-    "withdraw",                   # no withdrawals
-    "peer_to_peer",               # no P2P transfers
-    "money_transmit",             # explicit money transmission
+    "transfer_credits",  # credits must be non-transferable
+    "cash_out",  # no cash-out allowed
+    "exchange_rate",  # no exchange rates
+    "convert_to_cash",  # no cash conversion
+    "withdraw",  # no withdrawals
+    "peer_to_peer",  # no P2P transfers
+    "money_transmit",  # explicit money transmission
 ]
 
 SAFE_CREDIT_PATTERNS: list[str] = [

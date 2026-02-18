@@ -100,15 +100,17 @@ def _check_system_prompt_coverage(
         )
 
     if not prompt_match:
-        findings.append(Finding(
-            id="keevs-prompt-001",
-            severity="high",
-            category="coaching_quality",
-            title="System prompt not found in coach_service.py",
-            detail="_KEEVS_SYSTEM_PROMPT variable not detected",
-            file=_relative(_COACH_SERVICE_PATH),
-            recommendation="Ensure _KEEVS_SYSTEM_PROMPT is defined as a triple-quoted string",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-prompt-001",
+                severity="high",
+                category="coaching_quality",
+                title="System prompt not found in coach_service.py",
+                detail="_KEEVS_SYSTEM_PROMPT variable not detected",
+                file=_relative(_COACH_SERVICE_PATH),
+                recommendation="Ensure _KEEVS_SYSTEM_PROMPT is defined as a triple-quoted string",
+            )
+        )
         metrics["prompt_rules_found"] = 0
         metrics["prompt_rules_expected"] = len(expected_rules)
         metrics["prompt_rule_coverage"] = 0.0
@@ -131,27 +133,31 @@ def _check_system_prompt_coverage(
 
     if missing_rules:
         severity = "high" if len(missing_rules) > 3 else "medium"
-        findings.append(Finding(
-            id="keevs-prompt-002",
-            severity=severity,
-            category="coaching_quality",
-            title=f"System prompt missing {len(missing_rules)} coaching rules",
-            detail=f"Missing rules: {', '.join(missing_rules)}",
-            file=_relative(_COACH_SERVICE_PATH),
-            recommendation="Add missing rule coverage to _KEEVS_SYSTEM_PROMPT",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-prompt-002",
+                severity=severity,
+                category="coaching_quality",
+                title=f"System prompt missing {len(missing_rules)} coaching rules",
+                detail=f"Missing rules: {', '.join(missing_rules)}",
+                file=_relative(_COACH_SERVICE_PATH),
+                recommendation="Add missing rule coverage to _KEEVS_SYSTEM_PROMPT",
+            )
+        )
 
     if coverage >= 0.75:
-        insights.append(OpsInsight(
-            id="keevs-insight-prompt",
-            category="coaching",
-            title=f"System prompt covers {coverage:.0%} of expected rules",
-            evidence=f"{rules_found}/{len(expected_rules)} rules detected in prompt",
-            impact="Coaching responses will be consistent with platform guidelines",
-            recommendation="Maintain rule coverage as new scenarios are added",
-            confidence=0.85,
-            persona="job_seeker",
-        ))
+        insights.append(
+            OpsInsight(
+                id="keevs-insight-prompt",
+                category="coaching",
+                title=f"System prompt covers {coverage:.0%} of expected rules",
+                evidence=f"{rules_found}/{len(expected_rules)} rules detected in prompt",
+                impact="Coaching responses will be consistent with platform guidelines",
+                recommendation="Maintain rule coverage as new scenarios are added",
+                confidence=0.85,
+                persona="job_seeker",
+            )
+        )
 
 
 def _check_context_assembly(
@@ -172,15 +178,11 @@ def _check_context_assembly(
             r"(?:network_analysis|_get_network_analysis|ConnectorProfile|contacts)",
             re.IGNORECASE,
         ),
-        "pipeline": re.compile(
-            r"(?:Application|applications|pipeline)", re.IGNORECASE
-        ),
+        "pipeline": re.compile(r"(?:Application|applications|pipeline)", re.IGNORECASE),
         "searches": re.compile(
             r"(?:SearchRequest|search_request|searches)", re.IGNORECASE
         ),
-        "credits": re.compile(
-            r"(?:get_balance|credit|credits)", re.IGNORECASE
-        ),
+        "credits": re.compile(r"(?:get_balance|credit|credits)", re.IGNORECASE),
         "market_trends": re.compile(
             r"(?:market_trends|_get_job_market_trends|market)", re.IGNORECASE
         ),
@@ -207,27 +209,31 @@ def _check_context_assembly(
     metrics["context_sources_expected"] = len(expected_sources)
 
     if missing_sources:
-        findings.append(Finding(
-            id="keevs-ctx-001",
-            severity="high",
-            category="coaching_quality",
-            title=f"Context assembly missing {len(missing_sources)} data sources",
-            detail=f"Missing sources: {', '.join(missing_sources)}",
-            file=_relative(_COACH_SERVICE_PATH),
-            recommendation="Add missing data sources to _assemble_context for richer coaching",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-ctx-001",
+                severity="high",
+                category="coaching_quality",
+                title=f"Context assembly missing {len(missing_sources)} data sources",
+                detail=f"Missing sources: {', '.join(missing_sources)}",
+                file=_relative(_COACH_SERVICE_PATH),
+                recommendation="Add missing data sources to _assemble_context for richer coaching",
+            )
+        )
 
     if sources_found == len(expected_sources):
-        insights.append(OpsInsight(
-            id="keevs-insight-ctx",
-            category="coaching",
-            title="Context assembly pulls all expected data sources",
-            evidence=f"{sources_found}/{len(expected_sources)} sources detected",
-            impact="Coaching responses can reference full user context",
-            recommendation="Keep context assembly in sync as new models are added",
-            confidence=0.90,
-            persona="job_seeker",
-        ))
+        insights.append(
+            OpsInsight(
+                id="keevs-insight-ctx",
+                category="coaching",
+                title="Context assembly pulls all expected data sources",
+                evidence=f"{sources_found}/{len(expected_sources)} sources detected",
+                impact="Coaching responses can reference full user context",
+                recommendation="Keep context assembly in sync as new models are added",
+                confidence=0.90,
+                persona="job_seeker",
+            )
+        )
 
 
 def _check_mock_handler_coverage(
@@ -254,15 +260,17 @@ def _check_mock_handler_coverage(
     )
 
     if not mock_match:
-        findings.append(Finding(
-            id="keevs-mock-001",
-            severity="medium",
-            category="coaching_quality",
-            title="_mock_chat_response function not found",
-            detail="Mock mode handler missing from coach_service.py",
-            file=_relative(_COACH_SERVICE_PATH),
-            recommendation="Ensure _mock_chat_response exists for AI_MOCK_MODE=true",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-mock-001",
+                severity="medium",
+                category="coaching_quality",
+                title="_mock_chat_response function not found",
+                detail="Mock mode handler missing from coach_service.py",
+                file=_relative(_COACH_SERVICE_PATH),
+                recommendation="Ensure _mock_chat_response exists for AI_MOCK_MODE=true",
+            )
+        )
         metrics["mock_handlers_found"] = 0
         metrics["mock_handlers_expected"] = len(expected_keywords)
         metrics["mock_handler_coverage"] = 0.0
@@ -274,7 +282,9 @@ def _check_mock_handler_coverage(
 
     for keyword in expected_keywords:
         # Match keyword in string literals or condition checks
-        pattern = re.compile(rf'["\'].*?{re.escape(keyword)}.*?["\']|{re.escape(keyword)}', re.IGNORECASE)
+        pattern = re.compile(
+            rf'["\'].*?{re.escape(keyword)}.*?["\']|{re.escape(keyword)}', re.IGNORECASE
+        )
         if pattern.search(mock_body):
             handlers_found += 1
         else:
@@ -286,26 +296,30 @@ def _check_mock_handler_coverage(
     metrics["mock_handler_coverage"] = round(coverage, 2)
 
     if coverage < COACH_KEYWORD_COVERAGE_TARGET:
-        findings.append(Finding(
-            id="keevs-mock-002",
-            severity="medium",
-            category="coaching_quality",
-            title=f"Mock handler coverage ({coverage:.0%}) below target ({COACH_KEYWORD_COVERAGE_TARGET:.0%})",
-            detail=f"Missing handlers: {', '.join(missing_handlers)}",
-            file=_relative(_COACH_SERVICE_PATH),
-            recommendation="Add keyword handlers for missing job seeker scenarios in mock mode",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-mock-002",
+                severity="medium",
+                category="coaching_quality",
+                title=f"Mock handler coverage ({coverage:.0%}) below target ({COACH_KEYWORD_COVERAGE_TARGET:.0%})",
+                detail=f"Missing handlers: {', '.join(missing_handlers)}",
+                file=_relative(_COACH_SERVICE_PATH),
+                recommendation="Add keyword handlers for missing job seeker scenarios in mock mode",
+            )
+        )
     else:
-        insights.append(OpsInsight(
-            id="keevs-insight-mock",
-            category="coaching",
-            title=f"Mock handler coverage meets target ({coverage:.0%})",
-            evidence=f"{handlers_found}/{len(expected_keywords)} keyword handlers present",
-            impact="AI_MOCK_MODE=true returns meaningful responses for all common queries",
-            recommendation="Add handlers for new scenarios as they emerge",
-            confidence=0.80,
-            persona="job_seeker",
-        ))
+        insights.append(
+            OpsInsight(
+                id="keevs-insight-mock",
+                category="coaching",
+                title=f"Mock handler coverage meets target ({coverage:.0%})",
+                evidence=f"{handlers_found}/{len(expected_keywords)} keyword handlers present",
+                impact="AI_MOCK_MODE=true returns meaningful responses for all common queries",
+                recommendation="Add handlers for new scenarios as they emerge",
+                confidence=0.80,
+                persona="job_seeker",
+            )
+        )
 
 
 def _check_journey_coverage(
@@ -318,14 +332,11 @@ def _check_journey_coverage(
     # Map journey steps to search patterns in JSX
     step_patterns: dict[str, re.Pattern] = {
         "signup": re.compile(
-            r"(?:sign\s*up|register|create\s*account|onboarding|Login|Auth)", re.IGNORECASE
+            r"(?:sign\s*up|register|create\s*account|onboarding|Login|Auth)",
+            re.IGNORECASE,
         ),
-        "upload": re.compile(
-            r"(?:upload|csv|import|contacts|file)", re.IGNORECASE
-        ),
-        "search": re.compile(
-            r"(?:search|find|referral|match|discover)", re.IGNORECASE
-        ),
+        "upload": re.compile(r"(?:upload|csv|import|contacts|file)", re.IGNORECASE),
+        "search": re.compile(r"(?:search|find|referral|match|discover)", re.IGNORECASE),
         "message": re.compile(
             r"(?:message|intro|draft|outreach|connect|facilitat)", re.IGNORECASE
         ),
@@ -372,26 +383,30 @@ def _check_journey_coverage(
     metrics["journey_missing_list"] = missing_steps
 
     if missing_steps:
-        findings.append(Finding(
-            id="keevs-journey-001",
-            severity="medium",
-            category="coaching_quality",
-            title=f"Job seeker journey missing {len(missing_steps)} steps in frontend",
-            detail=f"Missing steps: {', '.join(missing_steps)}",
-            recommendation="Add frontend pages or components covering missing journey steps",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-journey-001",
+                severity="medium",
+                category="coaching_quality",
+                title=f"Job seeker journey missing {len(missing_steps)} steps in frontend",
+                detail=f"Missing steps: {', '.join(missing_steps)}",
+                recommendation="Add frontend pages or components covering missing journey steps",
+            )
+        )
 
     if coverage >= 0.80:
-        insights.append(OpsInsight(
-            id="keevs-insight-journey",
-            category="coaching",
-            title=f"Job seeker journey coverage at {coverage:.0%}",
-            evidence=f"Covered: {', '.join(covered_steps)}",
-            impact="Most journey steps have corresponding frontend touchpoints",
-            recommendation="Fill remaining gaps to complete the end-to-end experience",
-            confidence=0.75,
-            persona="job_seeker",
-        ))
+        insights.append(
+            OpsInsight(
+                id="keevs-insight-journey",
+                category="coaching",
+                title=f"Job seeker journey coverage at {coverage:.0%}",
+                evidence=f"Covered: {', '.join(covered_steps)}",
+                impact="Most journey steps have corresponding frontend touchpoints",
+                recommendation="Fill remaining gaps to complete the end-to-end experience",
+                confidence=0.75,
+                persona="job_seeker",
+            )
+        )
 
 
 def _check_streaming_robustness(
@@ -405,7 +420,8 @@ def _check_streaming_robustness(
             r"(?:SSE_TIMEOUT|timeout|wait_for|asyncio\.timeout)", re.IGNORECASE
         ),
         "concurrent_limit": re.compile(
-            r"(?:MAX_CONCURRENT|_active_streams|concurrent|stream.*limit)", re.IGNORECASE
+            r"(?:MAX_CONCURRENT|_active_streams|concurrent|stream.*limit)",
+            re.IGNORECASE,
         ),
         "sanitisation": re.compile(
             r"(?:sanitiz|escap|strip|clean|replace.*<|html)", re.IGNORECASE
@@ -428,15 +444,17 @@ def _check_streaming_robustness(
     metrics["streaming_checks_total"] = len(checks)
 
     if failed_checks:
-        findings.append(Finding(
-            id="keevs-stream-001",
-            severity="high",
-            category="streaming_robustness",
-            title=f"SSE streaming missing {len(failed_checks)} safety checks",
-            detail=f"Missing: {', '.join(failed_checks)}",
-            file=_relative(_COACH_API_PATH),
-            recommendation="Add missing SSE safety checks to app/api/coach.py",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-stream-001",
+                severity="high",
+                category="streaming_robustness",
+                title=f"SSE streaming missing {len(failed_checks)} safety checks",
+                detail=f"Missing: {', '.join(failed_checks)}",
+                file=_relative(_COACH_API_PATH),
+                recommendation="Add missing SSE safety checks to app/api/coach.py",
+            )
+        )
 
 
 def _check_frontend_integration(
@@ -469,14 +487,16 @@ def _check_frontend_integration(
     metrics["frontend_coach_imports"] = files_with_imports
 
     if files_with_api_calls == 0:
-        findings.append(Finding(
-            id="keevs-frontend-001",
-            severity="medium",
-            category="coaching_quality",
-            title="No frontend pages reference coaching API endpoints",
-            detail="No JSX pages in frontend/src/pages/ call /coach or /briefing",
-            recommendation="Integrate coaching API calls into relevant frontend pages",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-frontend-001",
+                severity="medium",
+                category="coaching_quality",
+                title="No frontend pages reference coaching API endpoints",
+                detail="No JSX pages in frontend/src/pages/ call /coach or /briefing",
+                recommendation="Integrate coaching API calls into relevant frontend pages",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -497,27 +517,31 @@ def scan() -> OpsTeamReport:
     try:
         coach_source = _COACH_SERVICE_PATH.read_text(errors="replace")
     except OSError:
-        findings.append(Finding(
-            id="keevs-io-001",
-            severity="high",
-            category="coaching_quality",
-            title="Could not read coach_service.py",
-            detail=f"Expected at {_COACH_SERVICE_PATH}",
-            recommendation="Ensure coach_service.py exists in ops_team/keevs/",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-io-001",
+                severity="high",
+                category="coaching_quality",
+                title="Could not read coach_service.py",
+                detail=f"Expected at {_COACH_SERVICE_PATH}",
+                recommendation="Ensure coach_service.py exists in ops_team/keevs/",
+            )
+        )
 
     api_source = ""
     try:
         api_source = _COACH_API_PATH.read_text(errors="replace")
     except OSError:
-        findings.append(Finding(
-            id="keevs-io-002",
-            severity="medium",
-            category="streaming_robustness",
-            title="Could not read app/api/coach.py",
-            detail=f"Expected at {_COACH_API_PATH}",
-            recommendation="Ensure app/api/coach.py exists for SSE streaming checks",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-io-002",
+                severity="medium",
+                category="streaming_robustness",
+                title="Could not read app/api/coach.py",
+                detail=f"Expected at {_COACH_API_PATH}",
+                recommendation="Ensure app/api/coach.py exists for SSE streaming checks",
+            )
+        )
 
     jsx_files = _find_jsx_files()
     metrics["total_jsx_pages"] = len(jsx_files)
@@ -533,14 +557,16 @@ def scan() -> OpsTeamReport:
         _check_journey_coverage(jsx_files, findings, insights, metrics)
         _check_frontend_integration(jsx_files, findings, metrics)
     else:
-        findings.append(Finding(
-            id="keevs-jsx-001",
-            severity="info",
-            category="coaching_quality",
-            title="No JSX page files found in frontend/src/pages/",
-            detail="Frontend may not be initialised yet",
-            recommendation="Initialise React frontend under frontend/src/pages/",
-        ))
+        findings.append(
+            Finding(
+                id="keevs-jsx-001",
+                severity="info",
+                category="coaching_quality",
+                title="No JSX page files found in frontend/src/pages/",
+                detail="Frontend may not be initialised yet",
+                recommendation="Initialise React frontend under frontend/src/pages/",
+            )
+        )
 
     if api_source:
         _check_streaming_robustness(api_source, findings, metrics)
@@ -549,10 +575,16 @@ def scan() -> OpsTeamReport:
 
     score_components = [
         metrics.get("prompt_rule_coverage", 0),
-        (metrics.get("context_sources_found", 0) / max(1, metrics.get("context_sources_expected", 1))),
+        (
+            metrics.get("context_sources_found", 0)
+            / max(1, metrics.get("context_sources_expected", 1))
+        ),
         metrics.get("mock_handler_coverage", 0),
         metrics.get("journey_coverage", 0),
-        (metrics.get("streaming_checks_passed", 0) / max(1, metrics.get("streaming_checks_total", 1))),
+        (
+            metrics.get("streaming_checks_passed", 0)
+            / max(1, metrics.get("streaming_checks_total", 1))
+        ),
     ]
     coaching_quality_score = round(
         sum(score_components) / max(1, len(score_components)) * 100, 1
@@ -568,13 +600,15 @@ def scan() -> OpsTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
 
@@ -585,12 +619,14 @@ def scan() -> OpsTeamReport:
         ls.record_severity_calibration(f.severity)
 
     for ins in insights:
-        ls.record_insight({
-            "id": ins.id,
-            "category": ins.category,
-            "title": ins.title,
-            "confidence": ins.confidence,
-        })
+        ls.record_insight(
+            {
+                "id": ins.id,
+                "category": ins.category,
+                "title": ins.title,
+                "confidence": ins.confidence,
+            }
+        )
 
     # Health snapshot
     severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}

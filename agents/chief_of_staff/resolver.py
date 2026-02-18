@@ -42,8 +42,7 @@ def _try_context_resolution(conflict: Conflict) -> Resolution | None:
     """Level 1: Check if the conflict resolves with shared context."""
     # If one side has no evidence, the other side's position stands
     teams_with_evidence = [
-        team for team in conflict.teams
-        if conflict.evidence.get(team)
+        team for team in conflict.teams if conflict.evidence.get(team)
     ]
     if len(teams_with_evidence) == 1:
         winner = teams_with_evidence[0]

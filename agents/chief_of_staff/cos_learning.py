@@ -106,15 +106,11 @@ def record_resolution(
     rp = state["resolution_patterns"]
     rp["total_conflicts"] = rp.get("total_conflicts", 0) + 1
     if not escalated:
-        rp["resolved_without_escalation"] = (
-            rp.get("resolved_without_escalation", 0) + 1
-        )
+        rp["resolved_without_escalation"] = rp.get("resolved_without_escalation", 0) + 1
     _save_state(state)
 
 
-def update_team_reliability(
-    team: str, reports: list[Any]
-) -> None:
+def update_team_reliability(team: str, reports: list[Any]) -> None:
     """Update team reliability stats based on received reports."""
     state = _load_state()
     tr = state.setdefault("team_reliability", {})
@@ -186,8 +182,7 @@ def weekly_reflect() -> list[str]:
         noise = stats.get("noise_ratio", 0)
         if total_reports > 0:
             notes.append(
-                f"{team}: {total_reports} reports processed, "
-                f"noise ratio {noise:.1%}"
+                f"{team}: {total_reports} reports processed, noise ratio {noise:.1%}"
             )
 
     if not notes:

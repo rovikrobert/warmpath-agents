@@ -87,53 +87,67 @@ def _check_supply_side_readiness(
     indexer_content = _read_safe(marketplace_indexer)
 
     # Core supply-side features
-    has_csv_upload = bool(re.search(r"(?:upload|csv|import)", contacts_content, re.IGNORECASE))
-    has_marketplace_opt_in = bool(re.search(
-        r"(?:opt.in|marketplace|share|sharing)", contacts_content, re.IGNORECASE
-    ))
+    has_csv_upload = bool(
+        re.search(r"(?:upload|csv|import)", contacts_content, re.IGNORECASE)
+    )
+    has_marketplace_opt_in = bool(
+        re.search(
+            r"(?:opt.in|marketplace|share|sharing)", contacts_content, re.IGNORECASE
+        )
+    )
     has_indexer = bool(indexer_content.strip())
-    has_anonymization = bool(re.search(r"(?:anonym|hash|blind.index)", indexer_content, re.IGNORECASE))
+    has_anonymization = bool(
+        re.search(r"(?:anonym|hash|blind.index)", indexer_content, re.IGNORECASE)
+    )
 
     metrics["supply_has_csv_upload"] = has_csv_upload
     metrics["supply_has_marketplace_opt_in"] = has_marketplace_opt_in
     metrics["supply_has_indexer"] = has_indexer
     metrics["supply_has_anonymization"] = has_anonymization
 
-    supply_score = sum([has_csv_upload, has_marketplace_opt_in, has_indexer, has_anonymization])
+    supply_score = sum(
+        [has_csv_upload, has_marketplace_opt_in, has_indexer, has_anonymization]
+    )
     metrics["supply_readiness_score"] = supply_score
 
     if not has_csv_upload:
-        findings.append(Finding(
-            id="prt-supply-001",
-            severity="high",
-            category="supply_readiness",
-            title="CSV upload endpoint not detected in contacts API",
-            detail="No upload/csv/import patterns found in contacts.py",
-            file=_relative(contacts_api),
-            recommendation="Verify CSV upload endpoint exists — core for network holder onboarding",
-        ))
+        findings.append(
+            Finding(
+                id="prt-supply-001",
+                severity="high",
+                category="supply_readiness",
+                title="CSV upload endpoint not detected in contacts API",
+                detail="No upload/csv/import patterns found in contacts.py",
+                file=_relative(contacts_api),
+                recommendation="Verify CSV upload endpoint exists — core for network holder onboarding",
+            )
+        )
 
     if not has_marketplace_opt_in:
-        findings.append(Finding(
-            id="prt-supply-002",
-            severity="high",
-            category="supply_readiness",
-            title="Marketplace opt-in not detected in contacts API",
-            detail="No opt-in/marketplace/sharing patterns found in contacts.py",
-            file=_relative(contacts_api),
-            recommendation="Verify marketplace opt-in endpoint exists — required for supply side",
-        ))
+        findings.append(
+            Finding(
+                id="prt-supply-002",
+                severity="high",
+                category="supply_readiness",
+                title="Marketplace opt-in not detected in contacts API",
+                detail="No opt-in/marketplace/sharing patterns found in contacts.py",
+                file=_relative(contacts_api),
+                recommendation="Verify marketplace opt-in endpoint exists — required for supply side",
+            )
+        )
 
     if not has_indexer:
-        findings.append(Finding(
-            id="prt-supply-003",
-            severity="high",
-            category="supply_readiness",
-            title="Marketplace indexer service is empty or missing",
-            detail="marketplace_indexer.py has no content — anonymized index generation blocked",
-            file=_relative(marketplace_indexer),
-            recommendation="Implement marketplace indexer with anonymized listing generation",
-        ))
+        findings.append(
+            Finding(
+                id="prt-supply-003",
+                severity="high",
+                category="supply_readiness",
+                title="Marketplace indexer service is empty or missing",
+                detail="marketplace_indexer.py has no content — anonymized index generation blocked",
+                file=_relative(marketplace_indexer),
+                recommendation="Implement marketplace indexer with anonymized listing generation",
+            )
+        )
 
     # Check frontend for NH onboarding pages
     jsx_files = _find_jsx_files()
@@ -146,26 +160,30 @@ def _check_supply_side_readiness(
     metrics["nh_onboarding_pages"] = nh_pages_found
 
     if "SharingSettings.jsx" not in nh_pages_found:
-        findings.append(Finding(
-            id="prt-supply-004",
-            severity="medium",
-            category="supply_readiness",
-            title="No SharingSettings page for network holders",
-            detail="Network holders need a dedicated page to manage what they share",
-            recommendation="Create SharingSettings.jsx with marketplace opt-in controls",
-        ))
+        findings.append(
+            Finding(
+                id="prt-supply-004",
+                severity="medium",
+                category="supply_readiness",
+                title="No SharingSettings page for network holders",
+                detail="Network holders need a dedicated page to manage what they share",
+                recommendation="Create SharingSettings.jsx with marketplace opt-in controls",
+            )
+        )
 
     if supply_score >= 3:
-        insights.append(MarketInsight(
-            id="prt-supply-insight-001",
-            category="market_entry",
-            title="Supply-side infrastructure largely ready",
-            evidence=f"Supply readiness score: {supply_score}/4",
-            strategic_impact="Platform can support network holder recruitment",
-            recommended_response="Begin outreach to seed network holders",
-            urgency="this_week",
-            confidence="high",
-        ))
+        insights.append(
+            MarketInsight(
+                id="prt-supply-insight-001",
+                category="market_entry",
+                title="Supply-side infrastructure largely ready",
+                evidence=f"Supply readiness score: {supply_score}/4",
+                strategic_impact="Platform can support network holder recruitment",
+                recommended_response="Begin outreach to seed network holders",
+                urgency="this_week",
+                confidence="high",
+            )
+        )
 
 
 def _check_referral_program_features(
@@ -192,10 +210,20 @@ def _check_referral_program_features(
                 combined_credits += content
 
     # Core referral program features
-    has_earn_actions = bool(re.search(r"(?:earn|reward|grant|add.credit)", combined_credits, re.IGNORECASE))
-    has_spend_actions = bool(re.search(r"(?:spend|deduct|charge|use.credit)", combined_credits, re.IGNORECASE))
-    has_balance = bool(re.search(r"(?:balance|total|sum)", combined_credits, re.IGNORECASE))
-    has_history = bool(re.search(r"(?:history|transaction|log)", combined_credits, re.IGNORECASE))
+    has_earn_actions = bool(
+        re.search(r"(?:earn|reward|grant|add.credit)", combined_credits, re.IGNORECASE)
+    )
+    has_spend_actions = bool(
+        re.search(
+            r"(?:spend|deduct|charge|use.credit)", combined_credits, re.IGNORECASE
+        )
+    )
+    has_balance = bool(
+        re.search(r"(?:balance|total|sum)", combined_credits, re.IGNORECASE)
+    )
+    has_history = bool(
+        re.search(r"(?:history|transaction|log)", combined_credits, re.IGNORECASE)
+    )
 
     metrics["credits_has_earn"] = has_earn_actions
     metrics["credits_has_spend"] = has_spend_actions
@@ -206,24 +234,28 @@ def _check_referral_program_features(
     metrics["credits_feature_score"] = credits_score
 
     if not has_earn_actions:
-        findings.append(Finding(
-            id="prt-ref-001",
-            severity="medium",
-            category="referral_program",
-            title="No credit earn actions detected",
-            detail="No earn/reward/grant patterns found in credits endpoints",
-            recommendation="Implement credit earn actions: CSV upload (100), intro facilitation (50), data freshness (10)",
-        ))
+        findings.append(
+            Finding(
+                id="prt-ref-001",
+                severity="medium",
+                category="referral_program",
+                title="No credit earn actions detected",
+                detail="No earn/reward/grant patterns found in credits endpoints",
+                recommendation="Implement credit earn actions: CSV upload (100), intro facilitation (50), data freshness (10)",
+            )
+        )
 
     if not has_spend_actions:
-        findings.append(Finding(
-            id="prt-ref-002",
-            severity="medium",
-            category="referral_program",
-            title="No credit spend actions detected",
-            detail="No spend/deduct/charge patterns found in credits endpoints",
-            recommendation="Implement credit spend: cross-network search (5), intro request (20)",
-        ))
+        findings.append(
+            Finding(
+                id="prt-ref-002",
+                severity="medium",
+                category="referral_program",
+                title="No credit spend actions detected",
+                detail="No spend/deduct/charge patterns found in credits endpoints",
+                recommendation="Implement credit spend: cross-network search (5), intro request (20)",
+            )
+        )
 
     # Check frontend for credits visibility
     jsx_files = _find_jsx_files()
@@ -237,14 +269,16 @@ def _check_referral_program_features(
     metrics["credits_visible_in_ui"] = credits_in_ui
 
     if not credits_in_ui:
-        findings.append(Finding(
-            id="prt-ref-003",
-            severity="medium",
-            category="referral_program",
-            title="Credits not visible in frontend UI",
-            detail="No credit/balance/earn references found in JSX pages",
-            recommendation="Add credit balance display and earn/spend history to user dashboard",
-        ))
+        findings.append(
+            Finding(
+                id="prt-ref-003",
+                severity="medium",
+                category="referral_program",
+                title="Credits not visible in frontend UI",
+                detail="No credit/balance/earn references found in JSX pages",
+                recommendation="Add credit balance display and earn/spend history to user dashboard",
+            )
+        )
 
     # Check CLAUDE.md for credit economy spec
     claude_md = get_strategy_doc("CLAUDE.md")
@@ -271,10 +305,18 @@ def _check_community_infrastructure(
             r"(?:testimonial|success\s+stor|review|rating|\d+\s*(?:users?|referrals?))",
             re.IGNORECASE,
         ),
-        "leaderboard": re.compile(r"(?:leaderboard|top\s+connectors?|ranking|score)", re.IGNORECASE),
-        "success_stories": re.compile(r"(?:success|story|stories|testimonial|case\s+study)", re.IGNORECASE),
-        "connector_score": re.compile(r"(?:connector|reputation|score|badge|level)", re.IGNORECASE),
-        "notifications": re.compile(r"(?:notification|alert|notify|bell)", re.IGNORECASE),
+        "leaderboard": re.compile(
+            r"(?:leaderboard|top\s+connectors?|ranking|score)", re.IGNORECASE
+        ),
+        "success_stories": re.compile(
+            r"(?:success|story|stories|testimonial|case\s+study)", re.IGNORECASE
+        ),
+        "connector_score": re.compile(
+            r"(?:connector|reputation|score|badge|level)", re.IGNORECASE
+        ),
+        "notifications": re.compile(
+            r"(?:notification|alert|notify|bell)", re.IGNORECASE
+        ),
     }
 
     features_found: dict[str, bool] = {}
@@ -293,26 +335,30 @@ def _check_community_infrastructure(
     missing = [k for k, v in features_found.items() if not v]
 
     if found_count < 3:
-        findings.append(Finding(
-            id="prt-comm-001",
-            severity="medium",
-            category="community",
-            title=f"Limited community infrastructure ({found_count}/{total} features)",
-            detail=f"Missing: {', '.join(missing)}",
-            recommendation="Add social proof, leaderboard, and connector scores to drive engagement",
-        ))
+        findings.append(
+            Finding(
+                id="prt-comm-001",
+                severity="medium",
+                category="community",
+                title=f"Limited community infrastructure ({found_count}/{total} features)",
+                detail=f"Missing: {', '.join(missing)}",
+                recommendation="Add social proof, leaderboard, and connector scores to drive engagement",
+            )
+        )
 
     if not features_found.get("leaderboard"):
-        insights.append(MarketInsight(
-            id="prt-comm-insight-001",
-            category="channel",
-            title="No leaderboard/connector ranking system",
-            evidence="No leaderboard/ranking patterns found in frontend",
-            strategic_impact="Network holders lack visible status incentive (motivation #4 in CLAUDE.md)",
-            recommended_response="Build top connectors leaderboard to drive supply-side engagement",
-            urgency="this_month",
-            confidence="medium",
-        ))
+        insights.append(
+            MarketInsight(
+                id="prt-comm-insight-001",
+                category="channel",
+                title="No leaderboard/connector ranking system",
+                evidence="No leaderboard/ranking patterns found in frontend",
+                strategic_impact="Network holders lack visible status incentive (motivation #4 in CLAUDE.md)",
+                recommended_response="Build top connectors leaderboard to drive supply-side engagement",
+                urgency="this_month",
+                confidence="medium",
+            )
+        )
 
 
 def _check_partnership_integration_points(
@@ -333,75 +379,95 @@ def _check_partnership_integration_points(
     metrics["total_api_files"] = len(api_files)
 
     # Check for partner-facing patterns
-    has_partner_api = bool(re.search(r"(?:partner|affiliate|white.?label)", all_api_content, re.IGNORECASE))
-    has_batch_endpoints = bool(re.search(r"(?:batch|bulk|import.all)", all_api_content, re.IGNORECASE))
-    has_webhook_out = bool(re.search(r"(?:webhook|callback|notify.partner)", all_api_content, re.IGNORECASE))
-    has_api_keys = bool(re.search(r"(?:api.key|partner.key|client.id)", all_api_content, re.IGNORECASE))
+    has_partner_api = bool(
+        re.search(r"(?:partner|affiliate|white.?label)", all_api_content, re.IGNORECASE)
+    )
+    has_batch_endpoints = bool(
+        re.search(r"(?:batch|bulk|import.all)", all_api_content, re.IGNORECASE)
+    )
+    has_webhook_out = bool(
+        re.search(
+            r"(?:webhook|callback|notify.partner)", all_api_content, re.IGNORECASE
+        )
+    )
+    has_api_keys = bool(
+        re.search(r"(?:api.key|partner.key|client.id)", all_api_content, re.IGNORECASE)
+    )
 
     metrics["api_has_partner_endpoints"] = has_partner_api
     metrics["api_has_batch_endpoints"] = has_batch_endpoints
     metrics["api_has_webhook_out"] = has_webhook_out
     metrics["api_has_api_keys"] = has_api_keys
 
-    extensibility_score = sum([has_partner_api, has_batch_endpoints, has_webhook_out, has_api_keys])
+    extensibility_score = sum(
+        [has_partner_api, has_batch_endpoints, has_webhook_out, has_api_keys]
+    )
     metrics["api_extensibility_score"] = extensibility_score
 
     if extensibility_score == 0:
-        findings.append(Finding(
-            id="prt-integ-001",
-            severity="info",
-            category="partnership_integration",
-            title="No partner integration points detected",
-            detail="No partner API, batch endpoints, outbound webhooks, or API keys found",
-            recommendation="Plan partner API for bootcamp/university integrations post-MVP",
-        ))
+        findings.append(
+            Finding(
+                id="prt-integ-001",
+                severity="info",
+                category="partnership_integration",
+                title="No partner integration points detected",
+                detail="No partner API, batch endpoints, outbound webhooks, or API keys found",
+                recommendation="Plan partner API for bootcamp/university integrations post-MVP",
+            )
+        )
 
     # Identify partnership opportunities based on codebase
     personas = extract_personas()
 
     if personas.get("has_bootcamp_persona"):
-        partnerships.append(PartnershipOpportunity(
-            id="prt-opp-bootcamp",
-            partner_name="Coding Bootcamps (General Assembly, Le Wagon, etc.)",
-            partner_type="bootcamp",
-            value_prop_to_them="Higher placement rates via referral access for graduates",
-            value_prop_to_us="Pre-qualified demand-side users with high activation potential",
-            estimated_user_impact="50-200 users per cohort partnership",
-            estimated_revenue_impact="$1K-4K/month per bootcamp at $20/user",
-            effort="medium",
-            stage="identified",
-            next_action="Research top 10 bootcamps in Singapore/SEA for outreach",
-        ))
+        partnerships.append(
+            PartnershipOpportunity(
+                id="prt-opp-bootcamp",
+                partner_name="Coding Bootcamps (General Assembly, Le Wagon, etc.)",
+                partner_type="bootcamp",
+                value_prop_to_them="Higher placement rates via referral access for graduates",
+                value_prop_to_us="Pre-qualified demand-side users with high activation potential",
+                estimated_user_impact="50-200 users per cohort partnership",
+                estimated_revenue_impact="$1K-4K/month per bootcamp at $20/user",
+                effort="medium",
+                stage="identified",
+                next_action="Research top 10 bootcamps in Singapore/SEA for outreach",
+            )
+        )
 
     if personas.get("has_coach_persona"):
-        partnerships.append(PartnershipOpportunity(
-            id="prt-opp-coaches",
-            partner_name="Career Coaches (independent + firms)",
-            partner_type="co_marketing",
-            value_prop_to_them="Concrete referral tool to offer clients (not just advice)",
-            value_prop_to_us="Multiplier channel — each coach brings 5-20 active seekers",
-            estimated_user_impact="5-20 users per coach",
-            estimated_revenue_impact="$100-600/month per coach relationship",
-            effort="low",
-            stage="identified",
-            next_action="Create coach partnership landing page + affiliate/referral link",
-        ))
+        partnerships.append(
+            PartnershipOpportunity(
+                id="prt-opp-coaches",
+                partner_name="Career Coaches (independent + firms)",
+                partner_type="co_marketing",
+                value_prop_to_them="Concrete referral tool to offer clients (not just advice)",
+                value_prop_to_us="Multiplier channel — each coach brings 5-20 active seekers",
+                estimated_user_impact="5-20 users per coach",
+                estimated_revenue_impact="$100-600/month per coach relationship",
+                effort="low",
+                stage="identified",
+                next_action="Create coach partnership landing page + affiliate/referral link",
+            )
+        )
 
     # Always suggest university partnership
-    partnerships.append(PartnershipOpportunity(
-        id="prt-opp-university",
-        partner_name="University Career Services (NUS, NTU, SMU)",
-        partner_type="university",
-        value_prop_to_them="Better employment outcomes via alumni referral networks",
-        value_prop_to_us="Volume demand-side users, brand credibility, institutional partnerships",
-        estimated_user_impact="100-500 graduating students per university per year",
-        estimated_revenue_impact="$2K-10K/month per university partnership",
-        effort="high",
-        stage="identified",
-        next_action="Pilot with one Singapore university career center",
-        legal_review_required=True,
-        legal_review_status="not_required",
-    ))
+    partnerships.append(
+        PartnershipOpportunity(
+            id="prt-opp-university",
+            partner_name="University Career Services (NUS, NTU, SMU)",
+            partner_type="university",
+            value_prop_to_them="Better employment outcomes via alumni referral networks",
+            value_prop_to_us="Volume demand-side users, brand credibility, institutional partnerships",
+            estimated_user_impact="100-500 graduating students per university per year",
+            estimated_revenue_impact="$2K-10K/month per university partnership",
+            effort="high",
+            stage="identified",
+            next_action="Pilot with one Singapore university career center",
+            legal_review_required=True,
+            legal_review_status="not_required",
+        )
+    )
 
 
 def _check_network_holder_value_prop(
@@ -423,11 +489,15 @@ def _check_network_holder_value_prop(
 
     strategy_nh_coverage: dict[str, bool] = {}
     for motive_name, pattern in nh_motivations.items():
-        strategy_nh_coverage[motive_name] = bool(pattern.search(claude_md)) if claude_md else False
+        strategy_nh_coverage[motive_name] = (
+            bool(pattern.search(claude_md)) if claude_md else False
+        )
 
     strategy_count = sum(1 for v in strategy_nh_coverage.values() if v)
     metrics["strategy_nh_motivations_documented"] = strategy_count
-    metrics["strategy_nh_motivation_detail"] = {k: v for k, v in strategy_nh_coverage.items()}
+    metrics["strategy_nh_motivation_detail"] = {
+        k: v for k, v in strategy_nh_coverage.items()
+    }
 
     # Check frontend for NH value prop messaging
     all_content = ""
@@ -456,45 +526,53 @@ def _check_network_holder_value_prop(
 
     frontend_count = sum(1 for v in frontend_nh_coverage.values() if v)
     metrics["frontend_nh_value_prop_signals"] = frontend_count
-    metrics["frontend_nh_value_prop_detail"] = {k: v for k, v in frontend_nh_coverage.items()}
+    metrics["frontend_nh_value_prop_detail"] = {
+        k: v for k, v in frontend_nh_coverage.items()
+    }
 
     nh_total = strategy_count + frontend_count
     metrics["nh_value_prop_total_score"] = nh_total
 
     missing_frontend = [k for k, v in frontend_nh_coverage.items() if not v]
     if frontend_count < 2:
-        findings.append(Finding(
-            id="prt-nhvp-001",
-            severity="medium",
-            category="nh_value_prop",
-            title=f"Weak network holder value proposition in UI ({frontend_count}/4 signals)",
-            detail=f"Missing in frontend: {', '.join(missing_frontend)}",
-            recommendation="Strengthen NH-facing messaging: referral bonuses, credits earned, reputation building",
-        ))
+        findings.append(
+            Finding(
+                id="prt-nhvp-001",
+                severity="medium",
+                category="nh_value_prop",
+                title=f"Weak network holder value proposition in UI ({frontend_count}/4 signals)",
+                detail=f"Missing in frontend: {', '.join(missing_frontend)}",
+                recommendation="Strengthen NH-facing messaging: referral bonuses, credits earned, reputation building",
+            )
+        )
 
     if not frontend_nh_coverage.get("referral_bonus_mention"):
-        insights.append(MarketInsight(
-            id="prt-nhvp-insight-001",
-            category="market_entry",
-            title="Referral bonus messaging absent from frontend",
-            evidence="No referral bonus/bounty/earn references found in JSX pages",
-            strategic_impact="Primary NH motivation (#1 in CLAUDE.md) is not communicated to users",
-            recommended_response="Add prominent referral bonus messaging to SharingSettings and onboarding",
-            urgency="this_week",
-            confidence="high",
-        ))
+        insights.append(
+            MarketInsight(
+                id="prt-nhvp-insight-001",
+                category="market_entry",
+                title="Referral bonus messaging absent from frontend",
+                evidence="No referral bonus/bounty/earn references found in JSX pages",
+                strategic_impact="Primary NH motivation (#1 in CLAUDE.md) is not communicated to users",
+                recommended_response="Add prominent referral bonus messaging to SharingSettings and onboarding",
+                urgency="this_week",
+                confidence="high",
+            )
+        )
 
     if strategy_count >= 3 and frontend_count < 2:
-        insights.append(MarketInsight(
-            id="prt-nhvp-insight-002",
-            category="competitive",
-            title="Strategy-to-frontend gap on NH value prop",
-            evidence=f"Strategy docs cover {strategy_count}/4 motivations but frontend only shows {frontend_count}/4",
-            strategic_impact="NH recruitment effectiveness limited by weak frontend messaging",
-            recommended_response="Translate CLAUDE.md NH motivations into user-facing copy on key pages",
-            urgency="this_month",
-            confidence="high",
-        ))
+        insights.append(
+            MarketInsight(
+                id="prt-nhvp-insight-002",
+                category="competitive",
+                title="Strategy-to-frontend gap on NH value prop",
+                evidence=f"Strategy docs cover {strategy_count}/4 motivations but frontend only shows {frontend_count}/4",
+                strategic_impact="NH recruitment effectiveness limited by weak frontend messaging",
+                recommended_response="Translate CLAUDE.md NH motivations into user-facing copy on key pages",
+                urgency="this_month",
+                confidence="high",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -548,10 +626,15 @@ def scan() -> GTMTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id, "severity": f.severity, "category": f.category,
-            "title": f.title, "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
     if file_findings:

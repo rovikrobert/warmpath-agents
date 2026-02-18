@@ -16,7 +16,11 @@ PIPELINES: dict[str, list[dict]] = {
     "ship-feature": [
         {"agent": "architect", "step": "Technical review", "next": "eng-lead"},
         {"agent": "eng-lead", "step": "Implementation plan", "next": "implementation"},
-        {"agent": "test-engineer", "step": "Test verification", "next": "security-reviewer"},
+        {
+            "agent": "test-engineer",
+            "step": "Test verification",
+            "next": "security-reviewer",
+        },
         {"agent": "security-reviewer", "step": "Security scan", "next": "privy"},
         {"agent": "privy", "step": "Privacy audit", "next": "product-lead"},
         {"agent": "product-lead", "step": "Acceptance review", "next": "complete"},

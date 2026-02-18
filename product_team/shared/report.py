@@ -96,7 +96,9 @@ class ProductTeamReport:
     @classmethod
     def from_dict(cls, data: dict) -> ProductTeamReport:
         findings = [Finding(**f) for f in data.pop("findings", [])]
-        product_insights = [ProductInsight(**i) for i in data.pop("product_insights", [])]
+        product_insights = [
+            ProductInsight(**i) for i in data.pop("product_insights", [])
+        ]
         ux_findings = [UXFinding(**u) for u in data.pop("ux_findings", [])]
         design_findings = [DesignFinding(**d) for d in data.pop("design_findings", [])]
         return cls(
@@ -121,7 +123,9 @@ class ProductTeamReport:
             lines.append(f"## Product Insights ({len(self.product_insights)})\n")
             for i in self.product_insights:
                 lines.append(f"### [{i.id}] {i.title}")
-                lines.append(f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}")
+                lines.append(
+                    f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}"
+                )
                 if i.persona:
                     lines.append(f"**Persona:** {i.persona}")
                 lines.append(f"{i.evidence}")
@@ -155,7 +159,13 @@ class ProductTeamReport:
 
         # Findings (same format as engineering)
         if self.findings:
-            sev_icons = {"critical": "!!", "high": "!", "medium": "~", "low": ".", "info": " "}
+            sev_icons = {
+                "critical": "!!",
+                "high": "!",
+                "medium": "~",
+                "low": ".",
+                "info": " ",
+            }
             lines.append(f"## Findings ({len(self.findings)})\n")
             for f in sorted(self.findings, key=lambda f: f.sort_key):
                 icon = sev_icons.get(f.severity, "")

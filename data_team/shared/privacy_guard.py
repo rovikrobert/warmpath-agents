@@ -23,42 +23,48 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # 13 PII columns — 10 EncryptedString/Text + 2 blind indexes + raw_csv_row
-PII_COLUMNS: frozenset[str] = frozenset({
-    "first_name",
-    "last_name",
-    "full_name",
-    "email",
-    "linkedin_url",
-    "current_title",
-    "current_company",
-    "location",
-    "notes",
-    "how_you_know",
-    "email_blind_index",
-    "name_company_blind_index",
-    "raw_csv_row",
-})
+PII_COLUMNS: frozenset[str] = frozenset(
+    {
+        "first_name",
+        "last_name",
+        "full_name",
+        "email",
+        "linkedin_url",
+        "current_title",
+        "current_company",
+        "location",
+        "notes",
+        "how_you_know",
+        "email_blind_index",
+        "name_company_blind_index",
+        "raw_csv_row",
+    }
+)
 
 # 11 vault tables — user-scoped or consent-gated
-VAULT_TABLES: frozenset[str] = frozenset({
-    "contacts",
-    "warm_scores",
-    "match_results",
-    "applications",
-    "marketplace_listings",
-    "intro_facilitations",
-    "credit_transactions",
-    "consent_records",
-    "data_requests",
-    "suppression_list",
-    "audit_logs",
-})
+VAULT_TABLES: frozenset[str] = frozenset(
+    {
+        "contacts",
+        "warm_scores",
+        "match_results",
+        "applications",
+        "marketplace_listings",
+        "intro_facilitations",
+        "credit_transactions",
+        "consent_records",
+        "data_requests",
+        "suppression_list",
+        "audit_logs",
+    }
+)
 
 # Immutable tables — no UPDATE or DELETE ever
-IMMUTABLE_TABLES: frozenset[str] = frozenset({
-    "audit_logs",
-    "consent_records",
-})
+IMMUTABLE_TABLES: frozenset[str] = frozenset(
+    {
+        "audit_logs",
+        "consent_records",
+    }
+)
 
 # Forbidden cross-vault JOIN pairs
 FORBIDDEN_JOIN_PAIRS: list[tuple[str, str]] = [
@@ -172,12 +178,14 @@ class PrivacyGuard:
 
     def log_query(self, sql: str, agent_name: str) -> None:
         """Audit trail for validated queries."""
-        self._audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "agent": agent_name,
-            "sql_hash": hash(sql),
-            "sql_preview": sql[:120].replace("\n", " "),
-        })
+        self._audit_log.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "agent": agent_name,
+                "sql_hash": hash(sql),
+                "sql_preview": sql[:120].replace("\n", " "),
+            }
+        )
         # Keep last 500 entries
         self._audit_log = self._audit_log[-500:]
 
@@ -232,9 +240,16 @@ class PrivacyGuard:
                         )
 
         # General cross-vault: contacts JOIN marketplace_listings needs consent
-        if "contacts" in normalized and "join" in normalized and "marketplace_listings" in normalized:
+        if (
+            "contacts" in normalized
+            and "join" in normalized
+            and "marketplace_listings" in normalized
+        ):
             if not self._matches_exception(normalized):
-                if "opt_in_marketplace" not in normalized and "consent" not in normalized:
+                if (
+                    "opt_in_marketplace" not in normalized
+                    and "consent" not in normalized
+                ):
                     raise PrivacyViolation(
                         "contacts JOIN marketplace_listings requires consent gate "
                         "(opt_in_marketplace or consent check)",
@@ -254,7 +269,9 @@ class PrivacyGuard:
                 # Must have user_id in WHERE or JOIN condition
                 if "user_id" not in normalized and "where" not in normalized:
                     # Exception for suppression_list (queried by hash)
-                    if table == "suppression_list" and ("email_hash" in normalized or "name_company_hash" in normalized):
+                    if table == "suppression_list" and (
+                        "email_hash" in normalized or "name_company_hash" in normalized
+                    ):
                         continue
                     # Exception for marketplace_listings (public anonymous data)
                     if table == "marketplace_listings" and "group by" in normalized:
@@ -280,7 +297,10 @@ class PrivacyGuard:
                 violation_type="plaintext_suppression",
                 privy_category="suppression",
             )
-        if re.search(r"suppression_list.*where.*(?:full_name|first_name|last_name)\s*=\s*'", normalized):
+        if re.search(
+            r"suppression_list.*where.*(?:full_name|first_name|last_name)\s*=\s*'",
+            normalized,
+        ):
             raise PrivacyViolation(
                 "Suppression list queried by plaintext name — must use SHA-256 hash",
                 violation_type="plaintext_suppression",
@@ -320,9 +340,7 @@ class PrivacyGuard:
             return False
         select_clause = select_match.group(1).strip()
         # Remove known aggregate functions
-        cleaned = re.sub(
-            r"\b(count|sum|avg|min|max)\s*\([^)]*\)", "", select_clause
-        )
+        cleaned = re.sub(r"\b(count|sum|avg|min|max)\s*\([^)]*\)", "", select_clause)
         # Remove commas, spaces, aliases
         cleaned = re.sub(r"\bas\s+\w+\b", "", cleaned)
         cleaned = re.sub(r"[,\s]", "", cleaned)

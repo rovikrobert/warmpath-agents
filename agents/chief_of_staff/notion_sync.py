@@ -312,11 +312,13 @@ class NotionSync:
             priority_obj = props.get("Priority", {}).get("select")
             priority = priority_obj["name"] if priority_obj else "P3"
 
-            briefs.append({
-                "page_id": page["id"],
-                "title": title,
-                "priority": priority,
-            })
+            briefs.append(
+                {
+                    "page_id": page["id"],
+                    "title": title,
+                    "priority": priority,
+                }
+            )
 
         return briefs
 

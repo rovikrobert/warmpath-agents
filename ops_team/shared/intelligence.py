@@ -272,20 +272,30 @@ class OpsIntelligence:
         for category, is_fresh in freshness.items():
             if not is_fresh:
                 meta = OPS_INTEL_CATEGORIES.get(category, {})
-                if category in ("job_market_trends", "competitor_ux", "company_hiring_signals"):
+                if category in (
+                    "job_market_trends",
+                    "competitor_ux",
+                    "company_hiring_signals",
+                ):
                     priority = "high"
-                elif category in ("marketplace_economics", "referral_best_practices", "nps_benchmarks"):
+                elif category in (
+                    "marketplace_economics",
+                    "referral_best_practices",
+                    "nps_benchmarks",
+                ):
                     priority = "medium"
                 else:
                     priority = "medium"
 
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": priority,
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": priority,
+                    }
+                )
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         agenda.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))

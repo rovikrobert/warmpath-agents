@@ -141,7 +141,11 @@ def _compute_gtm_readiness(metrics: dict[str, Any]) -> float:
     for kpi_name, kpi_meta in KPI_TARGETS.items():
         target = kpi_meta.get("target", 1)
         current = metrics.get(kpi_name, 0)
-        if isinstance(current, (int, float)) and isinstance(target, (int, float)) and target > 0:
+        if (
+            isinstance(current, (int, float))
+            and isinstance(target, (int, float))
+            and target > 0
+        ):
             scores.append(min(1.0, current / target))
         else:
             scores.append(0.0)
@@ -190,71 +194,77 @@ def _generate_cross_team_requests(
     # Critical findings -> request to relevant team
     critical = [f for f in findings if f.severity == "critical"]
     if critical:
-        requests.append({
-            "team": "engineering",
-            "request": (
-                f"{len(critical)} critical GTM finding(s) need engineering attention"
-            ),
-            "urgency": "high",
-            "source": AGENT_NAME,
-        })
+        requests.append(
+            {
+                "team": "engineering",
+                "request": (
+                    f"{len(critical)} critical GTM finding(s) need engineering attention"
+                ),
+                "urgency": "high",
+                "source": AGENT_NAME,
+            }
+        )
 
     # Marketing compliance gaps -> finance team (legal agent)
-    blocked_compliance = [
-        c for c in compliance_reviews if c.status == "blocked"
-    ]
+    blocked_compliance = [c for c in compliance_reviews if c.status == "blocked"]
     if blocked_compliance:
-        requests.append({
-            "team": "finance",
-            "request": (
-                f"{len(blocked_compliance)} marketing compliance item(s) blocked -- "
-                f"legal review required"
-            ),
-            "urgency": "high",
-            "source": AGENT_NAME,
-        })
+        requests.append(
+            {
+                "team": "finance",
+                "request": (
+                    f"{len(blocked_compliance)} marketing compliance item(s) blocked -- "
+                    f"legal review required"
+                ),
+                "urgency": "high",
+                "source": AGENT_NAME,
+            }
+        )
 
     # Pending compliance reviews -> finance team
-    pending_compliance = [
-        c for c in compliance_reviews if c.status == "pending"
-    ]
+    pending_compliance = [c for c in compliance_reviews if c.status == "pending"]
     if pending_compliance:
-        requests.append({
-            "team": "finance",
-            "request": (
-                f"{len(pending_compliance)} marketing compliance item(s) pending "
-                f"legal review"
-            ),
-            "urgency": "medium",
-            "source": AGENT_NAME,
-        })
+        requests.append(
+            {
+                "team": "finance",
+                "request": (
+                    f"{len(pending_compliance)} marketing compliance item(s) pending "
+                    f"legal review"
+                ),
+                "urgency": "medium",
+                "source": AGENT_NAME,
+            }
+        )
 
     # Pricing implementation gaps -> engineering team
     running_experiments = [
         e for e in pricing_experiments if e.status in ("designed", "running")
     ]
     if running_experiments:
-        requests.append({
-            "team": "engineering",
-            "request": (
-                f"{len(running_experiments)} pricing experiment(s) may need "
-                f"feature-flag or billing implementation"
-            ),
-            "urgency": "medium",
-            "source": AGENT_NAME,
-        })
+        requests.append(
+            {
+                "team": "engineering",
+                "request": (
+                    f"{len(running_experiments)} pricing experiment(s) may need "
+                    f"feature-flag or billing implementation"
+                ),
+                "urgency": "medium",
+                "source": AGENT_NAME,
+            }
+        )
 
     # Data team request if conversion metrics are missing
     if not metrics.get("funnel_metrics_available"):
-        requests.append({
-            "team": "data",
-            "request": (
-                "GTM team needs funnel conversion metrics (signup -> upload -> search -> intro) "
-                "for channel attribution"
-            ),
-            "urgency": "medium",
-            "source": AGENT_NAME,
-        })
+        requests.append(
+            {
+                "team": "data",
+                "request": (
+                    "GTM team needs funnel conversion metrics (signup -> upload -> search -> intro) "
+                    "for channel attribution"
+                ),
+                "urgency": "medium",
+                "source": AGENT_NAME,
+            }
+        )
 
     return requests
 
@@ -294,13 +304,13 @@ def scan() -> GTMTeamReport:
 
     # Competitive alert level
     urgent_insights = [i for i in insights if i.urgency in ("immediate", "this_week")]
-    competitive_alert = "high" if len(urgent_insights) >= 3 else "medium" if urgent_insights else "low"
+    competitive_alert = (
+        "high" if len(urgent_insights) >= 3 else "medium" if urgent_insights else "low"
+    )
     metrics["competitive_alert_level"] = competitive_alert
 
     # Cross-team requests
-    cross_team = _generate_cross_team_requests(
-        findings, compliance, pricing, metrics
-    )
+    cross_team = _generate_cross_team_requests(findings, compliance, pricing, metrics)
     # Include any sub-agent cross-team requests
     cross_team.extend(agg["cross_team_requests"])
 
@@ -323,20 +333,24 @@ def scan() -> GTMTeamReport:
     ls = GTMLearningState(AGENT_NAME)
     ls.record_scan(metrics)
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+            }
+        )
         ls.record_severity_calibration(f.severity)
     for ins in insights:
-        ls.record_insight({
-            "id": ins.id,
-            "category": ins.category,
-            "title": ins.title,
-            "confidence": ins.confidence,
-        })
+        ls.record_insight(
+            {
+                "id": ins.id,
+                "category": ins.category,
+                "title": ins.title,
+                "confidence": ins.confidence,
+            }
+        )
 
     finding_counts: dict[str, int] = {}
     for f in findings:
@@ -416,7 +430,9 @@ def generate_daily_brief(
     readiness = _compute_gtm_readiness(metrics)
     health = _compute_health_score(reports, findings)
     urgent_insights = [i for i in insights if i.urgency in ("immediate", "this_week")]
-    competitive_alert = "HIGH" if len(urgent_insights) >= 3 else "MEDIUM" if urgent_insights else "LOW"
+    competitive_alert = (
+        "HIGH" if len(urgent_insights) >= 3 else "MEDIUM" if urgent_insights else "LOW"
+    )
 
     # -- Active Initiatives ---------------------------------------------------
     lines.append("## Active Initiatives\n")
@@ -431,9 +447,7 @@ def generate_daily_brief(
 
     # -- Decisions Needed -----------------------------------------------------
     critical_high = [f for f in findings if f.severity in ("critical", "high")]
-    blocked_compliance = [
-        c for c in agg["compliance_reviews"] if c.status == "blocked"
-    ]
+    blocked_compliance = [c for c in agg["compliance_reviews"] if c.status == "blocked"]
     if critical_high or blocked_compliance or conflicts:
         lines.append("## Decisions Needed\n")
         for f in sorted(critical_high, key=lambda x: x.sort_key)[:5]:
@@ -581,7 +595,9 @@ def generate_weekly_report(
     content_depth = metrics.get("content_pipeline_depth", 0)
     content_target = KPI_TARGETS.get("content_pipeline_depth", {}).get("target", 20)
     content_status = "Good" if content_depth >= content_target else "Building"
-    lines.append(f"| SEO/Content | {content_status} | {content_depth}/{content_target} articles |")
+    lines.append(
+        f"| SEO/Content | {content_status} | {content_depth}/{content_target} articles |"
+    )
 
     lp_ready = metrics.get("landing_page_readiness", 0)
     lp_target = KPI_TARGETS.get("landing_page_readiness", {}).get("target", 6)
@@ -591,17 +607,23 @@ def generate_weekly_report(
     partner_count = len(partnerships)
     partner_target = KPI_TARGETS.get("partnership_pipeline", {}).get("target", 15)
     partner_status = "Good" if partner_count >= partner_target else "Building"
-    lines.append(f"| Partnerships | {partner_status} | {partner_count}/{partner_target} active |")
+    lines.append(
+        f"| Partnerships | {partner_status} | {partner_count}/{partner_target} active |"
+    )
 
     supply_targets = metrics.get("supply_side_targets", 0)
     supply_target = KPI_TARGETS.get("supply_side_targets", {}).get("target", 50)
     supply_status = "Good" if supply_targets >= supply_target else "Building"
-    lines.append(f"| Supply Seeding | {supply_status} | {supply_targets}/{supply_target} targets |")
+    lines.append(
+        f"| Supply Seeding | {supply_status} | {supply_targets}/{supply_target} targets |"
+    )
     lines.append("")
 
     # -- Competitive Landscape ------------------------------------------------
     lines.append("## Competitive Landscape\n")
-    competitive_insights = [i for i in insights if i.category in ("competitive", "market_entry")]
+    competitive_insights = [
+        i for i in insights if i.category in ("competitive", "market_entry")
+    ]
     if competitive_insights:
         for i in competitive_insights[:5]:
             lines.append(f"- **[{i.id}] {i.title}** (confidence: {i.confidence})")
@@ -632,7 +654,14 @@ def generate_weekly_report(
         by_stage: dict[str, list[PartnershipOpportunity]] = {}
         for p in partnerships:
             by_stage.setdefault(p.stage, []).append(p)
-        for stage in ("signed", "negotiation", "proposal", "conversation", "outreach", "identified"):
+        for stage in (
+            "signed",
+            "negotiation",
+            "proposal",
+            "conversation",
+            "outreach",
+            "identified",
+        ):
             stage_partners = by_stage.get(stage, [])
             if stage_partners:
                 lines.append(f"### {stage.title()} ({len(stage_partners)})")
@@ -667,7 +696,9 @@ def generate_weekly_report(
             )
             lines.append(f"- Health trajectory: {report['health_trajectory']}")
             if report.get("escalated_patterns"):
-                lines.append(f"- Escalated patterns: {len(report['escalated_patterns'])}")
+                lines.append(
+                    f"- Escalated patterns: {len(report['escalated_patterns'])}"
+                )
             lines.append("")
         except Exception:
             pass
@@ -701,7 +732,13 @@ def generate_weekly_report(
         current = metrics.get(kpi_name, 0)
         target = kpi_meta.get("target", "?")
         unit = kpi_meta.get("unit", "")
-        status = "met" if isinstance(current, (int, float)) and isinstance(target, (int, float)) and current >= target else "gap"
+        status = (
+            "met"
+            if isinstance(current, (int, float))
+            and isinstance(target, (int, float))
+            and current >= target
+            else "gap"
+        )
         lines.append(f"- {kpi_name}: {current}/{target} {unit} [{status}]")
     lines.append("")
 
@@ -766,7 +803,9 @@ def generate_monthly_review(
     )
     lines.append("| Assumption | Confidence |")
     lines.append("|------------|------------|")
-    lines.append("| Cold apps convert 1-3%, referrals 10-40% | High (well-researched) |")
+    lines.append(
+        "| Cold apps convert 1-3%, referrals 10-40% | High (well-researched) |"
+    )
     lines.append("| Mid-career tech professionals as wedge market | High |")
     lines.append("| $20-30/mo price point sustainable | Medium (needs validation) |")
     lines.append("| Network holders motivated by referral bonuses | Medium |")
@@ -793,12 +832,8 @@ def generate_monthly_review(
     lines.append("| US market | Future | Requires pricing localisation |")
 
     # Vertical
-    bootcamp_partners = [
-        p for p in partnerships if p.partner_type == "bootcamp"
-    ]
-    uni_partners = [
-        p for p in partnerships if p.partner_type == "university"
-    ]
+    bootcamp_partners = [p for p in partnerships if p.partner_type == "bootcamp"]
+    uni_partners = [p for p in partnerships if p.partner_type == "university"]
     lines.append(
         f"| Bootcamp vertical | "
         f"{'Active' if bootcamp_partners else 'Identified'} | "
@@ -831,9 +866,15 @@ def generate_monthly_review(
 
     # -- Roadmap --------------------------------------------------------------
     lines.append("## GTM Roadmap\n")
-    lines.append("1. **Phase 1 (Current):** Competitive positioning, pricing validation, content pipeline")
-    lines.append("2. **Phase 2:** Supply seeding (10-15 network holders), demand seeding (10-15 job seekers)")
-    lines.append("3. **Phase 3:** Channel expansion (SEO, partnerships, community), geographic expansion")
+    lines.append(
+        "1. **Phase 1 (Current):** Competitive positioning, pricing validation, content pipeline"
+    )
+    lines.append(
+        "2. **Phase 2:** Supply seeding (10-15 network holders), demand seeding (10-15 job seekers)"
+    )
+    lines.append(
+        "3. **Phase 3:** Channel expansion (SEO, partnerships, community), geographic expansion"
+    )
     lines.append("")
 
     return "\n".join(lines)

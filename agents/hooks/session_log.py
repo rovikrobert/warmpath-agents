@@ -28,9 +28,13 @@ def log_session(session_data: dict | None = None) -> None:
         "session_id": os.environ.get("CLAUDE_SESSION_ID", "unknown"),
         "agent": session_data.get("agent", "unknown") if session_data else "unknown",
         "model": session_data.get("model", "unknown") if session_data else "unknown",
-        "duration_seconds": session_data.get("duration_seconds", 0) if session_data else 0,
+        "duration_seconds": session_data.get("duration_seconds", 0)
+        if session_data
+        else 0,
         "tokens_used": session_data.get("tokens_used", 0) if session_data else 0,
-        "estimated_cost_usd": session_data.get("estimated_cost_usd", 0.0) if session_data else 0.0,
+        "estimated_cost_usd": session_data.get("estimated_cost_usd", 0.0)
+        if session_data
+        else 0.0,
     }
 
     with open(log_file, "a") as f:

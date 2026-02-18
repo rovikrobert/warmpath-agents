@@ -238,20 +238,26 @@ class FinanceIntelligence:
         for category, is_fresh in freshness.items():
             if not is_fresh:
                 meta = FINANCE_INTEL_CATEGORIES.get(category, {})
-                if category in ("regulatory_privacy", "regulatory_financial", "competitor_pricing"):
+                if category in (
+                    "regulatory_privacy",
+                    "regulatory_financial",
+                    "competitor_pricing",
+                ):
                     priority = "high"
                 elif category in ("startup_finance", "vc_market", "ai_regulation"):
                     priority = "medium"
                 else:
                     priority = "medium"
 
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": priority,
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": priority,
+                    }
+                )
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         agenda.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))

@@ -117,7 +117,9 @@ def _migrate_state(state: dict) -> dict:
     """Add missing keys with sane defaults — never modifies existing keys."""
     for key, default in _NEW_STATE_DEFAULTS.items():
         if key not in state:
-            state[key] = default if not isinstance(default, (list, dict)) else type(default)()
+            state[key] = (
+                default if not isinstance(default, (list, dict)) else type(default)()
+            )
     return state
 
 
@@ -138,7 +140,10 @@ def _load_state(agent: str) -> dict:
             return _migrate_state(state)
         except (json.JSONDecodeError, OSError):
             logger.warning("Corrupt state for %s, resetting", agent)
-    return {k: (v if not isinstance(v, (list, dict)) else type(v)()) for k, v in _NEW_STATE_DEFAULTS.items()}
+    return {
+        k: (v if not isinstance(v, (list, dict)) else type(v)())
+        for k, v in _NEW_STATE_DEFAULTS.items()
+    }
 
 
 def _save_state(agent: str, state: dict) -> None:
@@ -344,7 +349,9 @@ class AgentLearningState:
                 current_val = existing.get("weight", 1.0)
                 # Apply time-based decay
                 try:
-                    last_dt = datetime.fromisoformat(existing.get("last_updated", now_iso))
+                    last_dt = datetime.fromisoformat(
+                        existing.get("last_updated", now_iso)
+                    )
                     if last_dt.tzinfo is None:
                         last_dt = last_dt.replace(tzinfo=timezone.utc)
                     days_since = (datetime.now(timezone.utc) - last_dt).days
@@ -373,12 +380,14 @@ class AgentLearningState:
         items = []
         for filepath, data in weights.items():
             if isinstance(data, dict):
-                items.append(AttentionWeight(
-                    file=filepath,
-                    weight=data.get("weight", 1.0),
-                    last_updated=data.get("last_updated", ""),
-                    reason=data.get("reason", ""),
-                ))
+                items.append(
+                    AttentionWeight(
+                        file=filepath,
+                        weight=data.get("weight", 1.0),
+                        last_updated=data.get("last_updated", ""),
+                        reason=data.get("reason", ""),
+                    )
+                )
             elif isinstance(data, (int, float)):
                 items.append(AttentionWeight(file=filepath, weight=float(data)))
         items.sort(key=lambda x: x.weight, reverse=True)
@@ -446,9 +455,7 @@ class AgentLearningState:
         self, name: str, source: str, effectiveness: float = 0.0
     ) -> None:
         """Record a methodology/best practice adopted."""
-        entry = MethodologyRecord(
-            name=name, source=source, effectiveness=effectiveness
-        )
+        entry = MethodologyRecord(name=name, source=source, effectiveness=effectiveness)
         self.state["methodologies"].append(asdict(entry))
         # Keep last 50
         self.state["methodologies"] = self.state["methodologies"][-50:]
@@ -463,7 +470,9 @@ class AgentLearningState:
         snapshot = HealthSnapshot(score=score, finding_counts=finding_counts)
         self.state["codebase_health_history"].append(asdict(snapshot))
         # Keep last 90 snapshots (~3 months daily)
-        self.state["codebase_health_history"] = self.state["codebase_health_history"][-90:]
+        self.state["codebase_health_history"] = self.state["codebase_health_history"][
+            -90:
+        ]
         self.save()
 
     def get_health_trajectory(self, window: int = 90) -> str:
@@ -509,9 +518,7 @@ class AgentLearningState:
         escalated = [
             {"key": k, **v} for k, v in patterns.items() if v.get("auto_escalated")
         ]
-        systemic = [
-            {"key": k, **v} for k, v in patterns.items() if v.get("systemic")
-        ]
+        systemic = [{"key": k, **v} for k, v in patterns.items() if v.get("systemic")]
 
         # Fix effectiveness
         resolutions = self.state.get("resolutions", {})
@@ -523,7 +530,9 @@ class AgentLearningState:
 
         effective_count = sum(1 for r in fix_records if r.get("effective"))
         total_checked = len(fix_records)
-        fix_rate = round(effective_count / total_checked, 3) if total_checked > 0 else None
+        fix_rate = (
+            round(effective_count / total_checked, 3) if total_checked > 0 else None
+        )
 
         # Tool reliability
         tool_reliability = self.get_tool_reliability()

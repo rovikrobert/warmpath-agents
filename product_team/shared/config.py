@@ -9,8 +9,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _THIS = Path(__file__).resolve()
-PRODUCT_TEAM_DIR = _THIS.parent.parent           # product_team/
-PROJECT_ROOT = PRODUCT_TEAM_DIR.parent            # warmpath/
+PRODUCT_TEAM_DIR = _THIS.parent.parent  # product_team/
+PROJECT_ROOT = PRODUCT_TEAM_DIR.parent  # warmpath/
 REPORTS_DIR = PRODUCT_TEAM_DIR / "reports"
 INTEL_CACHE = PRODUCT_TEAM_DIR / "shared" / "intel_cache.json"
 
@@ -43,14 +43,27 @@ PERSONAS: dict[str, dict] = {
         "label": "Job Seeker",
         "description": "Mid-career tech professional (3-10 yr exp) actively hunting",
         "motivation": "Get employee referrals instead of applying cold",
-        "key_pages": ["Dashboard", "FindReferrals", "ReferralResults", "ApplicationsPage", "NewSearch", "SearchResults"],
+        "key_pages": [
+            "Dashboard",
+            "FindReferrals",
+            "ReferralResults",
+            "ApplicationsPage",
+            "NewSearch",
+            "SearchResults",
+        ],
         "tier": "demand",
     },
     "network_holder": {
         "label": "Network Holder",
         "description": "Employee at desirable company with LinkedIn connections to share",
         "motivation": "Capture referral bonuses, build reputation, bank credits",
-        "key_pages": ["Dashboard", "ContactsPage", "SharingSettings", "MarketplaceDashboard", "CreditsPage"],
+        "key_pages": [
+            "Dashboard",
+            "ContactsPage",
+            "SharingSettings",
+            "MarketplaceDashboard",
+            "CreditsPage",
+        ],
         "tier": "supply",
     },
 }
@@ -96,11 +109,11 @@ DESIGN_SYSTEM_TARGETS: dict[str, float] = {
 # Self-learning thresholds
 # ---------------------------------------------------------------------------
 
-RECURRING_PATTERN_THRESHOLD = 5       # auto-escalate at 5+ occurrences
-SYSTEMIC_PATTERN_THRESHOLD = 10       # flag as systemic at 10+
-ATTENTION_WEIGHT_DECAY = 0.05         # per-day decay for quiet files
-FIX_EFFECTIVENESS_WINDOW_DAYS = 30    # look-back window for fix effectiveness
-INTEL_CACHE_TTL_HOURS = 24            # default intelligence cache TTL
+RECURRING_PATTERN_THRESHOLD = 5  # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10  # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05  # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30  # look-back window for fix effectiveness
+INTEL_CACHE_TTL_HOURS = 24  # default intelligence cache TTL
 
 # Health score weights per agent (total = 100)
 HEALTH_WEIGHTS: dict[str, int] = {

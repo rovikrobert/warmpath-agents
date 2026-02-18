@@ -34,7 +34,9 @@ class CreditEconomyFinding:
     """A credit economy finding from earn/spend/velocity analysis."""
 
     id: str
-    category: str  # earn_spend_balance | velocity | distribution | abuse | pricing | expiry
+    category: (
+        str  # earn_spend_balance | velocity | distribution | abuse | pricing | expiry
+    )
     severity: str  # critical | high | medium | low | info
     title: str
     file: str = ""
@@ -97,8 +99,12 @@ class FinanceTeamReport:
     def from_dict(cls, data: dict) -> FinanceTeamReport:
         findings = [Finding(**f) for f in data.pop("findings", [])]
         financial_findings = [Finding(**f) for f in data.pop("financial_findings", [])]
-        credit_findings = [CreditEconomyFinding(**c) for c in data.pop("credit_findings", [])]
-        compliance_findings = [ComplianceFinding(**c) for c in data.pop("compliance_findings", [])]
+        credit_findings = [
+            CreditEconomyFinding(**c) for c in data.pop("credit_findings", [])
+        ]
+        compliance_findings = [
+            ComplianceFinding(**c) for c in data.pop("compliance_findings", [])
+        ]
         return cls(
             findings=findings,
             financial_findings=financial_findings,
@@ -116,7 +122,13 @@ class FinanceTeamReport:
             f"*{self.timestamp}* — scanned in {self.scan_duration_seconds:.1f}s\n"
         )
 
-        sev_icons = {"critical": "!!", "high": "!", "medium": "~", "low": ".", "info": " "}
+        sev_icons = {
+            "critical": "!!",
+            "high": "!",
+            "medium": "~",
+            "low": ".",
+            "info": " ",
+        }
 
         # Financial findings
         if self.financial_findings:

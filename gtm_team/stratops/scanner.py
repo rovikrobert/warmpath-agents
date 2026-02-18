@@ -81,55 +81,65 @@ def _check_competitive_coverage(
     missing = [c for c in TRACKED_COMPETITORS if c not in mentioned]
 
     if coverage < 0.5:
-        findings.append(Finding(
-            id="STRAT-COMP-LOW",
-            severity="high",
-            category="competitive",
-            title=f"Low competitive coverage: {coverage:.0%} ({len(mentioned)}/{total})",
-            detail=(
-                f"Only {len(mentioned)} of {total} tracked competitors are mentioned "
-                f"in strategy docs. Missing: {', '.join(missing[:5])}."
-            ),
-            recommendation=(
-                "Create or update competitive analysis to cover all tracked competitors: "
-                + ", ".join(missing[:5])
-            ),
-            effort_hours=2.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-COMP-LOW",
+                severity="high",
+                category="competitive",
+                title=f"Low competitive coverage: {coverage:.0%} ({len(mentioned)}/{total})",
+                detail=(
+                    f"Only {len(mentioned)} of {total} tracked competitors are mentioned "
+                    f"in strategy docs. Missing: {', '.join(missing[:5])}."
+                ),
+                recommendation=(
+                    "Create or update competitive analysis to cover all tracked competitors: "
+                    + ", ".join(missing[:5])
+                ),
+                effort_hours=2.0,
+            )
+        )
     elif coverage < 0.75:
-        findings.append(Finding(
-            id="STRAT-COMP-MED",
-            severity="medium",
-            category="competitive",
-            title=f"Moderate competitive coverage: {coverage:.0%} ({len(mentioned)}/{total})",
-            detail=f"Missing competitors: {', '.join(missing)}.",
-            recommendation="Add analysis for missing competitors.",
-            effort_hours=1.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-COMP-MED",
+                severity="medium",
+                category="competitive",
+                title=f"Moderate competitive coverage: {coverage:.0%} ({len(mentioned)}/{total})",
+                detail=f"Missing competitors: {', '.join(missing)}.",
+                recommendation="Add analysis for missing competitors.",
+                effort_hours=1.0,
+            )
+        )
 
     # Always produce a market insight for competitive landscape
-    insights.append(MarketInsight(
-        id="strat-insight-comp",
-        category="competitive",
-        title=f"Competitive coverage: {coverage:.0%} ({len(mentioned)}/{total} tracked)",
-        evidence=f"Mentioned: {', '.join(mentioned) or 'none'}. Missing: {', '.join(missing) or 'none'}.",
-        strategic_impact="Low coverage means blind spots in competitive positioning",
-        recommended_response="Expand competitive analysis in strategy docs" if coverage < 0.75 else "Maintain current coverage",
-        urgency="this_week" if coverage < 0.5 else "this_month",
-        confidence="high",
-    ))
+    insights.append(
+        MarketInsight(
+            id="strat-insight-comp",
+            category="competitive",
+            title=f"Competitive coverage: {coverage:.0%} ({len(mentioned)}/{total} tracked)",
+            evidence=f"Mentioned: {', '.join(mentioned) or 'none'}. Missing: {', '.join(missing) or 'none'}.",
+            strategic_impact="Low coverage means blind spots in competitive positioning",
+            recommended_response="Expand competitive analysis in strategy docs"
+            if coverage < 0.75
+            else "Maintain current coverage",
+            urgency="this_week" if coverage < 0.5 else "this_month",
+            confidence="high",
+        )
+    )
 
     # Check for market sizing
     if comp_info.get("has_market_sizing"):
-        insights.append(MarketInsight(
-            id="strat-insight-tam",
-            category="market_entry",
-            title="Market sizing (TAM/SAM/SOM) documented",
-            evidence="Found TAM/SAM/SOM or total addressable market references",
-            strategic_impact="Market sizing supports investor conversations and prioritization",
-            urgency="monitor",
-            confidence="medium",
-        ))
+        insights.append(
+            MarketInsight(
+                id="strat-insight-tam",
+                category="market_entry",
+                title="Market sizing (TAM/SAM/SOM) documented",
+                evidence="Found TAM/SAM/SOM or total addressable market references",
+                strategic_impact="Market sizing supports investor conversations and prioritization",
+                urgency="monitor",
+                confidence="medium",
+            )
+        )
 
 
 def _check_market_entry_analysis(
@@ -159,46 +169,54 @@ def _check_market_entry_analysis(
     metrics["has_entry_sequence"] = has_entry_sequence
 
     if not has_entry_sequence and markets_mentioned == 0:
-        findings.append(Finding(
-            id="STRAT-ENTRY-MISSING",
-            severity="medium",
-            category="market_entry",
-            title="No market entry strategy documented",
-            detail=(
-                "No geographic market entry strategy found in strategy docs. "
-                "WarmPath needs a clear sequence for Singapore -> US -> APAC."
-            ),
-            recommendation=(
-                "Document market entry sequence: primary market (Singapore), "
-                "expansion markets (US, APAC), regulatory requirements per market."
-            ),
-            effort_hours=3.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-ENTRY-MISSING",
+                severity="medium",
+                category="market_entry",
+                title="No market entry strategy documented",
+                detail=(
+                    "No geographic market entry strategy found in strategy docs. "
+                    "WarmPath needs a clear sequence for Singapore -> US -> APAC."
+                ),
+                recommendation=(
+                    "Document market entry sequence: primary market (Singapore), "
+                    "expansion markets (US, APAC), regulatory requirements per market."
+                ),
+                effort_hours=3.0,
+            )
+        )
     elif not has_entry_sequence:
-        findings.append(Finding(
-            id="STRAT-ENTRY-NOSEQUENCE",
-            severity="low",
-            category="market_entry",
-            title=f"Markets mentioned ({markets_mentioned}) but no entry sequence",
-            detail="Geographic markets are referenced but no explicit entry sequence is documented.",
-            recommendation="Add explicit market entry prioritization and sequencing.",
-            effort_hours=1.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-ENTRY-NOSEQUENCE",
+                severity="low",
+                category="market_entry",
+                title=f"Markets mentioned ({markets_mentioned}) but no entry sequence",
+                detail="Geographic markets are referenced but no explicit entry sequence is documented.",
+                recommendation="Add explicit market entry prioritization and sequencing.",
+                effort_hours=1.0,
+            )
+        )
 
-    insights.append(MarketInsight(
-        id="strat-insight-entry",
-        category="market_entry",
-        title=f"Market entry: {markets_mentioned} markets, sequence={'yes' if has_entry_sequence else 'no'}",
-        evidence=(
-            f"Singapore: {'yes' if has_singapore else 'no'}, "
-            f"US: {'yes' if has_us else 'no'}, "
-            f"APAC: {'yes' if has_apac else 'no'}"
-        ),
-        strategic_impact="Clear entry sequence de-risks geographic expansion",
-        recommended_response="Formalize entry sequence" if not has_entry_sequence else "Monitor expansion readiness",
-        urgency="this_month" if not has_entry_sequence else "monitor",
-        confidence="high",
-    ))
+    insights.append(
+        MarketInsight(
+            id="strat-insight-entry",
+            category="market_entry",
+            title=f"Market entry: {markets_mentioned} markets, sequence={'yes' if has_entry_sequence else 'no'}",
+            evidence=(
+                f"Singapore: {'yes' if has_singapore else 'no'}, "
+                f"US: {'yes' if has_us else 'no'}, "
+                f"APAC: {'yes' if has_apac else 'no'}"
+            ),
+            strategic_impact="Clear entry sequence de-risks geographic expansion",
+            recommended_response="Formalize entry sequence"
+            if not has_entry_sequence
+            else "Monitor expansion readiness",
+            urgency="this_month" if not has_entry_sequence else "monitor",
+            confidence="high",
+        )
+    )
 
 
 def _check_geographic_readiness(
@@ -219,42 +237,50 @@ def _check_geographic_readiness(
     metrics["has_regulatory_notes"] = has_regulatory
 
     if markets and not has_regulatory:
-        findings.append(Finding(
-            id="STRAT-GEO-NOREG",
-            severity="medium",
-            category="geographic",
-            title="Geographic markets mentioned without regulatory notes",
-            detail=(
-                f"Markets {', '.join(markets.keys())} are mentioned but no regulatory "
-                "framework (PDPA, GDPR, CCPA) documentation found."
-            ),
-            recommendation=(
-                "Document regulatory requirements for each target market: "
-                "PDPA (Singapore), GDPR (EU), CCPA (US)."
-            ),
-            effort_hours=2.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-GEO-NOREG",
+                severity="medium",
+                category="geographic",
+                title="Geographic markets mentioned without regulatory notes",
+                detail=(
+                    f"Markets {', '.join(markets.keys())} are mentioned but no regulatory "
+                    "framework (PDPA, GDPR, CCPA) documentation found."
+                ),
+                recommendation=(
+                    "Document regulatory requirements for each target market: "
+                    "PDPA (Singapore), GDPR (EU), CCPA (US)."
+                ),
+                effort_hours=2.0,
+            )
+        )
     elif not markets:
-        findings.append(Finding(
-            id="STRAT-GEO-NONE",
-            severity="low",
-            category="geographic",
-            title="No geographic markets documented",
-            detail="No target geographic markets identified in strategy docs.",
-            recommendation="Define target markets and document entry requirements.",
-            effort_hours=1.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-GEO-NONE",
+                severity="low",
+                category="geographic",
+                title="No geographic markets documented",
+                detail="No target geographic markets identified in strategy docs.",
+                recommendation="Define target markets and document entry requirements.",
+                effort_hours=1.0,
+            )
+        )
 
-    insights.append(MarketInsight(
-        id="strat-insight-geo",
-        category="market_entry",
-        title=f"Geographic readiness: {len(markets)} markets, regulatory={'covered' if has_regulatory else 'missing'}",
-        evidence=f"Markets: {', '.join(markets.keys()) or 'none'}. Regulatory: {'yes' if has_regulatory else 'no'}.",
-        strategic_impact="Regulatory gaps block market entry",
-        recommended_response="Add regulatory docs" if not has_regulatory else "Maintain regulatory coverage",
-        urgency="this_week" if markets and not has_regulatory else "monitor",
-        confidence="high",
-    ))
+    insights.append(
+        MarketInsight(
+            id="strat-insight-geo",
+            category="market_entry",
+            title=f"Geographic readiness: {len(markets)} markets, regulatory={'covered' if has_regulatory else 'missing'}",
+            evidence=f"Markets: {', '.join(markets.keys()) or 'none'}. Regulatory: {'yes' if has_regulatory else 'no'}.",
+            strategic_impact="Regulatory gaps block market entry",
+            recommended_response="Add regulatory docs"
+            if not has_regulatory
+            else "Maintain regulatory coverage",
+            urgency="this_week" if markets and not has_regulatory else "monitor",
+            confidence="high",
+        )
+    )
 
 
 def _check_positioning_strength(
@@ -272,24 +298,34 @@ def _check_positioning_strength(
     all_text = "\n".join(docs.values())
     all_lower = all_text.lower()
 
-    has_differentiators = bool(re.search(
-        r"differentiator|competitive\s+advantage|unique\s+value|key\s+differentiator",
-        all_lower,
-    ))
-    has_value_prop = bool(re.search(
-        r"value\s+prop|wedge\s+market|core\s+thesis|two.sided\s+marketplace",
-        all_lower,
-    ))
-    has_positioning = bool(re.search(
-        r"positioning|market\s+position|category\s+design",
-        all_lower,
-    ))
-    has_privacy_messaging = bool(re.search(
-        r"privacy.first|anonymi[sz]ed|consent.gate|vault\s+model",
-        all_lower,
-    ))
+    has_differentiators = bool(
+        re.search(
+            r"differentiator|competitive\s+advantage|unique\s+value|key\s+differentiator",
+            all_lower,
+        )
+    )
+    has_value_prop = bool(
+        re.search(
+            r"value\s+prop|wedge\s+market|core\s+thesis|two.sided\s+marketplace",
+            all_lower,
+        )
+    )
+    has_positioning = bool(
+        re.search(
+            r"positioning|market\s+position|category\s+design",
+            all_lower,
+        )
+    )
+    has_privacy_messaging = bool(
+        re.search(
+            r"privacy.first|anonymi[sz]ed|consent.gate|vault\s+model",
+            all_lower,
+        )
+    )
 
-    signals = sum([has_differentiators, has_value_prop, has_positioning, has_privacy_messaging])
+    signals = sum(
+        [has_differentiators, has_value_prop, has_positioning, has_privacy_messaging]
+    )
     metrics["positioning_signals"] = signals
     metrics["has_differentiators"] = has_differentiators
     metrics["has_value_prop"] = has_value_prop
@@ -297,52 +333,64 @@ def _check_positioning_strength(
     metrics["has_privacy_messaging"] = has_privacy_messaging
 
     if signals == 0:
-        findings.append(Finding(
-            id="STRAT-POS-NONE",
-            severity="high",
-            category="positioning",
-            title="No positioning or differentiation documented",
-            detail=(
-                "No differentiators, value propositions, or positioning statements "
-                "found in strategy docs."
-            ),
-            recommendation=(
-                "Document: (1) key differentiators, (2) value proposition per persona, "
-                "(3) competitive positioning statement, (4) privacy-first messaging."
-            ),
-            effort_hours=3.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-POS-NONE",
+                severity="high",
+                category="positioning",
+                title="No positioning or differentiation documented",
+                detail=(
+                    "No differentiators, value propositions, or positioning statements "
+                    "found in strategy docs."
+                ),
+                recommendation=(
+                    "Document: (1) key differentiators, (2) value proposition per persona, "
+                    "(3) competitive positioning statement, (4) privacy-first messaging."
+                ),
+                effort_hours=3.0,
+            )
+        )
     elif signals < 3:
-        findings.append(Finding(
-            id="STRAT-POS-PARTIAL",
-            severity="medium",
-            category="positioning",
-            title=f"Partial positioning: {signals}/4 elements documented",
-            detail=(
+        findings.append(
+            Finding(
+                id="STRAT-POS-PARTIAL",
+                severity="medium",
+                category="positioning",
+                title=f"Partial positioning: {signals}/4 elements documented",
+                detail=(
+                    f"Differentiators: {'yes' if has_differentiators else 'no'}, "
+                    f"Value prop: {'yes' if has_value_prop else 'no'}, "
+                    f"Positioning: {'yes' if has_positioning else 'no'}, "
+                    f"Privacy messaging: {'yes' if has_privacy_messaging else 'no'}"
+                ),
+                recommendation="Complete positioning documentation for missing elements.",
+                effort_hours=1.5,
+            )
+        )
+
+    insights.append(
+        MarketInsight(
+            id="strat-insight-pos",
+            category="competitive",
+            title=f"Positioning strength: {signals}/4 elements",
+            evidence=(
                 f"Differentiators: {'yes' if has_differentiators else 'no'}, "
                 f"Value prop: {'yes' if has_value_prop else 'no'}, "
                 f"Positioning: {'yes' if has_positioning else 'no'}, "
                 f"Privacy messaging: {'yes' if has_privacy_messaging else 'no'}"
             ),
-            recommendation="Complete positioning documentation for missing elements.",
-            effort_hours=1.5,
-        ))
-
-    insights.append(MarketInsight(
-        id="strat-insight-pos",
-        category="competitive",
-        title=f"Positioning strength: {signals}/4 elements",
-        evidence=(
-            f"Differentiators: {'yes' if has_differentiators else 'no'}, "
-            f"Value prop: {'yes' if has_value_prop else 'no'}, "
-            f"Positioning: {'yes' if has_positioning else 'no'}, "
-            f"Privacy messaging: {'yes' if has_privacy_messaging else 'no'}"
-        ),
-        strategic_impact="Weak positioning makes GTM execution ineffective",
-        recommended_response="Strengthen positioning" if signals < 3 else "Position is solid",
-        urgency="this_week" if signals == 0 else "this_month" if signals < 3 else "monitor",
-        confidence="high",
-    ))
+            strategic_impact="Weak positioning makes GTM execution ineffective",
+            recommended_response="Strengthen positioning"
+            if signals < 3
+            else "Position is solid",
+            urgency="this_week"
+            if signals == 0
+            else "this_month"
+            if signals < 3
+            else "monitor",
+            confidence="high",
+        )
+    )
 
 
 def _check_referral_rails_thesis(
@@ -361,12 +409,24 @@ def _check_referral_rails_thesis(
     all_lower = all_text.lower()
 
     thesis_signals = {
-        "referral_bonus": bool(re.search(r"referral\s+bonus|employer\s+referral", all_lower)),
-        "network_effects": bool(re.search(r"network\s+effect|flywheel|supply.side", all_lower)),
-        "marketplace_thesis": bool(re.search(r"two.sided\s+marketplace|marketplace|cross.network", all_lower)),
+        "referral_bonus": bool(
+            re.search(r"referral\s+bonus|employer\s+referral", all_lower)
+        ),
+        "network_effects": bool(
+            re.search(r"network\s+effect|flywheel|supply.side", all_lower)
+        ),
+        "marketplace_thesis": bool(
+            re.search(r"two.sided\s+marketplace|marketplace|cross.network", all_lower)
+        ),
         "warm_score": bool(re.search(r"warm\s+score|warm_score|warmth", all_lower)),
-        "cultural_context": bool(re.search(r"cultural\s+context|approach\s+style|message\s+sequence", all_lower)),
-        "credit_economy": bool(re.search(r"credit|non.transferable|loyalty\s+program", all_lower)),
+        "cultural_context": bool(
+            re.search(
+                r"cultural\s+context|approach\s+style|message\s+sequence", all_lower
+            )
+        ),
+        "credit_economy": bool(
+            re.search(r"credit|non.transferable|loyalty\s+program", all_lower)
+        ),
     }
 
     documented = sum(thesis_signals.values())
@@ -379,26 +439,34 @@ def _check_referral_rails_thesis(
 
     if documented < total:
         missing = [k for k, v in thesis_signals.items() if not v]
-        findings.append(Finding(
-            id="STRAT-THESIS-GAP",
-            severity="info",
-            category="thesis",
-            title=f"Referral rails thesis: {documented}/{total} elements documented",
-            detail=f"Missing thesis elements: {', '.join(missing)}",
-            recommendation="Document missing thesis elements for investor and team alignment.",
-            effort_hours=1.0,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-THESIS-GAP",
+                severity="info",
+                category="thesis",
+                title=f"Referral rails thesis: {documented}/{total} elements documented",
+                detail=f"Missing thesis elements: {', '.join(missing)}",
+                recommendation="Document missing thesis elements for investor and team alignment.",
+                effort_hours=1.0,
+            )
+        )
 
-    insights.append(MarketInsight(
-        id="strat-insight-thesis",
-        category="competitive",
-        title=f"Referral rails thesis: {documented}/{total} elements documented",
-        evidence=", ".join(f"{k}={'yes' if v else 'no'}" for k, v in thesis_signals.items()),
-        strategic_impact="Complete thesis documentation drives aligned execution",
-        recommended_response="Document remaining thesis elements" if documented < total else "Thesis well-documented",
-        urgency="monitor",
-        confidence="high",
-    ))
+    insights.append(
+        MarketInsight(
+            id="strat-insight-thesis",
+            category="competitive",
+            title=f"Referral rails thesis: {documented}/{total} elements documented",
+            evidence=", ".join(
+                f"{k}={'yes' if v else 'no'}" for k, v in thesis_signals.items()
+            ),
+            strategic_impact="Complete thesis documentation drives aligned execution",
+            recommended_response="Document remaining thesis elements"
+            if documented < total
+            else "Thesis well-documented",
+            urgency="monitor",
+            confidence="high",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -417,14 +485,12 @@ def _compute_strategic_readiness(metrics: dict[str, Any]) -> float:
     - Thesis: 15%
     """
     comp_score = metrics.get("competitor_coverage_ratio", 0.0) * 100
-    entry_score = (
-        50.0 * (1 if metrics.get("has_entry_sequence") else 0)
-        + 50.0 * min(1.0, metrics.get("markets_mentioned", 0) / 3)
+    entry_score = 50.0 * (1 if metrics.get("has_entry_sequence") else 0) + 50.0 * min(
+        1.0, metrics.get("markets_mentioned", 0) / 3
     )
-    geo_score = (
-        50.0 * min(1.0, metrics.get("geographic_markets_found", 0) / 3)
-        + 50.0 * (1 if metrics.get("has_regulatory_notes") else 0)
-    )
+    geo_score = 50.0 * min(
+        1.0, metrics.get("geographic_markets_found", 0) / 3
+    ) + 50.0 * (1 if metrics.get("has_regulatory_notes") else 0)
     pos_score = metrics.get("positioning_signals", 0) / 4 * 100
     thesis_score = metrics.get("thesis_coverage", 0.0) * 100
 
@@ -456,15 +522,17 @@ def scan() -> GTMTeamReport:
     metrics["strategy_docs_loaded"] = len(docs)
 
     if not docs:
-        findings.append(Finding(
-            id="STRAT-NODOCS",
-            severity="high",
-            category="strategy",
-            title="No strategy documents found",
-            detail="Could not load any strategy documents. StratOps cannot operate without them.",
-            recommendation="Ensure CLAUDE.md and other strategy docs exist at project root.",
-            effort_hours=0.5,
-        ))
+        findings.append(
+            Finding(
+                id="STRAT-NODOCS",
+                severity="high",
+                category="strategy",
+                title="No strategy documents found",
+                detail="Could not load any strategy documents. StratOps cannot operate without them.",
+                recommendation="Ensure CLAUDE.md and other strategy docs exist at project root.",
+                effort_hours=0.5,
+            )
+        )
     else:
         # Run all checks
         _check_competitive_coverage(docs, findings, insights, metrics)
@@ -479,16 +547,20 @@ def scan() -> GTMTeamReport:
 
     # -- Self-learning -------------------------------------------------------
     ls = GTMLearningState(AGENT_NAME)
-    ls.record_scan({k: v for k, v in metrics.items() if isinstance(v, (int, float, bool))})
+    ls.record_scan(
+        {k: v for k, v in metrics.items() if isinstance(v, (int, float, bool))}
+    )
 
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         ls.record_severity_calibration(f.severity)
 
     # Attention weights on strategy docs
@@ -522,9 +594,7 @@ def scan() -> GTMTeamReport:
     )
     hot_spots = ls.get_hot_spots(top_n=3)
     if hot_spots:
-        learning_updates.append(
-            f"Hot spots: {', '.join(h.file for h in hot_spots)}"
-        )
+        learning_updates.append(f"Hot spots: {', '.join(h.file for h in hot_spots)}")
 
     duration = time.time() - start
 
@@ -580,7 +650,9 @@ if __name__ == "__main__":
     print(
         f"\nTotal: {len(report.findings)} findings ({', '.join(summary_parts) or 'clean'})"
     )
-    print(f"Strategic readiness: {report.metrics.get('strategic_readiness_score', 0)}/100")
+    print(
+        f"Strategic readiness: {report.metrics.get('strategic_readiness_score', 0)}/100"
+    )
 
     if sev_counts.get("critical", 0) or sev_counts.get("high", 0):
         sys.exit(1)

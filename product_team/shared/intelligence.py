@@ -272,20 +272,30 @@ class ProductIntelligence:
         for category, is_fresh in freshness.items():
             if not is_fresh:
                 meta = PRODUCT_INTEL_CATEGORIES.get(category, {})
-                if category in ("competitor_features", "user_forums", "marketplace_dynamics"):
+                if category in (
+                    "competitor_features",
+                    "user_forums",
+                    "marketplace_dynamics",
+                ):
                     priority = "high"
-                elif category in ("accessibility_standards", "ux_patterns", "career_platforms"):
+                elif category in (
+                    "accessibility_standards",
+                    "ux_patterns",
+                    "career_platforms",
+                ):
                     priority = "medium"
                 else:
                     priority = "medium"
 
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": priority,
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": priority,
+                    }
+                )
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         agenda.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))

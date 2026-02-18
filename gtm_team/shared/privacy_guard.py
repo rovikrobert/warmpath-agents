@@ -25,16 +25,27 @@ logger = logging.getLogger(__name__)
 
 PII_PATTERNS: list[str] = [
     r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
-    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",                          # Phone
-    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",                    # LinkedIn profile
+    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",  # Phone
+    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",  # LinkedIn profile
 ]
 
-PII_COLUMN_NAMES: frozenset[str] = frozenset({
-    "first_name", "last_name", "full_name", "email",
-    "linkedin_url", "current_title", "current_company",
-    "location", "notes", "how_you_know",
-    "email_blind_index", "name_company_blind_index", "raw_csv_row",
-})
+PII_COLUMN_NAMES: frozenset[str] = frozenset(
+    {
+        "first_name",
+        "last_name",
+        "full_name",
+        "email",
+        "linkedin_url",
+        "current_title",
+        "current_company",
+        "location",
+        "notes",
+        "how_you_know",
+        "email_blind_index",
+        "name_company_blind_index",
+        "raw_csv_row",
+    }
+)
 
 # GTM-specific forbidden actions
 FORBIDDEN_ACTIONS: list[str] = [
@@ -110,9 +121,7 @@ class GTMPrivacyGuard:
         self._log(action, context or "validate_action")
         return True
 
-    def validate_marketing_claim(
-        self, claim: str, *, context: str = ""
-    ) -> bool:
+    def validate_marketing_claim(self, claim: str, *, context: str = "") -> bool:
         """Reject marketing claims that misrepresent privacy architecture.
 
         Returns True if valid; raises PrivacyViolation otherwise.
@@ -120,9 +129,15 @@ class GTMPrivacyGuard:
         lower = claim.lower()
         false_claim_patterns = [
             (r"we\s+(can\s+)?see\s+(your|users?)\s+network", "claim_false_privacy"),
-            (r"we\s+know\s+who\s+(your|their)\s+connections\s+know", "cross_vault_claim"),
+            (
+                r"we\s+know\s+who\s+(your|their)\s+connections\s+know",
+                "cross_vault_claim",
+            ),
             (r"we\s+share\s+(your|user)\s+data", "claim_false_privacy"),
-            (r"names?\s+(are|is)\s+visible\s+to\s+(job\s+seekers?|strangers?)", "anonymization_violation"),
+            (
+                r"names?\s+(are|is)\s+visible\s+to\s+(job\s+seekers?|strangers?)",
+                "anonymization_violation",
+            ),
         ]
         for pattern, privy_cat in false_claim_patterns:
             if re.search(pattern, lower):
@@ -178,11 +193,13 @@ class GTMPrivacyGuard:
 
     def _log(self, text: str, context: str) -> None:
         """Audit trail for validated outputs."""
-        self._audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "context": context,
-            "text_preview": text[:120].replace("\n", " "),
-        })
+        self._audit_log.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "context": context,
+                "text_preview": text[:120].replace("\n", " "),
+            }
+        )
         self._audit_log = self._audit_log[-500:]
 
 

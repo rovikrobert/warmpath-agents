@@ -114,7 +114,9 @@ class DataTeamReport:
             lines.append(f"## Insights ({len(self.insights)})\n")
             for i in self.insights:
                 lines.append(f"### [{i.id}] {i.title}")
-                lines.append(f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}")
+                lines.append(
+                    f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}"
+                )
                 lines.append(f"{i.evidence}")
                 lines.append(f"**Impact:** {i.impact}")
                 lines.append(f"**Recommendation:** {i.recommendation}")

@@ -84,50 +84,62 @@ def _check_seo_basics(
 
     # Check index.html for essential SEO elements
     has_title = bool(re.search(r"<title\b[^>]*>", index_content))
-    has_meta_desc = bool(re.search(r'<meta\s+[^>]*name=["\']description["\']', index_content))
+    has_meta_desc = bool(
+        re.search(r'<meta\s+[^>]*name=["\']description["\']', index_content)
+    )
     has_og_tags = bool(re.search(r'<meta\s+[^>]*property=["\']og:', index_content))
-    has_viewport = bool(re.search(r'<meta\s+[^>]*name=["\']viewport["\']', index_content))
-    has_charset = bool(re.search(r'<meta\s+[^>]*charset=', index_content))
+    has_viewport = bool(
+        re.search(r'<meta\s+[^>]*name=["\']viewport["\']', index_content)
+    )
+    has_charset = bool(re.search(r"<meta\s+[^>]*charset=", index_content))
     has_favicon = bool(re.search(r'<link\s+[^>]*rel=["\']icon["\']', index_content))
 
-    seo_score = sum([has_title, has_meta_desc, has_og_tags, has_viewport, has_charset, has_favicon])
+    seo_score = sum(
+        [has_title, has_meta_desc, has_og_tags, has_viewport, has_charset, has_favicon]
+    )
     metrics["seo_index_score"] = seo_score
     metrics["seo_has_title"] = has_title
     metrics["seo_has_meta_description"] = has_meta_desc
     metrics["seo_has_og_tags"] = has_og_tags
 
     if not has_title:
-        findings.append(Finding(
-            id="mkt-seo-001",
-            severity="medium",
-            category="seo",
-            title="Missing <title> tag in index.html",
-            detail="index.html has no <title> tag — critical for SEO and browser tab display",
-            file=_relative(index_html),
-            recommendation="Add a descriptive <title> tag with primary keyword",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-seo-001",
+                severity="medium",
+                category="seo",
+                title="Missing <title> tag in index.html",
+                detail="index.html has no <title> tag — critical for SEO and browser tab display",
+                file=_relative(index_html),
+                recommendation="Add a descriptive <title> tag with primary keyword",
+            )
+        )
 
     if not has_meta_desc:
-        findings.append(Finding(
-            id="mkt-seo-002",
-            severity="medium",
-            category="seo",
-            title="Missing meta description in index.html",
-            detail="No <meta name=\"description\"> — search engines will auto-generate a snippet",
-            file=_relative(index_html),
-            recommendation="Add a 150-160 character meta description with value proposition",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-seo-002",
+                severity="medium",
+                category="seo",
+                title="Missing meta description in index.html",
+                detail='No <meta name="description"> — search engines will auto-generate a snippet',
+                file=_relative(index_html),
+                recommendation="Add a 150-160 character meta description with value proposition",
+            )
+        )
 
     if not has_og_tags:
-        findings.append(Finding(
-            id="mkt-seo-003",
-            severity="medium",
-            category="seo",
-            title="Missing OpenGraph tags in index.html",
-            detail="No og: meta tags — social media shares will lack rich preview",
-            file=_relative(index_html),
-            recommendation="Add og:title, og:description, og:image, og:url meta tags",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-seo-003",
+                severity="medium",
+                category="seo",
+                title="Missing OpenGraph tags in index.html",
+                detail="No og: meta tags — social media shares will lack rich preview",
+                file=_relative(index_html),
+                recommendation="Add og:title, og:description, og:image, og:url meta tags",
+            )
+        )
 
     # Check JSX pages for heading hierarchy
     pages_with_h1 = 0
@@ -163,14 +175,16 @@ def _check_seo_basics(
     metrics["seo_heading_hierarchy_issues"] = len(heading_issues)
 
     if h1_pct < 0.3:
-        findings.append(Finding(
-            id="mkt-seo-004",
-            severity="medium",
-            category="seo",
-            title=f"Low h1 tag coverage ({h1_pct:.0%})",
-            detail=f"Only {pages_with_h1}/{len(jsx_files)} pages have <h1> tags",
-            recommendation="Add semantic h1 headings to all pages for SEO and accessibility",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-seo-004",
+                severity="medium",
+                category="seo",
+                title=f"Low h1 tag coverage ({h1_pct:.0%})",
+                detail=f"Only {pages_with_h1}/{len(jsx_files)} pages have <h1> tags",
+                recommendation="Add semantic h1 headings to all pages for SEO and accessibility",
+            )
+        )
 
 
 def _check_landing_page_readiness(
@@ -181,7 +195,12 @@ def _check_landing_page_readiness(
 ) -> None:
     """Check for homepage value proposition, CTA buttons, social proof elements."""
     # Look for the main Dashboard / landing page
-    landing_candidates = ["Dashboard.jsx", "LandingPage.jsx", "HomePage.jsx", "AuthPage.jsx"]
+    landing_candidates = [
+        "Dashboard.jsx",
+        "LandingPage.jsx",
+        "HomePage.jsx",
+        "AuthPage.jsx",
+    ]
     landing_content = ""
     landing_file = ""
 
@@ -201,7 +220,7 @@ def _check_landing_page_readiness(
 
     # CTAs across all pages
     cta_patterns = re.compile(
-        r'(?:Get\s+Started|Sign\s+Up|Start\s+Free|Try\s+Free|Join\s+Now|Upload|Get\s+Referred|Find\s+Referrals)',
+        r"(?:Get\s+Started|Sign\s+Up|Start\s+Free|Try\s+Free|Join\s+Now|Upload|Get\s+Referred|Find\s+Referrals)",
         re.IGNORECASE,
     )
     cta_count = len(cta_patterns.findall(all_content))
@@ -209,7 +228,7 @@ def _check_landing_page_readiness(
 
     # Value proposition keywords
     value_prop_patterns = re.compile(
-        r'(?:referral|warm\s+introduction|employee\s+referral|get\s+referred|network|connection)',
+        r"(?:referral|warm\s+introduction|employee\s+referral|get\s+referred|network|connection)",
         re.IGNORECASE,
     )
     value_prop_mentions = len(value_prop_patterns.findall(all_content))
@@ -217,7 +236,7 @@ def _check_landing_page_readiness(
 
     # Social proof patterns
     social_proof_patterns = re.compile(
-        r'(?:testimonial|success\s+stor|review|rating|\d+\s*(?:users?|referrals?|connections?|companies)|trusted\s+by)',
+        r"(?:testimonial|success\s+stor|review|rating|\d+\s*(?:users?|referrals?|connections?|companies)|trusted\s+by)",
         re.IGNORECASE,
     )
     social_proof_count = len(social_proof_patterns.findall(all_content))
@@ -228,36 +247,42 @@ def _check_landing_page_readiness(
     metrics["total_buttons"] = button_count
 
     if cta_count == 0:
-        findings.append(Finding(
-            id="mkt-lp-001",
-            severity="high",
-            category="landing_page",
-            title="No clear call-to-action found across pages",
-            detail="No CTA patterns (Get Started, Sign Up, etc.) detected in any page",
-            recommendation="Add prominent CTA buttons on landing/dashboard pages",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-lp-001",
+                severity="high",
+                category="landing_page",
+                title="No clear call-to-action found across pages",
+                detail="No CTA patterns (Get Started, Sign Up, etc.) detected in any page",
+                recommendation="Add prominent CTA buttons on landing/dashboard pages",
+            )
+        )
 
     if social_proof_count == 0:
-        insights.append(MarketInsight(
-            id="mkt-lp-insight-001",
-            category="channel",
-            title="No social proof elements detected",
-            evidence="No testimonials, success stories, or usage stats found in JSX pages",
-            strategic_impact="Landing page conversion likely below benchmark without social proof",
-            recommended_response="Add testimonials, user counts, or success metrics to key pages",
-            urgency="this_month",
-            confidence="high",
-        ))
+        insights.append(
+            MarketInsight(
+                id="mkt-lp-insight-001",
+                category="channel",
+                title="No social proof elements detected",
+                evidence="No testimonials, success stories, or usage stats found in JSX pages",
+                strategic_impact="Landing page conversion likely below benchmark without social proof",
+                recommended_response="Add testimonials, user counts, or success metrics to key pages",
+                urgency="this_month",
+                confidence="high",
+            )
+        )
 
     if value_prop_mentions < 3:
-        findings.append(Finding(
-            id="mkt-lp-002",
-            severity="medium",
-            category="landing_page",
-            title="Weak value proposition visibility",
-            detail=f"Only {value_prop_mentions} referral/network value prop mentions across all pages",
-            recommendation="Reinforce the core value prop (referrals > cold applications) on key pages",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-lp-002",
+                severity="medium",
+                category="landing_page",
+                title="Weak value proposition visibility",
+                detail=f"Only {value_prop_mentions} referral/network value prop mentions across all pages",
+                recommendation="Reinforce the core value prop (referrals > cold applications) on key pages",
+            )
+        )
 
 
 def _check_brand_messaging(
@@ -301,31 +326,38 @@ def _check_brand_messaging(
 
     missing = [k for k, v in phrase_coverage.items() if not v]
     if missing and coverage_ratio < 0.6:
-        findings.append(Finding(
-            id="mkt-brand-001",
-            severity="medium",
-            category="brand_messaging",
-            title=f"Brand messaging gaps — {len(missing)} key phrases missing",
-            detail=f"Missing: {', '.join(missing)}. Coverage: {coverage_ratio:.0%}",
-            recommendation="Ensure core brand language from CLAUDE.md appears in user-facing pages",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-brand-001",
+                severity="medium",
+                category="brand_messaging",
+                title=f"Brand messaging gaps — {len(missing)} key phrases missing",
+                detail=f"Missing: {', '.join(missing)}. Coverage: {coverage_ratio:.0%}",
+                recommendation="Ensure core brand language from CLAUDE.md appears in user-facing pages",
+            )
+        )
 
     # Check for off-brand messaging
     off_brand_patterns = [
-        (r"apply\s+(?:to\s+)?(?:hundreds|thousands)\s+of\s+jobs", "Mass-apply messaging contradicts referral focus"),
+        (
+            r"apply\s+(?:to\s+)?(?:hundreds|thousands)\s+of\s+jobs",
+            "Mass-apply messaging contradicts referral focus",
+        ),
         (r"we\s+guarantee", "Guarantee claims are risky for a marketplace"),
         (r"instant\s+(?:job|hire|referral)", "Instant promises set wrong expectations"),
     ]
     for pattern, reason in off_brand_patterns:
         if re.search(pattern, all_content, re.IGNORECASE):
-            findings.append(Finding(
-                id=f"mkt-brand-off-{hash(pattern) % 1000:03d}",
-                severity="medium",
-                category="brand_messaging",
-                title="Potentially off-brand messaging detected",
-                detail=reason,
-                recommendation="Review and align with CLAUDE.md positioning",
-            ))
+            findings.append(
+                Finding(
+                    id=f"mkt-brand-off-{hash(pattern) % 1000:03d}",
+                    severity="medium",
+                    category="brand_messaging",
+                    title="Potentially off-brand messaging detected",
+                    detail=reason,
+                    recommendation="Review and align with CLAUDE.md positioning",
+                )
+            )
 
 
 def _check_privacy_compliance_in_marketing(
@@ -350,32 +382,40 @@ def _check_privacy_compliance_in_marketing(
 
     if "OnboardingPage.jsx" in privacy_page_content:
         onboarding = privacy_page_content["OnboardingPage.jsx"]
-        has_onboarding_privacy = bool(re.search(
-            r"(?:privacy|vault|anonymous|consent|your\s+data)", onboarding, re.IGNORECASE
-        ))
+        has_onboarding_privacy = bool(
+            re.search(
+                r"(?:privacy|vault|anonymous|consent|your\s+data)",
+                onboarding,
+                re.IGNORECASE,
+            )
+        )
 
     metrics["has_privacy_page"] = has_privacy_page
     metrics["has_onboarding_privacy"] = has_onboarding_privacy
 
     if not has_privacy_page:
-        findings.append(Finding(
-            id="mkt-priv-001",
-            severity="medium",
-            category="privacy_compliance",
-            title="No dedicated privacy page found",
-            detail="PrivacyPage.jsx not found — users need a visible privacy policy page",
-            recommendation="Create or verify PrivacyPage.jsx exists with privacy architecture details",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-priv-001",
+                severity="medium",
+                category="privacy_compliance",
+                title="No dedicated privacy page found",
+                detail="PrivacyPage.jsx not found — users need a visible privacy policy page",
+                recommendation="Create or verify PrivacyPage.jsx exists with privacy architecture details",
+            )
+        )
 
     if not has_onboarding_privacy:
-        findings.append(Finding(
-            id="mkt-priv-002",
-            severity="medium",
-            category="privacy_compliance",
-            title="Onboarding lacks privacy messaging",
-            detail="OnboardingPage.jsx does not mention privacy/vault/consent",
-            recommendation="Add privacy explainer step to onboarding per CLAUDE.md architecture (P16)",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-priv-002",
+                severity="medium",
+                category="privacy_compliance",
+                title="Onboarding lacks privacy messaging",
+                detail="OnboardingPage.jsx does not mention privacy/vault/consent",
+                recommendation="Add privacy explainer step to onboarding per CLAUDE.md architecture (P16)",
+            )
+        )
 
     # Check for dangerous marketing claims in all pages
     all_content = ""
@@ -383,22 +423,33 @@ def _check_privacy_compliance_in_marketing(
         all_content += _read_safe(path) + "\n"
 
     dangerous_claims = [
-        (r"100%\s*(?:private|secure|safe)", "Absolute privacy/security claims are risky"),
-        (r"we\s+never\s+(?:share|sell|see)\s+your\s+data", "Overbroad data handling claim — we do process data"),
-        (r"military.grade\s+(?:encryption|security)", "Military-grade is a marketing red flag"),
+        (
+            r"100%\s*(?:private|secure|safe)",
+            "Absolute privacy/security claims are risky",
+        ),
+        (
+            r"we\s+never\s+(?:share|sell|see)\s+your\s+data",
+            "Overbroad data handling claim — we do process data",
+        ),
+        (
+            r"military.grade\s+(?:encryption|security)",
+            "Military-grade is a marketing red flag",
+        ),
     ]
 
     for pattern, reason in dangerous_claims:
         if re.search(pattern, all_content, re.IGNORECASE):
-            compliance_reviews.append(ComplianceReviewItem(
-                id=f"mkt-compl-{hash(pattern) % 1000:03d}",
-                asset_type="landing_page",
-                description=reason,
-                jurisdiction="global",
-                reviewer="privy_agent",
-                status="pending",
-                changes_required=f"Review claim: {reason}",
-            ))
+            compliance_reviews.append(
+                ComplianceReviewItem(
+                    id=f"mkt-compl-{hash(pattern) % 1000:03d}",
+                    asset_type="landing_page",
+                    description=reason,
+                    jurisdiction="global",
+                    reviewer="privy_agent",
+                    status="pending",
+                    changes_required=f"Review claim: {reason}",
+                )
+            )
 
     # Verify privacy architecture claims align with CLAUDE.md
     if has_privacy_page:
@@ -411,14 +462,16 @@ def _check_privacy_compliance_in_marketing(
         metrics["privacy_architecture_alignment"] = arch_alignment
 
         if arch_alignment < 2 and privacy_constraints.get("has_vault_model"):
-            findings.append(Finding(
-                id="mkt-priv-003",
-                severity="medium",
-                category="privacy_compliance",
-                title="Privacy page under-represents architecture",
-                detail=f"Privacy page mentions {arch_alignment}/3 key architecture features (vault, anon, consent)",
-                recommendation="Ensure privacy page covers Private Vault, anonymization, and consent gates",
-            ))
+            findings.append(
+                Finding(
+                    id="mkt-priv-003",
+                    severity="medium",
+                    category="privacy_compliance",
+                    title="Privacy page under-represents architecture",
+                    detail=f"Privacy page mentions {arch_alignment}/3 key architecture features (vault, anon, consent)",
+                    recommendation="Ensure privacy page covers Private Vault, anonymization, and consent gates",
+                )
+            )
 
 
 def _check_onboarding_conversion(
@@ -438,77 +491,98 @@ def _check_onboarding_conversion(
             break
 
     if not onboarding_content:
-        findings.append(Finding(
-            id="mkt-onb-001",
-            severity="medium",
-            category="onboarding",
-            title="No OnboardingPage.jsx found",
-            detail="Onboarding flow is critical for activation — no page detected",
-            recommendation="Create onboarding flow with step-by-step guidance",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-onb-001",
+                severity="medium",
+                category="onboarding",
+                title="No OnboardingPage.jsx found",
+                detail="Onboarding flow is critical for activation — no page detected",
+                recommendation="Create onboarding flow with step-by-step guidance",
+            )
+        )
         return
 
     # Progress indicators
-    has_progress = bool(re.search(
-        r"(?:step|progress|stage|phase|\d\s*(?:of|/)\s*\d|stepper|wizard)",
-        onboarding_content, re.IGNORECASE,
-    ))
+    has_progress = bool(
+        re.search(
+            r"(?:step|progress|stage|phase|\d\s*(?:of|/)\s*\d|stepper|wizard)",
+            onboarding_content,
+            re.IGNORECASE,
+        )
+    )
     metrics["onboarding_has_progress"] = has_progress
 
     # Value communication
-    has_value_comm = bool(re.search(
-        r"(?:referral|warm|connect|network|get\s+referred|employee)",
-        onboarding_content, re.IGNORECASE,
-    ))
+    has_value_comm = bool(
+        re.search(
+            r"(?:referral|warm|connect|network|get\s+referred|employee)",
+            onboarding_content,
+            re.IGNORECASE,
+        )
+    )
     metrics["onboarding_has_value_comm"] = has_value_comm
 
     # Upload/action prompt
-    has_action = bool(re.search(
-        r"(?:upload|import|csv|get\s+started|connect|add\s+contacts)",
-        onboarding_content, re.IGNORECASE,
-    ))
+    has_action = bool(
+        re.search(
+            r"(?:upload|import|csv|get\s+started|connect|add\s+contacts)",
+            onboarding_content,
+            re.IGNORECASE,
+        )
+    )
     metrics["onboarding_has_action_prompt"] = has_action
 
     # Skip option (reduces friction)
-    has_skip = bool(re.search(r"(?:skip|later|not\s+now|maybe\s+later)", onboarding_content, re.IGNORECASE))
+    has_skip = bool(
+        re.search(
+            r"(?:skip|later|not\s+now|maybe\s+later)", onboarding_content, re.IGNORECASE
+        )
+    )
     metrics["onboarding_has_skip_option"] = has_skip
 
     conversion_signals = sum([has_progress, has_value_comm, has_action, has_skip])
     metrics["onboarding_conversion_score"] = conversion_signals
 
     if not has_progress:
-        findings.append(Finding(
-            id="mkt-onb-002",
-            severity="medium",
-            category="onboarding",
-            title="Onboarding lacks progress indicator",
-            detail="No step/progress/wizard pattern detected in OnboardingPage.jsx",
-            file=onboarding_file,
-            recommendation="Add step counter or progress bar to reduce abandonment",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-onb-002",
+                severity="medium",
+                category="onboarding",
+                title="Onboarding lacks progress indicator",
+                detail="No step/progress/wizard pattern detected in OnboardingPage.jsx",
+                file=onboarding_file,
+                recommendation="Add step counter or progress bar to reduce abandonment",
+            )
+        )
 
     if not has_value_comm:
-        findings.append(Finding(
-            id="mkt-onb-003",
-            severity="medium",
-            category="onboarding",
-            title="Onboarding lacks value communication",
-            detail="No referral/network value messaging found in onboarding flow",
-            file=onboarding_file,
-            recommendation="Reinforce why referrals matter before asking users to take action",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-onb-003",
+                severity="medium",
+                category="onboarding",
+                title="Onboarding lacks value communication",
+                detail="No referral/network value messaging found in onboarding flow",
+                file=onboarding_file,
+                recommendation="Reinforce why referrals matter before asking users to take action",
+            )
+        )
 
     if conversion_signals >= 3:
-        insights.append(MarketInsight(
-            id="mkt-onb-insight-001",
-            category="channel",
-            title="Onboarding has solid conversion foundations",
-            evidence=f"{conversion_signals}/4 conversion signals present",
-            strategic_impact="Good activation funnel structure",
-            recommended_response="A/B test copy variants to optimize conversion rate",
-            urgency="this_month",
-            confidence="medium",
-        ))
+        insights.append(
+            MarketInsight(
+                id="mkt-onb-insight-001",
+                category="channel",
+                title="Onboarding has solid conversion foundations",
+                evidence=f"{conversion_signals}/4 conversion signals present",
+                strategic_impact="Good activation funnel structure",
+                recommended_response="A/B test copy variants to optimize conversion rate",
+                urgency="this_month",
+                confidence="medium",
+            )
+        )
 
 
 def _check_content_infrastructure(
@@ -523,11 +597,20 @@ def _check_content_infrastructure(
         all_content += _read_safe(path) + "\n"
 
     # Check for blog/content routes
-    has_blog_route = bool(re.search(r"(?:/blog|/articles?|/resources?|/guides?)", all_content, re.IGNORECASE))
+    has_blog_route = bool(
+        re.search(
+            r"(?:/blog|/articles?|/resources?|/guides?)", all_content, re.IGNORECASE
+        )
+    )
     metrics["has_blog_route"] = has_blog_route
 
     # Check for content page files
-    content_page_names = ["BlogPage.jsx", "ResourcesPage.jsx", "GuidesPage.jsx", "ArticlePage.jsx"]
+    content_page_names = [
+        "BlogPage.jsx",
+        "ResourcesPage.jsx",
+        "GuidesPage.jsx",
+        "ArticlePage.jsx",
+    ]
     content_pages_found = []
     for path in jsx_files:
         if path.name in content_page_names:
@@ -548,25 +631,29 @@ def _check_content_infrastructure(
     metrics["has_robots_txt"] = has_robots
 
     if not has_blog_route and not content_pages_found:
-        findings.append(Finding(
-            id="mkt-content-001",
-            severity="info",
-            category="content_infrastructure",
-            title="No blog/content infrastructure detected",
-            detail="No blog routes, resource pages, or article pages found",
-            recommendation="Build content infrastructure for SEO — blog with referral tips, company guides",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-content-001",
+                severity="info",
+                category="content_infrastructure",
+                title="No blog/content infrastructure detected",
+                detail="No blog routes, resource pages, or article pages found",
+                recommendation="Build content infrastructure for SEO — blog with referral tips, company guides",
+            )
+        )
 
-        insights.append(MarketInsight(
-            id="mkt-content-insight-001",
-            category="channel",
-            title="Content marketing infrastructure not yet built",
-            evidence="No blog routes or content pages detected in frontend",
-            strategic_impact="SEO-driven acquisition channel is blocked until content infrastructure exists",
-            recommended_response="Prioritize /blog route with 5-10 seed articles targeting referral keywords",
-            urgency="this_month",
-            confidence="high",
-        ))
+        insights.append(
+            MarketInsight(
+                id="mkt-content-insight-001",
+                category="channel",
+                title="Content marketing infrastructure not yet built",
+                evidence="No blog routes or content pages detected in frontend",
+                strategic_impact="SEO-driven acquisition channel is blocked until content infrastructure exists",
+                recommended_response="Prioritize /blog route with 5-10 seed articles targeting referral keywords",
+                urgency="this_month",
+                confidence="high",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -586,19 +673,23 @@ def scan() -> GTMTeamReport:
     metrics["total_jsx_pages"] = len(jsx_files)
 
     if not jsx_files:
-        findings.append(Finding(
-            id="mkt-000",
-            severity="info",
-            category="marketing",
-            title="No JSX page files found in frontend/src/pages/",
-            detail="Frontend may not be initialized yet",
-            recommendation="Initialize React frontend under frontend/src/pages/",
-        ))
+        findings.append(
+            Finding(
+                id="mkt-000",
+                severity="info",
+                category="marketing",
+                title="No JSX page files found in frontend/src/pages/",
+                detail="Frontend may not be initialized yet",
+                recommendation="Initialize React frontend under frontend/src/pages/",
+            )
+        )
     else:
         _check_seo_basics(jsx_files, findings, insights, metrics)
         _check_landing_page_readiness(jsx_files, findings, insights, metrics)
         _check_brand_messaging(jsx_files, findings, insights, metrics)
-        _check_privacy_compliance_in_marketing(jsx_files, findings, compliance_reviews, metrics)
+        _check_privacy_compliance_in_marketing(
+            jsx_files, findings, compliance_reviews, metrics
+        )
         _check_onboarding_conversion(jsx_files, findings, insights, metrics)
         _check_content_infrastructure(jsx_files, findings, insights, metrics)
 
@@ -611,8 +702,14 @@ def scan() -> GTMTeamReport:
         "privacy_page": 1.0 if metrics.get("has_privacy_page") else 0.0,
         "onboarding": min(1.0, metrics.get("onboarding_conversion_score", 0) / 4),
     }
-    weights = {"seo": 0.20, "cta": 0.20, "value_prop": 0.15, "brand_coverage": 0.15,
-               "privacy_page": 0.15, "onboarding": 0.15}
+    weights = {
+        "seo": 0.20,
+        "cta": 0.20,
+        "value_prop": 0.15,
+        "brand_coverage": 0.15,
+        "privacy_page": 0.15,
+        "onboarding": 0.15,
+    }
 
     weighted_sum = sum(score_components.get(k, 0) * weights.get(k, 0) for k in weights)
     total_weight = sum(weights.values())
@@ -627,10 +724,15 @@ def scan() -> GTMTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id, "severity": f.severity, "category": f.category,
-            "title": f.title, "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
     if file_findings:

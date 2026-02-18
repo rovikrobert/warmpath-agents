@@ -68,7 +68,9 @@ class WhatsAppBridge:
         cost_str = f"${total_cost:.2f}/day"
 
         # Build Notion URL if page was synced
-        notion_url = WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
+        notion_url = (
+            WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
+        )
 
         # Generate the message
         message = self._formatter.morning_brief(
@@ -132,7 +134,9 @@ class WhatsAppBridge:
         notion_page_id: str = "",
     ) -> dict[str, Any]:
         """Generate and send the weekly summary (Sunday 8 PM SGT)."""
-        notion_url = WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
+        notion_url = (
+            WhatsAppFormatter.notion_url(notion_page_id) if notion_page_id else ""
+        )
         message = self._formatter.weekly_summary(
             week_num=week_num,
             users_active=metrics.get("users_active", 0),

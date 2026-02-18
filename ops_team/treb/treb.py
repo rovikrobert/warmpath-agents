@@ -103,30 +103,34 @@ def _check_nh_journey(
     metrics["nh_journey_gaps"] = gaps
 
     if gaps:
-        findings.append(Finding(
-            id="treb-001",
-            severity="high",
-            category="nh_journey",
-            title=f"NH journey gaps: {', '.join(gaps)}",
-            detail=(
-                f"{len(gaps)}/{len(NH_JOURNEY_STEPS)} journey steps lack "
-                f"backend support. Covered: {', '.join(covered) or 'none'}."
-            ),
-            recommendation="Implement missing journey steps to complete the NH funnel.",
-        ))
+        findings.append(
+            Finding(
+                id="treb-001",
+                severity="high",
+                category="nh_journey",
+                title=f"NH journey gaps: {', '.join(gaps)}",
+                detail=(
+                    f"{len(gaps)}/{len(NH_JOURNEY_STEPS)} journey steps lack "
+                    f"backend support. Covered: {', '.join(covered) or 'none'}."
+                ),
+                recommendation="Implement missing journey steps to complete the NH funnel.",
+            )
+        )
 
     if coverage >= 0.8:
-        insights.append(OpsInsight(
-            id="treb-ins-001",
-            category="supply_activation",
-            title="NH journey is mostly complete",
-            evidence=f"{len(covered)}/{len(NH_JOURNEY_STEPS)} steps covered",
-            impact="Network holders can complete the core loop",
-            recommendation="Focus on polishing the remaining gaps",
-            confidence=coverage,
-            persona="network_holder",
-            actionable_by="engineering",
-        ))
+        insights.append(
+            OpsInsight(
+                id="treb-ins-001",
+                category="supply_activation",
+                title="NH journey is mostly complete",
+                evidence=f"{len(covered)}/{len(NH_JOURNEY_STEPS)} steps covered",
+                impact="Network holders can complete the core loop",
+                recommendation="Focus on polishing the remaining gaps",
+                confidence=coverage,
+                persona="network_holder",
+                actionable_by="engineering",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -169,33 +173,37 @@ def _check_sharing_controls(
     metrics["sharing_controls_missing"] = controls_missing
 
     if controls_missing:
-        findings.append(Finding(
-            id="treb-002",
-            severity="medium",
-            category="sharing_controls",
-            title=f"Missing sharing controls: {', '.join(controls_missing)}",
-            detail=(
-                f"{len(controls_missing)}/{len(_SHARING_CONTROL_PATTERNS)} "
-                f"sharing controls not detected in marketplace code."
-            ),
-            recommendation=(
-                "Implement missing controls so network holders have "
-                "granular sharing options per CLAUDE.md spec."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="treb-002",
+                severity="medium",
+                category="sharing_controls",
+                title=f"Missing sharing controls: {', '.join(controls_missing)}",
+                detail=(
+                    f"{len(controls_missing)}/{len(_SHARING_CONTROL_PATTERNS)} "
+                    f"sharing controls not detected in marketplace code."
+                ),
+                recommendation=(
+                    "Implement missing controls so network holders have "
+                    "granular sharing options per CLAUDE.md spec."
+                ),
+            )
+        )
 
     if len(controls_found) == len(_SHARING_CONTROL_PATTERNS):
-        insights.append(OpsInsight(
-            id="treb-ins-002",
-            category="supply_activation",
-            title="All sharing controls present",
-            evidence=f"All {len(controls_found)} controls detected",
-            impact="Network holders have full granular sharing control",
-            recommendation="Monitor usage of each control for optimisation",
-            confidence=1.0,
-            persona="network_holder",
-            actionable_by="product",
-        ))
+        insights.append(
+            OpsInsight(
+                id="treb-ins-002",
+                category="supply_activation",
+                title="All sharing controls present",
+                evidence=f"All {len(controls_found)} controls detected",
+                impact="Network holders have full granular sharing control",
+                recommendation="Monitor usage of each control for optimisation",
+                confidence=1.0,
+                persona="network_holder",
+                actionable_by="product",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -237,35 +245,39 @@ def _check_intro_facilitation(
     metrics["facilitation_statuses_found"] = statuses_found
 
     if endpoints_missing:
-        findings.append(Finding(
-            id="treb-003",
-            severity="high",
-            category="intro_facilitation",
-            title=f"Missing facilitation endpoints: {', '.join(endpoints_missing)}",
-            detail=(
-                f"{len(endpoints_missing)}/{len(_FACILITATION_PATTERNS)} "
-                f"intro lifecycle endpoints not detected. "
-                f"Found: {', '.join(endpoints_found) or 'none'}."
-            ),
-            recommendation=(
-                "Implement missing intro lifecycle endpoints so network "
-                "holders can manage intro requests."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="treb-003",
+                severity="high",
+                category="intro_facilitation",
+                title=f"Missing facilitation endpoints: {', '.join(endpoints_missing)}",
+                detail=(
+                    f"{len(endpoints_missing)}/{len(_FACILITATION_PATTERNS)} "
+                    f"intro lifecycle endpoints not detected. "
+                    f"Found: {', '.join(endpoints_found) or 'none'}."
+                ),
+                recommendation=(
+                    "Implement missing intro lifecycle endpoints so network "
+                    "holders can manage intro requests."
+                ),
+            )
+        )
 
     if len(statuses_found) < len(_STATUS_KEYWORDS):
         missing_statuses = [s for s in _STATUS_KEYWORDS if s not in statuses_found]
-        findings.append(Finding(
-            id="treb-004",
-            severity="medium",
-            category="intro_facilitation",
-            title=f"Missing intro status tracking: {', '.join(missing_statuses)}",
-            detail=(
-                "Intro status lifecycle should track pending, approved, "
-                "and declined states for proper funnel instrumentation."
-            ),
-            recommendation="Add status column/enum with all lifecycle states.",
-        ))
+        findings.append(
+            Finding(
+                id="treb-004",
+                severity="medium",
+                category="intro_facilitation",
+                title=f"Missing intro status tracking: {', '.join(missing_statuses)}",
+                detail=(
+                    "Intro status lifecycle should track pending, approved, "
+                    "and declined states for proper funnel instrumentation."
+                ),
+                recommendation="Add status column/enum with all lifecycle states.",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -300,32 +312,36 @@ def _check_frontend_supply_pages(
     metrics["frontend_supply_page_list"] = supply_pages
 
     if not supply_pages and jsx_files:
-        findings.append(Finding(
-            id="treb-005",
-            severity="medium",
-            category="frontend_supply",
-            title="No supply-side pages detected in frontend",
-            detail=(
-                f"{len(jsx_files)} JSX pages scanned but none contain "
-                "supply-side keywords (contacts, sharing, upload, etc.)."
-            ),
-            recommendation=(
-                "Ensure frontend has dedicated pages for the network "
-                "holder journey: upload, sharing controls, intro review."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="treb-005",
+                severity="medium",
+                category="frontend_supply",
+                title="No supply-side pages detected in frontend",
+                detail=(
+                    f"{len(jsx_files)} JSX pages scanned but none contain "
+                    "supply-side keywords (contacts, sharing, upload, etc.)."
+                ),
+                recommendation=(
+                    "Ensure frontend has dedicated pages for the network "
+                    "holder journey: upload, sharing controls, intro review."
+                ),
+            )
+        )
     elif supply_pages:
-        insights.append(OpsInsight(
-            id="treb-ins-003",
-            category="supply_activation",
-            title=f"{len(supply_pages)} supply-side pages detected",
-            evidence=f"Pages: {', '.join(p.split('/')[-1] for p in supply_pages[:5])}",
-            impact="Network holders have frontend touchpoints for the core loop",
-            recommendation="Verify each page maps to a journey step",
-            confidence=0.8,
-            persona="network_holder",
-            actionable_by="product",
-        ))
+        insights.append(
+            OpsInsight(
+                id="treb-ins-003",
+                category="supply_activation",
+                title=f"{len(supply_pages)} supply-side pages detected",
+                evidence=f"Pages: {', '.join(p.split('/')[-1] for p in supply_pages[:5])}",
+                impact="Network holders have frontend touchpoints for the core loop",
+                recommendation="Verify each page maps to a journey step",
+                confidence=0.8,
+                persona="network_holder",
+                actionable_by="product",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -369,20 +385,22 @@ def _check_engagement_touchpoints(
     metrics["engagement_touchpoints_missing"] = missing
 
     if missing:
-        findings.append(Finding(
-            id="treb-006",
-            severity="medium",
-            category="engagement",
-            title=f"Missing engagement touchpoints: {', '.join(missing)}",
-            detail=(
-                f"{len(missing)}/{len(_ENGAGEMENT_PATTERNS)} engagement "
-                f"touchpoints not detected. Found: {', '.join(found) or 'none'}."
-            ),
-            recommendation=(
-                "Add missing engagement hooks to keep network holders "
-                "active and informed about their contribution value."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="treb-006",
+                severity="medium",
+                category="engagement",
+                title=f"Missing engagement touchpoints: {', '.join(missing)}",
+                detail=(
+                    f"{len(missing)}/{len(_ENGAGEMENT_PATTERNS)} engagement "
+                    f"touchpoints not detected. Found: {', '.join(found) or 'none'}."
+                ),
+                recommendation=(
+                    "Add missing engagement hooks to keep network holders "
+                    "active and informed about their contribution value."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -410,15 +428,17 @@ def scan() -> OpsTeamReport:
         if source:
             api_sources[key] = source
         else:
-            findings.append(Finding(
-                id=f"treb-src-{key}",
-                severity="info",
-                category="source_availability",
-                title=f"Could not read {_relative(path)}",
-                detail=f"File not found or unreadable: {path}",
-                file=_relative(path),
-                recommendation="Verify the file exists at the expected path.",
-            ))
+            findings.append(
+                Finding(
+                    id=f"treb-src-{key}",
+                    severity="info",
+                    category="source_availability",
+                    title=f"Could not read {_relative(path)}",
+                    detail=f"File not found or unreadable: {path}",
+                    file=_relative(path),
+                    recommendation="Verify the file exists at the expected path.",
+                )
+            )
 
     # ---- Read service file ------------------------------------------------
 
@@ -440,14 +460,16 @@ def scan() -> OpsTeamReport:
     # ---- Run checks -------------------------------------------------------
 
     if not api_sources:
-        findings.append(Finding(
-            id="treb-000",
-            severity="high",
-            category="nh_journey",
-            title="No API source files readable",
-            detail="Could not read any API files; all checks skipped.",
-            recommendation="Ensure app/api/ directory and files exist.",
-        ))
+        findings.append(
+            Finding(
+                id="treb-000",
+                severity="high",
+                category="nh_journey",
+                title="No API source files readable",
+                detail="Could not read any API files; all checks skipped.",
+                recommendation="Ensure app/api/ directory and files exist.",
+            )
+        )
     else:
         _check_nh_journey(api_sources, findings, insights, metrics)
         _check_sharing_controls(marketplace_combined, findings, insights, metrics)
@@ -478,13 +500,15 @@ def scan() -> OpsTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
 
@@ -495,12 +519,14 @@ def scan() -> OpsTeamReport:
         ls.record_severity_calibration(f.severity)
 
     for ins in insights:
-        ls.record_insight({
-            "id": ins.id,
-            "category": ins.category,
-            "title": ins.title,
-            "confidence": ins.confidence,
-        })
+        ls.record_insight(
+            {
+                "id": ins.id,
+                "category": ins.category,
+                "title": ins.title,
+                "confidence": ins.confidence,
+            }
+        )
 
     finding_counts: dict[str, int] = {}
     for f in findings:

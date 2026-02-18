@@ -75,24 +75,28 @@ def _check_stripe_webhook_handlers(
     rel_path = _relative(webhooks_path)
 
     if not source:
-        findings.append(Finding(
-            id="finmgr-webhook-000",
-            severity="critical",
-            category="stripe_integration",
-            title="Stripe webhook handler file not found",
-            detail=f"Could not read {rel_path}",
-            file=rel_path,
-            recommendation="Create app/api/webhooks.py with a Stripe webhook endpoint",
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-webhook-000",
-            category="stripe_integration",
-            severity="critical",
-            title="Stripe webhook file missing — no payment events can be processed",
-            file=rel_path,
-            detail="Without a webhook handler, Stripe events (payments, subscriptions) are silently dropped",
-            recommendation="Implement app/api/webhooks.py with verified Stripe event handling",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-webhook-000",
+                severity="critical",
+                category="stripe_integration",
+                title="Stripe webhook handler file not found",
+                detail=f"Could not read {rel_path}",
+                file=rel_path,
+                recommendation="Create app/api/webhooks.py with a Stripe webhook endpoint",
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-webhook-000",
+                category="stripe_integration",
+                severity="critical",
+                title="Stripe webhook file missing — no payment events can be processed",
+                file=rel_path,
+                detail="Without a webhook handler, Stripe events (payments, subscriptions) are silently dropped",
+                recommendation="Implement app/api/webhooks.py with verified Stripe event handling",
+            )
+        )
         metrics["webhook_events_found"] = 0
         metrics["webhook_events_expected"] = len(EXPECTED_STRIPE_EVENTS)
         metrics["webhook_event_coverage"] = 0.0
@@ -111,27 +115,31 @@ def _check_stripe_webhook_handlers(
     metrics["has_signature_verification"] = has_signature_verification
 
     if not has_signature_verification:
-        findings.append(Finding(
-            id="finmgr-webhook-001",
-            severity="critical",
-            category="stripe_integration",
-            title="Stripe webhook signature verification not found",
-            detail="stripe.Webhook.construct_event or manual HMAC verification absent",
-            file=rel_path,
-            recommendation=(
-                "Add Stripe signature verification to prevent fake payment events from "
-                "granting free credits (critical security + financial integrity requirement)"
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-webhook-001",
-            category="stripe_integration",
-            severity="critical",
-            title="Webhook accepts unsigned events — payment fraud risk",
-            file=rel_path,
-            detail="Attackers can POST fake checkout.session.completed events to grant unlimited credits",
-            recommendation="Verify HMAC-SHA256 signature on every incoming webhook request",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-webhook-001",
+                severity="critical",
+                category="stripe_integration",
+                title="Stripe webhook signature verification not found",
+                detail="stripe.Webhook.construct_event or manual HMAC verification absent",
+                file=rel_path,
+                recommendation=(
+                    "Add Stripe signature verification to prevent fake payment events from "
+                    "granting free credits (critical security + financial integrity requirement)"
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-webhook-001",
+                category="stripe_integration",
+                severity="critical",
+                title="Webhook accepts unsigned events — payment fraud risk",
+                file=rel_path,
+                detail="Attackers can POST fake checkout.session.completed events to grant unlimited credits",
+                recommendation="Verify HMAC-SHA256 signature on every incoming webhook request",
+            )
+        )
 
     # Check for each expected Stripe event type
     events_found: list[str] = []
@@ -152,41 +160,50 @@ def _check_stripe_webhook_handlers(
     if events_missing:
         # Subscription lifecycle events are especially important for revenue
         subscription_missing = [e for e in events_missing if "subscription" in e]
-        payment_missing = [e for e in events_missing if "payment" in e or "invoice" in e]
+        payment_missing = [
+            e for e in events_missing if "payment" in e or "invoice" in e
+        ]
 
         if subscription_missing or payment_missing:
             severity = "high"
         else:
             severity = "medium"
 
-        findings.append(Finding(
-            id="finmgr-webhook-002",
-            severity=severity,
-            category="stripe_integration",
-            title=f"Stripe webhook missing {len(events_missing)}/{len(EXPECTED_STRIPE_EVENTS)} expected event handlers",
-            detail=f"Missing: {', '.join(events_missing)}",
-            file=rel_path,
-            recommendation=(
-                "Add event-specific handlers for all expected Stripe events. "
-                "checkout.session.completed grants credits; subscription events manage access."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-webhook-002",
-            category="stripe_integration",
-            severity=severity,
-            title=f"Unhandled Stripe events: {', '.join(events_missing)}",
-            file=rel_path,
-            detail=(
-                f"Event coverage: {coverage:.0%}. "
-                f"Missing handlers mean payment failures go undetected and subscription changes are ignored."
-            ),
-            recommendation="Implement all 6 expected Stripe event handlers for full billing lifecycle coverage",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-webhook-002",
+                severity=severity,
+                category="stripe_integration",
+                title=f"Stripe webhook missing {len(events_missing)}/{len(EXPECTED_STRIPE_EVENTS)} expected event handlers",
+                detail=f"Missing: {', '.join(events_missing)}",
+                file=rel_path,
+                recommendation=(
+                    "Add event-specific handlers for all expected Stripe events. "
+                    "checkout.session.completed grants credits; subscription events manage access."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-webhook-002",
+                category="stripe_integration",
+                severity=severity,
+                title=f"Unhandled Stripe events: {', '.join(events_missing)}",
+                file=rel_path,
+                detail=(
+                    f"Event coverage: {coverage:.0%}. "
+                    f"Missing handlers mean payment failures go undetected and subscription changes are ignored."
+                ),
+                recommendation="Implement all 6 expected Stripe event handlers for full billing lifecycle coverage",
+            )
+        )
 
     if events_found and not events_missing:
         # Full coverage — positive signal
-        logger.info("finance_manager: Stripe webhook has full event coverage (%s events)", len(events_found))
+        logger.info(
+            "finance_manager: Stripe webhook has full event coverage (%s events)",
+            len(events_found),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -205,15 +222,17 @@ def _check_credit_purchase_endpoint(
     rel_path = _relative(credits_api_path)
 
     if not source:
-        findings.append(Finding(
-            id="finmgr-purchase-000",
-            severity="high",
-            category="billing",
-            title="Credits API file not found",
-            detail=f"Could not read {rel_path}",
-            file=rel_path,
-            recommendation="Create app/api/credits.py with credit balance, history, and purchase endpoints",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-purchase-000",
+                severity="high",
+                category="billing",
+                title="Credits API file not found",
+                detail=f"Could not read {rel_path}",
+                file=rel_path,
+                recommendation="Create app/api/credits.py with credit balance, history, and purchase endpoints",
+            )
+        )
         metrics["has_purchase_endpoint"] = False
         metrics["purchase_has_stripe_ref"] = False
         return
@@ -229,27 +248,31 @@ def _check_credit_purchase_endpoint(
     metrics["has_purchase_endpoint"] = has_purchase
 
     if not has_purchase:
-        findings.append(Finding(
-            id="finmgr-purchase-001",
-            severity="high",
-            category="billing",
-            title="Credit purchase endpoint not found in app/api/credits.py",
-            detail="No purchase, buy, or checkout route detected",
-            file=rel_path,
-            recommendation=(
-                "Implement POST /credits/purchase for direct credit purchase. "
-                "Required for job seeker revenue ($1 = 5 credits)."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-purchase-001",
-            category="billing",
-            severity="high",
-            title="No credit purchase endpoint — job seekers cannot buy credits",
-            file=rel_path,
-            detail="Without a purchase endpoint, the demand-side revenue model ($20-30/month) cannot function",
-            recommendation="Implement POST /credits/purchase with Stripe Checkout integration",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-purchase-001",
+                severity="high",
+                category="billing",
+                title="Credit purchase endpoint not found in app/api/credits.py",
+                detail="No purchase, buy, or checkout route detected",
+                file=rel_path,
+                recommendation=(
+                    "Implement POST /credits/purchase for direct credit purchase. "
+                    "Required for job seeker revenue ($1 = 5 credits)."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-purchase-001",
+                category="billing",
+                severity="high",
+                title="No credit purchase endpoint — job seekers cannot buy credits",
+                file=rel_path,
+                detail="Without a purchase endpoint, the demand-side revenue model ($20-30/month) cannot function",
+                recommendation="Implement POST /credits/purchase with Stripe Checkout integration",
+            )
+        )
 
     # Check for Stripe integration reference
     has_stripe_ref = bool(
@@ -262,30 +285,34 @@ def _check_credit_purchase_endpoint(
     metrics["purchase_has_stripe_ref"] = has_stripe_ref
 
     if not has_stripe_ref:
-        findings.append(Finding(
-            id="finmgr-purchase-002",
-            severity="medium",
-            category="billing",
-            title="Credits API has no Stripe integration reference",
-            detail="No stripe, checkout.session, or payment_intent found in credits API",
-            file=rel_path,
-            recommendation=(
-                "Wire credits purchase to Stripe Checkout. "
-                "Production billing requires Stripe — current stub grants credits directly."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-purchase-002",
-            category="billing",
-            severity="medium",
-            title="Credits purchase not wired to Stripe — revenue not captured",
-            file=rel_path,
-            detail=(
-                "MVP direct-grant stub is present but Stripe Checkout must be wired "
-                "before real money can be collected from job seekers."
-            ),
-            recommendation="Integrate stripe.checkout.Session.create() into the purchase endpoint",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-purchase-002",
+                severity="medium",
+                category="billing",
+                title="Credits API has no Stripe integration reference",
+                detail="No stripe, checkout.session, or payment_intent found in credits API",
+                file=rel_path,
+                recommendation=(
+                    "Wire credits purchase to Stripe Checkout. "
+                    "Production billing requires Stripe — current stub grants credits directly."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-purchase-002",
+                category="billing",
+                severity="medium",
+                title="Credits purchase not wired to Stripe — revenue not captured",
+                file=rel_path,
+                detail=(
+                    "MVP direct-grant stub is present but Stripe Checkout must be wired "
+                    "before real money can be collected from job seekers."
+                ),
+                recommendation="Integrate stripe.checkout.Session.create() into the purchase endpoint",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -340,95 +367,109 @@ def _check_subscription_model(
     metrics["has_stripe_subscription_id"] = has_stripe_subscription_id
     metrics["has_subscription_service"] = has_subscription_service
 
-    subscription_signals = sum([
-        has_subscription_class,
-        has_subscription_tier,
-        has_stripe_subscription_id,
-        has_subscription_service,
-    ])
+    subscription_signals = sum(
+        [
+            has_subscription_class,
+            has_subscription_tier,
+            has_stripe_subscription_id,
+            has_subscription_service,
+        ]
+    )
     metrics["subscription_signals_found"] = subscription_signals
     metrics["subscription_signals_expected"] = 4
 
     if not has_subscription_class:
-        findings.append(Finding(
-            id="finmgr-sub-001",
-            severity="medium",
-            category="billing",
-            title="No Subscription model class found in app/models/",
-            detail="class Subscription not found across all model files",
-            recommendation=(
-                "Add a Subscription model for tracking recurring billing state "
-                "(plan tier, billing period, Stripe subscription ID, status)."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-sub-001",
-            category="billing",
-            severity="medium",
-            title="Missing Subscription model — recurring revenue state is untracked",
-            detail=(
-                "Without a Subscription model, we cannot track which users have active $20-30/month plans, "
-                "handle plan upgrades/downgrades, or enforce access based on subscription status."
-            ),
-            recommendation="Add app/models/subscription.py with Stripe subscription lifecycle fields",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-sub-001",
+                severity="medium",
+                category="billing",
+                title="No Subscription model class found in app/models/",
+                detail="class Subscription not found across all model files",
+                recommendation=(
+                    "Add a Subscription model for tracking recurring billing state "
+                    "(plan tier, billing period, Stripe subscription ID, status)."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-sub-001",
+                category="billing",
+                severity="medium",
+                title="Missing Subscription model — recurring revenue state is untracked",
+                detail=(
+                    "Without a Subscription model, we cannot track which users have active $20-30/month plans, "
+                    "handle plan upgrades/downgrades, or enforce access based on subscription status."
+                ),
+                recommendation="Add app/models/subscription.py with Stripe subscription lifecycle fields",
+            )
+        )
 
     if not has_subscription_tier:
-        findings.append(Finding(
-            id="finmgr-sub-002",
-            severity="medium",
-            category="billing",
-            title="subscription_tier column not found on User model",
-            detail="subscription_tier field not detected in any model file",
-            recommendation=(
-                "Add subscription_tier to the User model (free/job_seeker/network_holder) "
-                "to gate marketplace access features."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-sub-002",
+                severity="medium",
+                category="billing",
+                title="subscription_tier column not found on User model",
+                detail="subscription_tier field not detected in any model file",
+                recommendation=(
+                    "Add subscription_tier to the User model (free/job_seeker/network_holder) "
+                    "to gate marketplace access features."
+                ),
+            )
+        )
 
     if not has_stripe_subscription_id:
-        findings.append(Finding(
-            id="finmgr-sub-003",
-            severity="low",
-            category="billing",
-            title="stripe_subscription_id column not found in models",
-            detail="stripe_subscription_id not found across model files",
-            recommendation=(
-                "Store stripe_subscription_id on the subscription or user model "
-                "to enable cancellation, upgrade, and webhook reconciliation."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-sub-003",
+                severity="low",
+                category="billing",
+                title="stripe_subscription_id column not found in models",
+                detail="stripe_subscription_id not found across model files",
+                recommendation=(
+                    "Store stripe_subscription_id on the subscription or user model "
+                    "to enable cancellation, upgrade, and webhook reconciliation."
+                ),
+            )
+        )
 
     if not has_subscription_service:
-        findings.append(Finding(
-            id="finmgr-sub-004",
-            severity="low",
-            category="billing",
-            title="No subscription management service found",
-            detail="No subscription-related functions detected in app/services/",
-            recommendation=(
-                "Create app/services/subscription.py to manage Stripe subscription "
-                "lifecycle (create, cancel, upgrade, downgrade, webhook sync)."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-sub-004",
+                severity="low",
+                category="billing",
+                title="No subscription management service found",
+                detail="No subscription-related functions detected in app/services/",
+                recommendation=(
+                    "Create app/services/subscription.py to manage Stripe subscription "
+                    "lifecycle (create, cancel, upgrade, downgrade, webhook sync)."
+                ),
+            )
+        )
 
     if subscription_signals == 4:
         logger.info("finance_manager: Full subscription model coverage detected")
     elif subscription_signals == 0:
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-sub-000",
-            category="billing",
-            severity="high",
-            title="No subscription infrastructure found — recurring revenue model not implemented",
-            detail=(
-                "Zero subscription signals detected across models and services. "
-                "The $20-30/month job seeker plan cannot be enforced without subscription tracking."
-            ),
-            recommendation=(
-                "Implement subscription model, tier field, Stripe ID storage, "
-                "and a management service before monetization launch."
-            ),
-        ))
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-sub-000",
+                category="billing",
+                severity="high",
+                title="No subscription infrastructure found — recurring revenue model not implemented",
+                detail=(
+                    "Zero subscription signals detected across models and services. "
+                    "The $20-30/month job seeker plan cannot be enforced without subscription tracking."
+                ),
+                recommendation=(
+                    "Implement subscription model, tier field, Stripe ID storage, "
+                    "and a management service before monetization launch."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +559,11 @@ def _check_agent_team_costs(
 
         logger.debug(
             "finance_manager: team=%s agents=%s duration=%.2fs tokens=%d cost=$%.6f",
-            team_name, agent_count, team_duration, estimated_tokens, estimated_cost,
+            team_name,
+            agent_count,
+            team_duration,
+            estimated_tokens,
+            estimated_cost,
         )
 
     metrics["teams_with_reports"] = teams_scanned
@@ -528,31 +573,35 @@ def _check_agent_team_costs(
     metrics["total_estimated_cost_usd"] = round(total_estimated_cost, 6)
 
     if teams_missing:
-        findings.append(Finding(
-            id="finmgr-cost-001",
-            severity="info",
-            category="cost_tracking",
-            title=f"{len(teams_missing)} agent team(s) have no report files",
-            detail=f"Teams without reports: {', '.join(teams_missing)}",
-            recommendation=(
-                "Run all agent teams at least once to establish cost baselines. "
-                "Missing reports cannot be included in aggregate cost tracking."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-cost-001",
+                severity="info",
+                category="cost_tracking",
+                title=f"{len(teams_missing)} agent team(s) have no report files",
+                detail=f"Teams without reports: {', '.join(teams_missing)}",
+                recommendation=(
+                    "Run all agent teams at least once to establish cost baselines. "
+                    "Missing reports cannot be included in aggregate cost tracking."
+                ),
+            )
+        )
 
     if total_estimated_cost > 1.0:
         # Flag if daily agent run cost exceeds $1 (unusual for codebase scanning)
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-cost-001",
-            category="cost_tracking",
-            severity="medium",
-            title=f"High estimated agent team cost: ${total_estimated_cost:.4f}/day",
-            detail=(
-                f"Total scan duration: {total_duration:.1f}s across {teams_scanned} teams. "
-                f"Estimated {total_estimated_tokens:,} tokens at blended $5/M rate."
-            ),
-            recommendation="Review agent scan frequency and optimize prompt length to reduce AI costs",
-        ))
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-cost-001",
+                category="cost_tracking",
+                severity="medium",
+                title=f"High estimated agent team cost: ${total_estimated_cost:.4f}/day",
+                detail=(
+                    f"Total scan duration: {total_duration:.1f}s across {teams_scanned} teams. "
+                    f"Estimated {total_estimated_tokens:,} tokens at blended $5/M rate."
+                ),
+                recommendation="Review agent scan frequency and optimize prompt length to reduce AI costs",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -586,192 +635,230 @@ def _check_billing_instrumentation(
 
     # -- Audit trail --
     has_audit_log = bool(
-        re.search(r"(?:log_event|audit_log|audit_logger|AuditLog)", combined, re.IGNORECASE)
+        re.search(
+            r"(?:log_event|audit_log|audit_logger|AuditLog)", combined, re.IGNORECASE
+        )
     )
     metrics["billing_has_audit_trail"] = has_audit_log
 
     if not has_audit_log:
-        findings.append(Finding(
-            id="finmgr-billing-001",
-            severity="high",
-            category="billing",
-            title="Billing audit trail not found in credits service or API",
-            detail="log_event / audit_log / AuditLog not referenced in credits files",
-            file=api_rel,
-            recommendation=(
-                "All credit purchases and admin grants must log to audit_logs table "
-                "(immutable, append-only) for financial integrity and dispute resolution."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-billing-001",
-            category="billing",
-            severity="high",
-            title="No billing audit trail — credit transactions are unauditable",
-            file=api_rel,
-            detail=(
-                "Without audit logging, credit grants and purchases cannot be investigated "
-                "during payment disputes or regulatory review."
-            ),
-            recommendation="Emit audit_logs entries for every earn, spend, and purchase event",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-001",
+                severity="high",
+                category="billing",
+                title="Billing audit trail not found in credits service or API",
+                detail="log_event / audit_log / AuditLog not referenced in credits files",
+                file=api_rel,
+                recommendation=(
+                    "All credit purchases and admin grants must log to audit_logs table "
+                    "(immutable, append-only) for financial integrity and dispute resolution."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-billing-001",
+                category="billing",
+                severity="high",
+                title="No billing audit trail — credit transactions are unauditable",
+                file=api_rel,
+                detail=(
+                    "Without audit logging, credit grants and purchases cannot be investigated "
+                    "during payment disputes or regulatory review."
+                ),
+                recommendation="Emit audit_logs entries for every earn, spend, and purchase event",
+            )
+        )
 
     # -- Usage tracking --
     has_usage_log = bool(
-        re.search(r"(?:UsageLog|usage_log|usage_logs|log_usage)", combined, re.IGNORECASE)
+        re.search(
+            r"(?:UsageLog|usage_log|usage_logs|log_usage)", combined, re.IGNORECASE
+        )
     )
     metrics["billing_has_usage_tracking"] = has_usage_log
 
     if not has_usage_log:
-        findings.append(Finding(
-            id="finmgr-billing-002",
-            severity="medium",
-            category="billing",
-            title="Usage tracking (UsageLog) not found in credits files",
-            detail="UsageLog or usage_log references absent from credits service and API",
-            file=svc_rel,
-            recommendation=(
-                "Link credit spend actions to UsageLog rows for metered billing analytics "
-                "and rate limiting (CLAUDE.md architecture decision #9)."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-002",
+                severity="medium",
+                category="billing",
+                title="Usage tracking (UsageLog) not found in credits files",
+                detail="UsageLog or usage_log references absent from credits service and API",
+                file=svc_rel,
+                recommendation=(
+                    "Link credit spend actions to UsageLog rows for metered billing analytics "
+                    "and rate limiting (CLAUDE.md architecture decision #9)."
+                ),
+            )
+        )
 
     # -- earn/spend transaction recording --
-    has_earn = bool(re.search(r"def\s+(?:earn_credits|add_credits|credit_earn)", combined))
-    has_spend = bool(re.search(r"def\s+(?:spend_credits|deduct_credits|credit_spend)", combined))
+    has_earn = bool(
+        re.search(r"def\s+(?:earn_credits|add_credits|credit_earn)", combined)
+    )
+    has_spend = bool(
+        re.search(r"def\s+(?:spend_credits|deduct_credits|credit_spend)", combined)
+    )
     has_credit_transaction = bool(
-        re.search(r"(?:CreditTransaction|credit_transaction|credit_transactions)", combined)
+        re.search(
+            r"(?:CreditTransaction|credit_transaction|credit_transactions)", combined
+        )
     )
     metrics["billing_has_earn_function"] = has_earn
     metrics["billing_has_spend_function"] = has_spend
     metrics["billing_has_credit_transaction_ref"] = has_credit_transaction
 
     if not has_earn:
-        findings.append(Finding(
-            id="finmgr-billing-003",
-            severity="medium",
-            category="billing",
-            title="earn_credits / add_credits function not found in credits service",
-            detail="No earn-side credit function detected in app/services/credits.py",
-            file=svc_rel,
-            recommendation=(
-                "Implement earn_credits(user_id, amount, reason, expires_at) "
-                "to record CreditTransaction rows for all earn actions."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-003",
+                severity="medium",
+                category="billing",
+                title="earn_credits / add_credits function not found in credits service",
+                detail="No earn-side credit function detected in app/services/credits.py",
+                file=svc_rel,
+                recommendation=(
+                    "Implement earn_credits(user_id, amount, reason, expires_at) "
+                    "to record CreditTransaction rows for all earn actions."
+                ),
+            )
+        )
 
     if not has_spend:
-        findings.append(Finding(
-            id="finmgr-billing-004",
-            severity="medium",
-            category="billing",
-            title="spend_credits / deduct_credits function not found in credits service",
-            detail="No spend-side credit function detected in app/services/credits.py",
-            file=svc_rel,
-            recommendation=(
-                "Implement spend_credits(user_id, amount, reason) "
-                "with pre-check on get_balance() before deduction."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-004",
+                severity="medium",
+                category="billing",
+                title="spend_credits / deduct_credits function not found in credits service",
+                detail="No spend-side credit function detected in app/services/credits.py",
+                file=svc_rel,
+                recommendation=(
+                    "Implement spend_credits(user_id, amount, reason) "
+                    "with pre-check on get_balance() before deduction."
+                ),
+            )
+        )
 
     if not has_credit_transaction:
-        findings.append(Finding(
-            id="finmgr-billing-005",
-            severity="high",
-            category="billing",
-            title="CreditTransaction model not referenced in credits files",
-            detail="credit_transaction or CreditTransaction not found in credits service/API",
-            file=svc_rel,
-            recommendation=(
-                "All earn/spend actions must write to credit_transactions table. "
-                "Balance = SUM query on non-expired rows (CLAUDE.md arch decision #14)."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-billing-005",
-            category="billing",
-            severity="high",
-            title="credit_transactions table not referenced — credit economy may be unrecorded",
-            file=svc_rel,
-            detail=(
-                "Without CreditTransaction writes, credit balance is computed incorrectly "
-                "and the 12-month expiry cannot be enforced."
-            ),
-            recommendation="Wire every earn/spend path through CreditTransaction inserts",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-005",
+                severity="high",
+                category="billing",
+                title="CreditTransaction model not referenced in credits files",
+                detail="credit_transaction or CreditTransaction not found in credits service/API",
+                file=svc_rel,
+                recommendation=(
+                    "All earn/spend actions must write to credit_transactions table. "
+                    "Balance = SUM query on non-expired rows (CLAUDE.md arch decision #14)."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-billing-005",
+                category="billing",
+                severity="high",
+                title="credit_transactions table not referenced — credit economy may be unrecorded",
+                file=svc_rel,
+                detail=(
+                    "Without CreditTransaction writes, credit balance is computed incorrectly "
+                    "and the 12-month expiry cannot be enforced."
+                ),
+                recommendation="Wire every earn/spend path through CreditTransaction inserts",
+            )
+        )
 
     # -- Expiry logic --
     has_expiry = bool(
-        re.search(r"(?:expire_stale_credits|expires_at|expiry|expired)", combined, re.IGNORECASE)
+        re.search(
+            r"(?:expire_stale_credits|expires_at|expiry|expired)",
+            combined,
+            re.IGNORECASE,
+        )
     )
     metrics["billing_has_expiry_logic"] = has_expiry
 
     if not has_expiry:
-        findings.append(Finding(
-            id="finmgr-billing-006",
-            severity="high",
-            category="billing",
-            title="Credit expiry logic not found in credits service or API",
-            detail="expires_at / expire_stale_credits / expired not found",
-            file=svc_rel,
-            recommendation=(
-                "Credits expire after 12 months per CLAUDE.md to avoid balance-sheet liability. "
-                "Implement expire_stale_credits() and set expires_at on every earn transaction."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-billing-006",
-            category="billing",
-            severity="high",
-            title="No credit expiry — outstanding balances create growing liability",
-            file=svc_rel,
-            detail=(
-                "Unexpired credits accumulate as a liability on the balance sheet. "
-                "12-month expiry keeps WarmPath in airline-miles territory, not money-transmitter."
-            ),
-            recommendation="Add expires_at column, set on earn, exclude from balance SUM after expiry",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-006",
+                severity="high",
+                category="billing",
+                title="Credit expiry logic not found in credits service or API",
+                detail="expires_at / expire_stale_credits / expired not found",
+                file=svc_rel,
+                recommendation=(
+                    "Credits expire after 12 months per CLAUDE.md to avoid balance-sheet liability. "
+                    "Implement expire_stale_credits() and set expires_at on every earn transaction."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-billing-006",
+                category="billing",
+                severity="high",
+                title="No credit expiry — outstanding balances create growing liability",
+                file=svc_rel,
+                detail=(
+                    "Unexpired credits accumulate as a liability on the balance sheet. "
+                    "12-month expiry keeps WarmPath in airline-miles territory, not money-transmitter."
+                ),
+                recommendation="Add expires_at column, set on earn, exclude from balance SUM after expiry",
+            )
+        )
 
     # -- Non-transferability --
     has_transfer = bool(re.search(r"def\s+transfer_credits", combined))
     metrics["billing_has_transfer_function"] = has_transfer
 
     if has_transfer:
-        findings.append(Finding(
-            id="finmgr-billing-007",
-            severity="high",
-            category="billing",
-            title="transfer_credits function found — credits must be non-transferable",
-            detail="A transfer function violates the non-transferability requirement from CLAUDE.md",
-            file=svc_rel,
-            recommendation=(
-                "Remove transfer_credits to stay in loyalty-program territory. "
-                "Tradeable credits require FinCEN/Singapore PSA money transmitter licensing."
-            ),
-        ))
-        financial_findings.append(FinancialFinding(
-            id="finmgr-ff-billing-007",
-            category="billing",
-            severity="high",
-            title="Credit transfer function creates regulatory exposure (FinCEN/PSA)",
-            file=svc_rel,
-            detail=(
-                "Transferable credits may be classified as stored value — triggering "
-                "money transmitter requirements under FinCEN and Singapore Payment Services Act."
-            ),
-            recommendation="Remove transfer_credits; revisit post-Series A with legal counsel",
-        ))
+        findings.append(
+            Finding(
+                id="finmgr-billing-007",
+                severity="high",
+                category="billing",
+                title="transfer_credits function found — credits must be non-transferable",
+                detail="A transfer function violates the non-transferability requirement from CLAUDE.md",
+                file=svc_rel,
+                recommendation=(
+                    "Remove transfer_credits to stay in loyalty-program territory. "
+                    "Tradeable credits require FinCEN/Singapore PSA money transmitter licensing."
+                ),
+            )
+        )
+        financial_findings.append(
+            FinancialFinding(
+                id="finmgr-ff-billing-007",
+                category="billing",
+                severity="high",
+                title="Credit transfer function creates regulatory exposure (FinCEN/PSA)",
+                file=svc_rel,
+                detail=(
+                    "Transferable credits may be classified as stored value — triggering "
+                    "money transmitter requirements under FinCEN and Singapore Payment Services Act."
+                ),
+                recommendation="Remove transfer_credits; revisit post-Series A with legal counsel",
+            )
+        )
 
     # -- Billing completeness score --
-    checks_passed = sum([
-        has_audit_log,
-        has_usage_log,
-        has_earn,
-        has_spend,
-        has_credit_transaction,
-        has_expiry,
-        not has_transfer,  # passing means no transfer function found
-    ])
+    checks_passed = sum(
+        [
+            has_audit_log,
+            has_usage_log,
+            has_earn,
+            has_spend,
+            has_credit_transaction,
+            has_expiry,
+            not has_transfer,  # passing means no transfer function found
+        ]
+    )
     total_checks = 7
     billing_score = round(checks_passed / total_checks, 2)
     metrics["billing_completeness_score"] = billing_score
@@ -808,24 +895,28 @@ def scan() -> FinanceTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
 
     for ff in financial_findings:
-        ls.record_finding({
-            "id": ff.id,
-            "severity": ff.severity,
-            "category": ff.category,
-            "title": ff.title,
-            "file": ff.file,
-        })
+        ls.record_finding(
+            {
+                "id": ff.id,
+                "severity": ff.severity,
+                "category": ff.category,
+                "title": ff.title,
+                "file": ff.file,
+            }
+        )
         if ff.file:
             file_findings[ff.file] = file_findings.get(ff.file, 0) + 1
 
@@ -851,17 +942,24 @@ def scan() -> FinanceTeamReport:
 
     # KPI tracking
     ls.track_kpi("webhook_event_coverage", metrics.get("webhook_event_coverage", 0.0))
-    ls.track_kpi("billing_completeness_score", metrics.get("billing_completeness_score", 0.0))
-    ls.track_kpi("total_estimated_cost_usd", metrics.get("total_estimated_cost_usd", 0.0))
-    ls.track_kpi("subscription_signals_found", metrics.get("subscription_signals_found", 0))
-    ls.track_kpi("has_signature_verification", int(metrics.get("has_signature_verification", False)))
+    ls.track_kpi(
+        "billing_completeness_score", metrics.get("billing_completeness_score", 0.0)
+    )
+    ls.track_kpi(
+        "total_estimated_cost_usd", metrics.get("total_estimated_cost_usd", 0.0)
+    )
+    ls.track_kpi(
+        "subscription_signals_found", metrics.get("subscription_signals_found", 0)
+    )
+    ls.track_kpi(
+        "has_signature_verification",
+        int(metrics.get("has_signature_verification", False)),
+    )
 
     # Learning summary
     high_critical = sum(
         1 for f in findings if f.severity in ("critical", "high")
-    ) + sum(
-        1 for ff in financial_findings if ff.severity in ("critical", "high")
-    )
+    ) + sum(1 for ff in financial_findings if ff.severity in ("critical", "high"))
     billing_score = metrics.get("billing_completeness_score", 0.0)
     webhook_coverage = metrics.get("webhook_event_coverage", 0.0)
     total_cost = metrics.get("total_estimated_cost_usd", 0.0)
@@ -881,7 +979,9 @@ def scan() -> FinanceTeamReport:
     ]
 
     if high_critical > 0:
-        learning_updates.append(f"Action required: {high_critical} high/critical financial findings")
+        learning_updates.append(
+            f"Action required: {high_critical} high/critical financial findings"
+        )
 
     hot_spots = ls.get_hot_spots(top_n=3)
     if hot_spots:

@@ -34,7 +34,9 @@ class SatisfactionFinding:
     """A user satisfaction finding from journey/feedback analysis."""
 
     id: str
-    category: str  # error_quality | feedback_collection | journey_milestone | usage_tracking
+    category: (
+        str  # error_quality | feedback_collection | journey_milestone | usage_tracking
+    )
     severity: str  # critical | high | medium | low | info
     title: str
     file: str = ""
@@ -96,8 +98,12 @@ class OpsTeamReport:
     def from_dict(cls, data: dict) -> OpsTeamReport:
         findings = [Finding(**f) for f in data.pop("findings", [])]
         ops_insights = [OpsInsight(**i) for i in data.pop("ops_insights", [])]
-        satisfaction_findings = [SatisfactionFinding(**s) for s in data.pop("satisfaction_findings", [])]
-        marketplace_findings = [MarketplaceFinding(**m) for m in data.pop("marketplace_findings", [])]
+        satisfaction_findings = [
+            SatisfactionFinding(**s) for s in data.pop("satisfaction_findings", [])
+        ]
+        marketplace_findings = [
+            MarketplaceFinding(**m) for m in data.pop("marketplace_findings", [])
+        ]
         return cls(
             findings=findings,
             ops_insights=ops_insights,
@@ -120,7 +126,9 @@ class OpsTeamReport:
             lines.append(f"## Ops Insights ({len(self.ops_insights)})\n")
             for i in self.ops_insights:
                 lines.append(f"### [{i.id}] {i.title}")
-                lines.append(f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}")
+                lines.append(
+                    f"**Category:** {i.category} | **Confidence:** {i.confidence:.0%}"
+                )
                 if i.persona:
                     lines.append(f"**Persona:** {i.persona}")
                 lines.append(f"{i.evidence}")
@@ -130,7 +138,9 @@ class OpsTeamReport:
 
         # Satisfaction findings
         if self.satisfaction_findings:
-            lines.append(f"## Satisfaction Findings ({len(self.satisfaction_findings)})\n")
+            lines.append(
+                f"## Satisfaction Findings ({len(self.satisfaction_findings)})\n"
+            )
             for s in self.satisfaction_findings:
                 loc = f"`{s.file}:{s.line}`" if s.file else ""
                 lines.append(f"- [{s.severity.upper()}] **{s.title}** {loc}")
@@ -142,7 +152,9 @@ class OpsTeamReport:
 
         # Marketplace findings
         if self.marketplace_findings:
-            lines.append(f"## Marketplace Findings ({len(self.marketplace_findings)})\n")
+            lines.append(
+                f"## Marketplace Findings ({len(self.marketplace_findings)})\n"
+            )
             for m in self.marketplace_findings:
                 loc = f"`{m.file}:{m.line}`" if m.file else ""
                 lines.append(f"- [{m.severity.upper()}] **{m.title}** {loc}")
@@ -154,7 +166,13 @@ class OpsTeamReport:
 
         # Findings (same format as engineering)
         if self.findings:
-            sev_icons = {"critical": "!!", "high": "!", "medium": "~", "low": ".", "info": " "}
+            sev_icons = {
+                "critical": "!!",
+                "high": "!",
+                "medium": "~",
+                "low": ".",
+                "info": " ",
+            }
             lines.append(f"## Findings ({len(self.findings)})\n")
             for f in sorted(self.findings, key=lambda f: f.sort_key):
                 icon = sev_icons.get(f.severity, "")

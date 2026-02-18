@@ -72,11 +72,29 @@ COS_CONFIG: dict = {
 
 # Team registry — canonical agent names per team for report classification
 TEAM_REGISTRY: dict[str, list[str]] = {
-    "engineering": ["architect", "test_engineer", "perf_monitor", "deps_manager", "doc_keeper"],
+    "engineering": [
+        "architect",
+        "test_engineer",
+        "perf_monitor",
+        "deps_manager",
+        "doc_keeper",
+    ],
     "data": ["pipeline", "analyst", "model_engineer", "data_lead"],
-    "product": ["user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"],
+    "product": [
+        "user_researcher",
+        "product_manager",
+        "ux_lead",
+        "design_lead",
+        "product_lead",
+    ],
     "ops": ["keevs", "treb", "naiv", "marsh", "ops_lead"],
-    "finance": ["finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"],
+    "finance": [
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+        "finance_lead",
+    ],
     "gtm": ["stratops", "monetization", "marketing", "partnerships", "gtm_lead"],
 }
 
@@ -91,10 +109,10 @@ SEVERITY_WEIGHT: dict[str, float] = {
 
 # Decision principle hierarchy — first item wins in a tie
 DECISION_PRINCIPLES = [
-    "safety_privacy",      # User safety and privacy — never compromise
-    "data_integrity",      # Protect the vault model
-    "user_experience",     # Job seekers first, then network holders
-    "speed_to_market",     # Ship fast, iterate
-    "cost_efficiency",     # Optimize, don't overspend
+    "safety_privacy",  # User safety and privacy — never compromise
+    "data_integrity",  # Protect the vault model
+    "user_experience",  # Job seekers first, then network holders
+    "speed_to_market",  # Ship fast, iterate
+    "cost_efficiency",  # Optimize, don't overspend
     "technical_elegance",  # Nice to have, never a blocker
 ]

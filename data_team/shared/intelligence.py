@@ -257,20 +257,26 @@ class DataIntelligence:
             if not is_fresh:
                 meta = DATA_INTEL_CATEGORIES.get(category, {})
                 priority = "high"
-                if category in ("marketplace_benchmarks", "job_market_data", "competitor_intel"):
+                if category in (
+                    "marketplace_benchmarks",
+                    "job_market_data",
+                    "competitor_intel",
+                ):
                     priority = "high"
                 elif category in ("privacy_regulations", "data_infrastructure"):
                     priority = "medium"
                 else:
                     priority = "medium"
 
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": priority,
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": priority,
+                    }
+                )
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         agenda.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))

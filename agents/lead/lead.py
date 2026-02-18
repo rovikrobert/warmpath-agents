@@ -239,9 +239,7 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
         hot_spots = meta.get("hot_spots", [])
         if hot_spots:
             top = hot_spots[:3]
-            spots_str = ", ".join(
-                f"`{h['file']}` ({h['weight']:.1f})" for h in top
-            )
+            spots_str = ", ".join(f"`{h['file']}` ({h['weight']:.1f})" for h in top)
             lines.append(f"- **Hot spots:** {spots_str}")
 
         # Fix effectiveness
@@ -266,7 +264,7 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
             if total_assessed > 0:
                 lines.append(
                     f"- **Severity calibration:** {total_overrides}/{total_assessed} "
-                    f"overridden ({total_overrides/total_assessed:.0%})"
+                    f"overridden ({total_overrides / total_assessed:.0%})"
                 )
 
         # Recurring patterns
@@ -304,7 +302,9 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
                     )
 
             if unadopted:
-                lines.append(f"- **Unadopted practices:** {len(unadopted)} pending review")
+                lines.append(
+                    f"- **Unadopted practices:** {len(unadopted)} pending review"
+                )
 
             if agenda:
                 for a in agenda[:2]:
@@ -422,7 +422,7 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
                     data = sev_cal[sev]
                     total = data.get("total", 0)
                     overridden = data.get("overridden", 0)
-                    rate = f"{overridden/total:.0%}" if total > 0 else "n/a"
+                    rate = f"{overridden / total:.0%}" if total > 0 else "n/a"
                     lines.append(f"| {sev} | {total} | {overridden} | {rate} |")
             lines.append("")
 

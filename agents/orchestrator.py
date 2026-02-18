@@ -119,8 +119,7 @@ def cmd_all(skip_tests: bool = False) -> None:
 
         # Compute health score (100 - weighted penalty)
         penalty = sum(
-            SEVERITY_WEIGHTS.get(sev, 0) * count
-            for sev, count in sev_counts.items()
+            SEVERITY_WEIGHTS.get(sev, 0) * count for sev, count in sev_counts.items()
         )
         health_score = max(0.0, 100.0 - penalty)
 
@@ -133,8 +132,10 @@ def cmd_all(skip_tests: bool = False) -> None:
     # Check intel freshness
     try:
         from agents.shared.config import INTEL_REFRESH_ON_SCAN
+
         if INTEL_REFRESH_ON_SCAN:
             from agents.shared.intelligence import ExternalIntelligence
+
             ei = ExternalIntelligence()
             freshness = ei.check_freshness()
             stale = [k for k, v in freshness.items() if not v]
@@ -270,7 +271,9 @@ def cmd_learning_report() -> None:
         if escalated:
             print(f"  Escalated patterns: {len(escalated)}")
             for p in escalated[:3]:
-                print(f"    - {p.get('category')}: {p.get('file', '?')} ({p.get('count')}x)")
+                print(
+                    f"    - {p.get('category')}: {p.get('file', '?')} ({p.get('count')}x)"
+                )
 
         # Systemic
         systemic = meta.get("systemic_patterns", [])
@@ -353,7 +356,9 @@ def main() -> None:
         "--lead-only", action="store_true", help="Brief from cached reports"
     )
     group.add_argument("--weekly", action="store_true", help="Weekly trend report")
-    group.add_argument("--kpis", action="store_true", help="KPI dashboard from cached reports")
+    group.add_argument(
+        "--kpis", action="store_true", help="KPI dashboard from cached reports"
+    )
     group.add_argument(
         "--intel-update", action="store_true", help="Refresh intelligence cache"
     )
@@ -361,7 +366,9 @@ def main() -> None:
         "--intel-report", action="store_true", help="Intelligence inventory + freshness"
     )
     group.add_argument(
-        "--learning-report", action="store_true", help="Meta-learning summary for all agents"
+        "--learning-report",
+        action="store_true",
+        help="Meta-learning summary for all agents",
     )
     group.add_argument(
         "--research-agenda", action="store_true", help="Prioritized research questions"
@@ -414,12 +421,15 @@ def main() -> None:
         cmd_health_trend()
     elif args.cos_daily:
         from agents.chief_of_staff.cos_agent import run_daily
+
         print(run_daily())
     elif args.cos_weekly:
         from agents.chief_of_staff.cos_agent import run_weekly
+
         print(run_weekly())
     elif args.cos_status:
         from agents.chief_of_staff.cos_agent import run_status
+
         print(run_status())
 
 

@@ -78,7 +78,9 @@ class WhatsAppFormatter:
             for i, d in enumerate(decisions_needed[:3], 1):
                 lines.append(f"{i}. {d}")
             lines.append("")
-            replies = ", ".join(f"{i}=yes" for i in range(1, min(len(decisions_needed), 4) + 1))
+            replies = ", ".join(
+                f"{i}=yes" for i in range(1, min(len(decisions_needed), 4) + 1)
+            )
             detail_link = notion_url if notion_url else "Notion"
             lines.append(f"Reply {replies}, or details: {detail_link}")
 
@@ -96,17 +98,19 @@ class WhatsAppFormatter:
         option_b: str,
     ) -> str:
         """Generate an urgent escalation message."""
-        return "\n".join([
-            f"ALERT: {title} [R]",
-            "",
-            detail,
-            "",
-            "Action needed:",
-            f"A) {option_a}",
-            f"B) {option_b}",
-            "",
-            "Reply A or B",
-        ])
+        return "\n".join(
+            [
+                f"ALERT: {title} [R]",
+                "",
+                detail,
+                "",
+                "Action needed:",
+                f"A) {option_a}",
+                f"B) {option_b}",
+                "",
+                "Reply A or B",
+            ]
+        )
 
     def cost_alert(
         self,
@@ -117,14 +121,16 @@ class WhatsAppFormatter:
         question: str,
     ) -> str:
         """Generate a cost alert message."""
-        return "\n".join([
-            f"Cost spike: {actual} yesterday (budget: {budget})",
-            "",
-            f"Cause: {cause}",
-            "",
-            f"Auto-action: {auto_action}",
-            f"{question} Y/N",
-        ])
+        return "\n".join(
+            [
+                f"Cost spike: {actual} yesterday (budget: {budget})",
+                "",
+                f"Cause: {cause}",
+                "",
+                f"Auto-action: {auto_action}",
+                f"{question} Y/N",
+            ]
+        )
 
     def weekly_summary(
         self,
@@ -142,19 +148,21 @@ class WhatsAppFormatter:
     ) -> str:
         """Generate the weekly summary (Sunday 8 PM SGT)."""
         report_link = notion_url if notion_url else "Notion"
-        return "\n".join([
-            f"Week {week_num} Summary",
-            "",
-            f"Users: {users_active} active (target: {users_target})",
-            f"Intros: {intros} facilitated, {interviews} -> interviews",
-            f"MRR: {mrr}",
-            f"Cost: {weekly_cost} ({daily_avg} avg)",
-            "",
-            f"Top win: {top_win}",
-            f"Top risk: {top_risk}",
-            "",
-            f"Full report: {report_link}",
-        ])
+        return "\n".join(
+            [
+                f"Week {week_num} Summary",
+                "",
+                f"Users: {users_active} active (target: {users_target})",
+                f"Intros: {intros} facilitated, {interviews} -> interviews",
+                f"MRR: {mrr}",
+                f"Cost: {weekly_cost} ({daily_avg} avg)",
+                "",
+                f"Top win: {top_win}",
+                f"Top risk: {top_risk}",
+                "",
+                f"Full report: {report_link}",
+            ]
+        )
 
     def feature_shipped(
         self,
@@ -287,9 +295,7 @@ class WhatsAppFormatter:
                 "Body": message,
             }
             with httpx.Client(timeout=15.0) as client:
-                response = client.post(
-                    url, data=data, auth=(account_sid, auth_token)
-                )
+                response = client.post(url, data=data, auth=(account_sid, auth_token))
                 response.raise_for_status()
                 result = response.json()
                 logger.info("WhatsApp message sent via Twilio: %s", result.get("sid"))

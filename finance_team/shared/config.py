@@ -9,8 +9,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _THIS = Path(__file__).resolve()
-FINANCE_TEAM_DIR = _THIS.parent.parent            # finance_team/
-PROJECT_ROOT = FINANCE_TEAM_DIR.parent             # warmpath/
+FINANCE_TEAM_DIR = _THIS.parent.parent  # finance_team/
+PROJECT_ROOT = FINANCE_TEAM_DIR.parent  # warmpath/
 REPORTS_DIR = FINANCE_TEAM_DIR / "reports"
 INTEL_CACHE = FINANCE_TEAM_DIR / "shared" / "intel_cache.json"
 
@@ -126,11 +126,11 @@ KPI_TARGETS: dict[str, dict] = {
 # Self-learning thresholds
 # ---------------------------------------------------------------------------
 
-RECURRING_PATTERN_THRESHOLD = 5       # auto-escalate at 5+ occurrences
-SYSTEMIC_PATTERN_THRESHOLD = 10       # flag as systemic at 10+
-ATTENTION_WEIGHT_DECAY = 0.05         # per-day decay for quiet files
-FIX_EFFECTIVENESS_WINDOW_DAYS = 30    # look-back window for fix effectiveness
-INTEL_CACHE_TTL_HOURS = 24            # default intelligence cache TTL
+RECURRING_PATTERN_THRESHOLD = 5  # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10  # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05  # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30  # look-back window for fix effectiveness
+INTEL_CACHE_TTL_HOURS = 24  # default intelligence cache TTL
 
 # ---------------------------------------------------------------------------
 # Health score weights per agent (total = 100)
@@ -163,13 +163,13 @@ BUDGET_CATEGORIES: list[str] = [
 # ---------------------------------------------------------------------------
 
 CREDIT_ECONOMY_PARAMS: dict[str, int] = {
-    "upload_csv_bonus": 100,        # credits earned per CSV upload
-    "facilitation_bonus": 50,       # credits earned per successful intro facilitation
-    "freshness_bonus": 10,          # credits earned per quarter for keeping data fresh
-    "search_cost": 5,               # credits spent per cross-network search
-    "intro_cost": 20,               # credits spent per intro request
-    "purchase_rate": 5,             # credits per dollar purchased
-    "expiry_months": 12,            # months before unused credits expire
+    "upload_csv_bonus": 100,  # credits earned per CSV upload
+    "facilitation_bonus": 50,  # credits earned per successful intro facilitation
+    "freshness_bonus": 10,  # credits earned per quarter for keeping data fresh
+    "search_cost": 5,  # credits spent per cross-network search
+    "intro_cost": 20,  # credits spent per intro request
+    "purchase_rate": 5,  # credits per dollar purchased
+    "expiry_months": 12,  # months before unused credits expire
 }
 
 # ---------------------------------------------------------------------------

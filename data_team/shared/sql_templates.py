@@ -270,6 +270,4 @@ def validate_all_templates() -> list[str]:
 # Validate at import time — hard fail if any template violates privacy
 _errors = validate_all_templates()
 if _errors:
-    raise RuntimeError(
-        f"SQL template privacy violations:\n" + "\n".join(_errors)
-    )
+    raise RuntimeError(f"SQL template privacy violations:\n" + "\n".join(_errors))

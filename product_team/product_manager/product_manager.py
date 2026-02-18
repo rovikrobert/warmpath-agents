@@ -88,15 +88,17 @@ def _extract_api_endpoints(api_files: list[Path]) -> dict[str, list[dict]]:
             route_path = match.group(2)
             # Try to find the function name
             func_match = re.search(
-                rf'@router\.{match.group(1)}\s*\([^)]*\)\s*\nasync\s+def\s+(\w+)',
-                source[match.start():]
+                rf"@router\.{match.group(1)}\s*\([^)]*\)\s*\nasync\s+def\s+(\w+)",
+                source[match.start() :],
             )
             func_name = func_match.group(1) if func_match else "unknown"
-            endpoints.append({
-                "method": method,
-                "path": route_path,
-                "function": func_name,
-            })
+            endpoints.append(
+                {
+                    "method": method,
+                    "path": route_path,
+                    "function": func_name,
+                }
+            )
         if endpoints:
             result[path.name] = endpoints
 
@@ -121,7 +123,12 @@ def _map_feature_coverage(
 
     # Map API modules to likely frontend consumers
     api_to_page_map: dict[str, list[str]] = {
-        "auth": ["AuthPage", "ForgotPasswordPage", "ResetPasswordPage", "VerifyEmailPage"],
+        "auth": [
+            "AuthPage",
+            "ForgotPasswordPage",
+            "ResetPasswordPage",
+            "VerifyEmailPage",
+        ],
         "contacts": ["ContactsPage"],
         "search": ["NewSearch", "SearchResults", "FindReferrals", "ReferralResults"],
         "marketplace": ["MarketplaceDashboard", "SharingSettings"],
@@ -138,19 +145,23 @@ def _map_feature_coverage(
     for api_file in endpoints:
         module = api_file.replace(".py", "")
         expected_pages = api_to_page_map.get(module, [])
-        has_consumer = any(p in page_names for p in expected_pages) if expected_pages else True
+        has_consumer = (
+            any(p in page_names for p in expected_pages) if expected_pages else True
+        )
         if not has_consumer and module not in ("health", "admin", "webhooks"):
             orphan_apis.append(module)
 
     if orphan_apis:
-        findings.append(Finding(
-            id="pm-001",
-            severity="low",
-            category="feature_coverage",
-            title=f"{len(orphan_apis)} API modules may lack frontend consumers",
-            detail=f"Modules: {', '.join(orphan_apis)}",
-            recommendation="Verify these APIs have frontend pages or are backend-only by design",
-        ))
+        findings.append(
+            Finding(
+                id="pm-001",
+                severity="low",
+                category="feature_coverage",
+                title=f"{len(orphan_apis)} API modules may lack frontend consumers",
+                detail=f"Modules: {', '.join(orphan_apis)}",
+                recommendation="Verify these APIs have frontend pages or are backend-only by design",
+            )
+        )
 
     # Check for pages without backing APIs
     all_api_modules = {f.replace(".py", "") for f in endpoints}
@@ -166,29 +177,35 @@ def _map_feature_coverage(
             orphan_pages.append(page)
 
     if orphan_pages:
-        findings.append(Finding(
-            id="pm-002",
-            severity="low",
-            category="feature_coverage",
-            title=f"{len(orphan_pages)} pages may lack API backing",
-            detail=f"Pages: {', '.join(orphan_pages)}",
-            recommendation="Verify these pages have the API endpoints they need",
-        ))
+        findings.append(
+            Finding(
+                id="pm-002",
+                severity="low",
+                category="feature_coverage",
+                title=f"{len(orphan_pages)} pages may lack API backing",
+                detail=f"Pages: {', '.join(orphan_pages)}",
+                recommendation="Verify these pages have the API endpoints they need",
+            )
+        )
 
     # Feature completeness scorecard
     covered = total_endpoints - len(orphan_apis)
     coverage_score = covered / max(1, total_endpoints)
     metrics["feature_coverage_score"] = round(coverage_score, 2)
 
-    insights.append(ProductInsight(
-        id="pm-insight-coverage",
-        category="feature_coverage",
-        title=f"Feature coverage: {coverage_score:.0%}",
-        evidence=f"{total_endpoints} API endpoints across {len(endpoints)} modules, {len(page_names)} pages",
-        impact="API-to-frontend alignment for feature completeness",
-        recommendation="Close coverage gaps" if coverage_score < 1.0 else "Full coverage",
-        confidence=0.85,
-    ))
+    insights.append(
+        ProductInsight(
+            id="pm-insight-coverage",
+            category="feature_coverage",
+            title=f"Feature coverage: {coverage_score:.0%}",
+            evidence=f"{total_endpoints} API endpoints across {len(endpoints)} modules, {len(page_names)} pages",
+            impact="API-to-frontend alignment for feature completeness",
+            recommendation="Close coverage gaps"
+            if coverage_score < 1.0
+            else "Full coverage",
+            confidence=0.85,
+        )
+    )
 
 
 def _audit_test_coverage(
@@ -202,7 +219,7 @@ def _audit_test_coverage(
     total_tests = 0
     test_with_assertions = 0
     acceptance_patterns = re.compile(
-        r'(?:test_.*(?:success|happy|flow|scenario|should|returns|creates|updates|deletes))',
+        r"(?:test_.*(?:success|happy|flow|scenario|should|returns|creates|updates|deletes))",
         re.IGNORECASE,
     )
 
@@ -211,9 +228,9 @@ def _audit_test_coverage(
 
     for path in test_files:
         source = _read_safe(path)
-        test_count = len(re.findall(r'def test_', source))
+        test_count = len(re.findall(r"def test_", source))
         total_tests += test_count
-        test_with_assertions += len(re.findall(r'assert\b', source))
+        test_with_assertions += len(re.findall(r"assert\b", source))
 
         # Check if test covers an API module
         for mod in api_modules:
@@ -228,14 +245,16 @@ def _audit_test_coverage(
     metrics["api_test_coverage"] = round(test_coverage, 2)
 
     if untested_modules:
-        findings.append(Finding(
-            id="pm-003",
-            severity="low",
-            category="feature_coverage",
-            title=f"{len(untested_modules)} API modules may lack dedicated tests",
-            detail=f"Modules: {', '.join(sorted(untested_modules))}",
-            recommendation="Add test coverage for untested API modules",
-        ))
+        findings.append(
+            Finding(
+                id="pm-003",
+                severity="low",
+                category="feature_coverage",
+                title=f"{len(untested_modules)} API modules may lack dedicated tests",
+                detail=f"Modules: {', '.join(sorted(untested_modules))}",
+                recommendation="Add test coverage for untested API modules",
+            )
+        )
 
 
 def _check_integration_gaps(
@@ -284,14 +303,16 @@ def scan() -> ProductTeamReport:
     metrics["test_files_found"] = len(test_files)
 
     if not api_files and not page_files:
-        findings.append(Finding(
-            id="pm-000",
-            severity="info",
-            category="feature_coverage",
-            title="No API or page files found",
-            detail="Backend and frontend may not be initialized yet",
-            recommendation="Initialize app/api/ and frontend/src/pages/",
-        ))
+        findings.append(
+            Finding(
+                id="pm-000",
+                severity="info",
+                category="feature_coverage",
+                title="No API or page files found",
+                detail="Backend and frontend may not be initialized yet",
+                recommendation="Initialize app/api/ and frontend/src/pages/",
+            )
+        )
     else:
         _map_feature_coverage(api_files, page_files, findings, insights, metrics)
         _audit_test_coverage(test_files, api_files, findings, insights, metrics)
@@ -303,8 +324,15 @@ def scan() -> ProductTeamReport:
     ls = ProductLearningState(AGENT_NAME)
     ls.record_scan(metrics)
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
-                           "title": f.title, "file": f.file})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         ls.record_severity_calibration(f.severity)
 
     severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}
@@ -316,15 +344,25 @@ def scan() -> ProductTeamReport:
     ls.record_health_snapshot(health, finding_counts)
 
     for i in insights:
-        ls.record_insight({"id": i.id, "category": i.category, "title": i.title,
-                          "confidence": i.confidence})
+        ls.record_insight(
+            {
+                "id": i.id,
+                "category": i.category,
+                "title": i.title,
+                "confidence": i.confidence,
+            }
+        )
 
     ls.track_kpi("feature_coverage_score", metrics.get("feature_coverage_score", 0))
     ls.track_kpi("api_test_coverage", metrics.get("api_test_coverage", 0))
 
-    learning_updates = [f"Scanned {len(api_files)} API + {len(page_files)} pages + {len(test_files)} tests"]
+    learning_updates = [
+        f"Scanned {len(api_files)} API + {len(page_files)} pages + {len(test_files)} tests"
+    ]
     if metrics.get("feature_coverage_score") is not None:
-        learning_updates.append(f"Feature coverage: {metrics['feature_coverage_score']:.0%}")
+        learning_updates.append(
+            f"Feature coverage: {metrics['feature_coverage_score']:.0%}"
+        )
 
     return ProductTeamReport(
         agent=AGENT_NAME,
@@ -339,6 +377,7 @@ def scan() -> ProductTeamReport:
 def save_report(report: ProductTeamReport) -> Path:
     """Save report to product_team/reports/."""
     from product_team.shared.config import REPORTS_DIR
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"{AGENT_NAME}_latest.json"
     path.write_text(report.serialize())

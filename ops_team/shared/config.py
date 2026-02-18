@@ -9,8 +9,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _THIS = Path(__file__).resolve()
-OPS_TEAM_DIR = _THIS.parent.parent            # ops_team/
-PROJECT_ROOT = OPS_TEAM_DIR.parent             # warmpath/
+OPS_TEAM_DIR = _THIS.parent.parent  # ops_team/
+PROJECT_ROOT = OPS_TEAM_DIR.parent  # warmpath/
 REPORTS_DIR = OPS_TEAM_DIR / "reports"
 INTEL_CACHE = OPS_TEAM_DIR / "shared" / "intel_cache.json"
 
@@ -94,26 +94,38 @@ KPI_TARGETS: dict[str, dict] = {
 # Thresholds for agent checks
 # ---------------------------------------------------------------------------
 
-COACH_KEYWORD_COVERAGE_TARGET = 0.80   # % of job seeker scenarios with mock handlers
+COACH_KEYWORD_COVERAGE_TARGET = 0.80  # % of job seeker scenarios with mock handlers
 COACH_JOURNEY_STEPS = [
-    "signup", "upload", "search", "message", "track", "interview",
+    "signup",
+    "upload",
+    "search",
+    "message",
+    "track",
+    "interview",
 ]
 NH_JOURNEY_STEPS = [
-    "signup", "upload_csv", "opt_in", "review_intros", "earn",
+    "signup",
+    "upload_csv",
+    "opt_in",
+    "review_intros",
+    "earn",
 ]
 MARKETPLACE_ACTIONS = [
-    "cross_network_search", "request_intro", "approve_intro", "decline_intro",
+    "cross_network_search",
+    "request_intro",
+    "approve_intro",
+    "decline_intro",
 ]
 
 # ---------------------------------------------------------------------------
 # Self-learning thresholds
 # ---------------------------------------------------------------------------
 
-RECURRING_PATTERN_THRESHOLD = 5       # auto-escalate at 5+ occurrences
-SYSTEMIC_PATTERN_THRESHOLD = 10       # flag as systemic at 10+
-ATTENTION_WEIGHT_DECAY = 0.05         # per-day decay for quiet files
-FIX_EFFECTIVENESS_WINDOW_DAYS = 30    # look-back window for fix effectiveness
-INTEL_CACHE_TTL_HOURS = 24            # default intelligence cache TTL
+RECURRING_PATTERN_THRESHOLD = 5  # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10  # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05  # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30  # look-back window for fix effectiveness
+INTEL_CACHE_TTL_HOURS = 24  # default intelligence cache TTL
 
 # Health score weights per agent (total = 100)
 HEALTH_WEIGHTS: dict[str, int] = {

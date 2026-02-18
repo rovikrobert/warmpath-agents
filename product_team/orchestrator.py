@@ -82,7 +82,13 @@ def cmd_all() -> None:
     reports = []
 
     # Run agents in order: leaf agents first, then lead
-    agent_order = ["user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"]
+    agent_order = [
+        "user_researcher",
+        "product_manager",
+        "ux_lead",
+        "design_lead",
+        "product_lead",
+    ]
     for name in agent_order:
         print(f"\n--- {name} ---")
         report = _run_agent(name)
@@ -100,6 +106,7 @@ def cmd_all() -> None:
 
     # Print daily brief
     from product_team.product_lead.product_lead import generate_daily_brief
+
     brief = generate_daily_brief()
     print(brief)
 
@@ -114,24 +121,28 @@ def cmd_agent(name: str) -> None:
 def cmd_daily_brief() -> None:
     """Generate brief from cached reports (no scanning)."""
     from product_team.product_lead.product_lead import generate_daily_brief
+
     print(generate_daily_brief())
 
 
 def cmd_weekly() -> None:
     """Generate weekly deep dive report."""
     from product_team.product_lead.product_lead import generate_weekly_report
+
     print(generate_weekly_report())
 
 
 def cmd_monthly() -> None:
     """Generate monthly strategy review."""
     from product_team.product_lead.product_lead import generate_monthly_review
+
     print(generate_monthly_review())
 
 
 def cmd_intel() -> None:
     """Check product intelligence freshness."""
     from product_team.shared.intelligence import ProductIntelligence
+
     pi = ProductIntelligence()
     freshness = pi.check_freshness()
     agenda = pi.generate_research_agenda()
@@ -150,6 +161,7 @@ def cmd_intel() -> None:
 def cmd_intel_report() -> None:
     """Full intelligence summary report."""
     from product_team.shared.intelligence import ProductIntelligence
+
     pi = ProductIntelligence()
     report = pi.generate_intel_report()
 
@@ -159,8 +171,10 @@ def cmd_intel_report() -> None:
     print(f"\nTotal items: {report['total_items']}")
     print(f"Urgent: {report['urgent_items']}")
     print(f"Unadopted: {report['unadopted_items']}")
-    print(f"Categories: {report['categories_fresh']} fresh / "
-          f"{report['categories_stale']} stale of {report['categories_total']}")
+    print(
+        f"Categories: {report['categories_fresh']} fresh / "
+        f"{report['categories_stale']} stale of {report['categories_total']}"
+    )
 
     if report.get("items_by_category"):
         print("\nBy Category:")
@@ -195,8 +209,10 @@ def cmd_learning_report() -> None:
         print(f"  Methodologies adopted: {report['methodologies_adopted']}")
 
         if report.get("fix_effectiveness_rate") is not None:
-            print(f"  Fix effectiveness: {report['fix_effectiveness_rate']:.0%} "
-                  f"({report['fix_records_sampled']} sampled)")
+            print(
+                f"  Fix effectiveness: {report['fix_effectiveness_rate']:.0%} "
+                f"({report['fix_records_sampled']} sampled)"
+            )
 
         if report.get("hot_spots"):
             print("  Hot spots:")
@@ -225,6 +241,7 @@ def cmd_learning_report() -> None:
 def cmd_research_agenda() -> None:
     """Show prioritized research agenda."""
     from product_team.shared.intelligence import ProductIntelligence
+
     pi = ProductIntelligence()
     agenda = pi.generate_research_agenda()
 
@@ -255,19 +272,23 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
-    parser = argparse.ArgumentParser(
-        description="WarmPath Product Team Orchestrator"
-    )
+    parser = argparse.ArgumentParser(description="WarmPath Product Team Orchestrator")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--all", action="store_true", help="Run all product agents")
     group.add_argument("--agent", type=str, help="Run a single agent by name")
-    group.add_argument("--daily-brief", action="store_true", help="Brief from cached reports")
+    group.add_argument(
+        "--daily-brief", action="store_true", help="Brief from cached reports"
+    )
     group.add_argument("--weekly", action="store_true", help="Weekly deep dive")
     group.add_argument("--monthly", action="store_true", help="Monthly review")
     group.add_argument("--intel", action="store_true", help="Intel freshness check")
     group.add_argument("--intel-report", action="store_true", help="Full intel summary")
-    group.add_argument("--learning-report", action="store_true", help="Meta-learning reports")
-    group.add_argument("--research-agenda", action="store_true", help="Research priorities")
+    group.add_argument(
+        "--learning-report", action="store_true", help="Meta-learning reports"
+    )
+    group.add_argument(
+        "--research-agenda", action="store_true", help="Research priorities"
+    )
 
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
 

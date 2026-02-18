@@ -21,6 +21,7 @@ if _project_root not in sys.path:
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(Path(_project_root) / ".env")
 except ImportError:
     pass
@@ -90,8 +91,13 @@ def _load_reports() -> list[AgentReport]:
 
     # Data team reports (if available)
     _AR_FIELDS = {
-        "agent", "timestamp", "scan_duration_seconds",
-        "findings", "metrics", "intelligence_applied", "learning_updates",
+        "agent",
+        "timestamp",
+        "scan_duration_seconds",
+        "findings",
+        "metrics",
+        "intelligence_applied",
+        "learning_updates",
     }
     if DATA_TEAM_REPORTS_DIR is not None and DATA_TEAM_REPORTS_DIR.is_dir():
         for path in sorted(DATA_TEAM_REPORTS_DIR.glob("*_latest.json")):
@@ -174,11 +180,31 @@ def run_daily() -> str:
 
     # Update learning state
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    _product_agents = {
+        "user_researcher",
+        "product_manager",
+        "ux_lead",
+        "design_lead",
+        "product_lead",
+    }
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _finance_agents = {
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+        "finance_lead",
+    }
     _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents and r.agent not in _finance_agents and r.agent not in _gtm_agents]
+    eng_reports = [
+        r
+        for r in reports
+        if r.agent not in _data_agents
+        and r.agent not in _product_agents
+        and r.agent not in _ops_agents
+        and r.agent not in _finance_agents
+        and r.agent not in _gtm_agents
+    ]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
     ops_reports = [r for r in reports if r.agent in _ops_agents]
@@ -203,9 +229,7 @@ def run_daily() -> str:
     return brief
 
 
-def _push_daily_outputs(
-    brief: str, costs: dict, alerts: list[str]
-) -> None:
+def _push_daily_outputs(brief: str, costs: dict, alerts: list[str]) -> None:
     """Push daily brief to Notion and generate WhatsApp message (best-effort).
 
     Idempotent: skips if today's brief has already been pushed (prevents
@@ -229,7 +253,9 @@ def _push_daily_outputs(
         notion = NotionSync()
         if notion.enabled:
             if notion._state.get("last_daily_sync") == today:
-                logger.info("Daily brief already synced to Notion for %s — skipping", today)
+                logger.info(
+                    "Daily brief already synced to Notion for %s — skipping", today
+                )
                 notion_page_id = notion._state.get("last_daily_page_id", "")
             else:
                 result = notion.push_daily_brief(
@@ -257,7 +283,9 @@ def _push_daily_outputs(
             "decisions_needed": [],
             "progress": [],
         }
-        wa.generate_morning_brief(brief_data, costs, alerts, notion_page_id=notion_page_id)
+        wa.generate_morning_brief(
+            brief_data, costs, alerts, notion_page_id=notion_page_id
+        )
     except Exception:
         logger.debug("WhatsApp message generation skipped")
 
@@ -274,6 +302,7 @@ def run_weekly() -> str:
 
     # Push weekly WhatsApp summary (best-effort, skip if already sent this week)
     from datetime import datetime, timezone
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     wa_weekly_marker = WHATSAPP_DIR / f"whatsapp-weekly-{today}.txt"
     if wa_weekly_marker.exists():
@@ -327,7 +356,9 @@ def setup_notion(parent_page_id: str) -> None:
             print(f"  {name}: {db_id}")
         print("\nAdd these IDs to your .env or cos_config for future runs.")
     else:
-        print("No databases were created. Check your Notion API key and parent page ID.")
+        print(
+            "No databases were created. Check your Notion API key and parent page ID."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +381,9 @@ def main() -> None:
         print(run_status())
     elif mode == "setup-notion":
         if len(sys.argv) < 3:
-            print("Usage: python -m agents.chief_of_staff.cos_agent setup-notion <parent_page_id>")
+            print(
+                "Usage: python -m agents.chief_of_staff.cos_agent setup-notion <parent_page_id>"
+            )
             sys.exit(1)
         setup_notion(sys.argv[2])
     else:

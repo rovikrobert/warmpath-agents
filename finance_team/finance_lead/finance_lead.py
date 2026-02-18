@@ -104,7 +104,9 @@ def generate_daily_brief(reports: list[FinanceTeamReport] | None = None) -> str:
 
     lines.append(f"| Stripe Integration | {stripe_score} | {_status(stripe_score)} |")
     lines.append(f"| Credit Economy | {credit_score} | {_status(credit_score)} |")
-    lines.append(f"| Regulatory Compliance | {compliance_score} | {_status(compliance_score)} |")
+    lines.append(
+        f"| Regulatory Compliance | {compliance_score} | {_status(compliance_score)} |"
+    )
     lines.append(f"| Investor Readiness | {ir_score} | {_status(ir_score)} |")
     lines.append("")
 
@@ -156,7 +158,9 @@ def generate_daily_brief(reports: list[FinanceTeamReport] | None = None) -> str:
             if any(f.severity == sev for f in r.findings):
                 worst = sev
                 break
-        lines.append(f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s")
+        lines.append(
+            f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s"
+        )
     lines.append("")
 
     # Learning Updates
@@ -165,7 +169,12 @@ def generate_daily_brief(reports: list[FinanceTeamReport] | None = None) -> str:
         if r.learning_updates:
             for lu in r.learning_updates:
                 lines.append(f"- **{r.agent}**: {lu}")
-    for agent_name in ["finance_manager", "credits_manager", "investor_relations", "legal_compliance"]:
+    for agent_name in [
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+    ]:
         try:
             ls = FinanceLearningState(agent_name)
             report = ls.generate_meta_learning_report()
@@ -173,8 +182,10 @@ def generate_daily_brief(reports: list[FinanceTeamReport] | None = None) -> str:
             total_scans = report.get("total_scans", 0)
             escalated = len(report.get("escalated_patterns", []))
             if total_scans > 0:
-                lines.append(f"- **{agent_name} meta**: {total_scans} scans, "
-                             f"health={trajectory}, escalated={escalated}")
+                lines.append(
+                    f"- **{agent_name} meta**: {total_scans} scans, "
+                    f"health={trajectory}, escalated={escalated}"
+                )
         except Exception:
             pass
     lines.append("")
@@ -230,9 +241,15 @@ def generate_weekly_report(reports: list[FinanceTeamReport] | None = None) -> st
     compliance = all_metrics.get("compliance_score", 0)
     compliance_val = compliance if isinstance(compliance, (int, float)) else 0
 
-    lines.append(f"| Stripe | {'Good' if stripe_val >= 0.80 else 'Needs Work'} | Score: {stripe} |")
-    lines.append(f"| Credit Economy | {'Good' if credit_val >= 0.80 else 'Needs Work'} | Score: {credit} |")
-    lines.append(f"| Compliance | {'Good' if compliance_val >= 0.80 else 'Needs Work'} | Score: {compliance} |")
+    lines.append(
+        f"| Stripe | {'Good' if stripe_val >= 0.80 else 'Needs Work'} | Score: {stripe} |"
+    )
+    lines.append(
+        f"| Credit Economy | {'Good' if credit_val >= 0.80 else 'Needs Work'} | Score: {credit} |"
+    )
+    lines.append(
+        f"| Compliance | {'Good' if compliance_val >= 0.80 else 'Needs Work'} | Score: {compliance} |"
+    )
     lines.append("")
 
     # Findings by category
@@ -251,7 +268,12 @@ def generate_weekly_report(reports: list[FinanceTeamReport] | None = None) -> st
 
     # Trend indicators
     lines.append("## Trend Indicators\n")
-    for agent_name in ["finance_manager", "credits_manager", "investor_relations", "legal_compliance"]:
+    for agent_name in [
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+    ]:
         try:
             ls = FinanceLearningState(agent_name)
             trajectory = ls.get_health_trajectory()
@@ -301,11 +323,17 @@ def generate_monthly_review(reports: list[FinanceTeamReport] | None = None) -> s
     total_count = len(all_findings)
 
     if critical_count == 0:
-        lines.append("- Financial infrastructure is healthy. Focus on investor readiness.")
+        lines.append(
+            "- Financial infrastructure is healthy. Focus on investor readiness."
+        )
     elif critical_count <= 3:
-        lines.append(f"- {critical_count} critical/high issues need attention before fundraise.")
+        lines.append(
+            f"- {critical_count} critical/high issues need attention before fundraise."
+        )
     else:
-        lines.append(f"- {critical_count} critical/high issues detected. Prioritize fixes before investor conversations.")
+        lines.append(
+            f"- {critical_count} critical/high issues detected. Prioritize fixes before investor conversations."
+        )
     lines.append(f"- Total findings across finance: {total_count}")
     lines.append("")
 
@@ -340,13 +368,17 @@ def scan() -> FinanceTeamReport:
         if f.severity in ("critical", "high") and f.category:
             target = _infer_target_team(f.category)
             if target:
-                cross_team.append({
-                    "target_team": target,
-                    "urgency": f.severity,
-                    "request": f"Fix: {f.title}",
-                    "source_agent": f.id.split("-")[0] if "-" in f.id else "finance",
-                    "finding_id": f.id,
-                })
+                cross_team.append(
+                    {
+                        "target_team": target,
+                        "urgency": f.severity,
+                        "request": f"Fix: {f.title}",
+                        "source_agent": f.id.split("-")[0]
+                        if "-" in f.id
+                        else "finance",
+                        "finding_id": f.id,
+                    }
+                )
 
     # Summary metrics
     metrics["finance_agents_reporting"] = len(reports)

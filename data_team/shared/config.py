@@ -9,8 +9,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _THIS = Path(__file__).resolve()
-DATA_TEAM_DIR = _THIS.parent.parent           # data_team/
-PROJECT_ROOT = DATA_TEAM_DIR.parent            # warmpath/
+DATA_TEAM_DIR = _THIS.parent.parent  # data_team/
+PROJECT_ROOT = DATA_TEAM_DIR.parent  # warmpath/
 REPORTS_DIR = DATA_TEAM_DIR / "reports"
 INTEL_CACHE = DATA_TEAM_DIR / "shared" / "intel_cache.json"
 
@@ -60,9 +60,7 @@ DATABASE_TABLES: dict[str, list[str]] = {
     ],
 }
 
-ALL_TABLES: list[str] = [
-    t for group in DATABASE_TABLES.values() for t in group
-]
+ALL_TABLES: list[str] = [t for group in DATABASE_TABLES.values() for t in group]
 
 # ---------------------------------------------------------------------------
 # KPI targets
@@ -101,11 +99,11 @@ DATA_AGENT_NAMES: list[str] = [
 # Self-learning thresholds
 # ---------------------------------------------------------------------------
 
-RECURRING_PATTERN_THRESHOLD = 5       # auto-escalate at 5+ occurrences
-SYSTEMIC_PATTERN_THRESHOLD = 10       # flag as systemic at 10+
-ATTENTION_WEIGHT_DECAY = 0.05         # per-day decay for quiet files
-FIX_EFFECTIVENESS_WINDOW_DAYS = 30    # look-back window for fix effectiveness
-INTEL_CACHE_TTL_HOURS = 24            # default intelligence cache TTL
+RECURRING_PATTERN_THRESHOLD = 5  # auto-escalate at 5+ occurrences
+SYSTEMIC_PATTERN_THRESHOLD = 10  # flag as systemic at 10+
+ATTENTION_WEIGHT_DECAY = 0.05  # per-day decay for quiet files
+FIX_EFFECTIVENESS_WINDOW_DAYS = 30  # look-back window for fix effectiveness
+INTEL_CACHE_TTL_HOURS = 24  # default intelligence cache TTL
 
 # Health score weights per agent (total = 100)
 HEALTH_WEIGHTS: dict[str, int] = {

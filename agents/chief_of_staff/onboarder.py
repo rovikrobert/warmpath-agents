@@ -85,9 +85,7 @@ def validate_team_spec(spec: dict) -> list[str]:
     return errors
 
 
-def generate_team_scaffold(
-    spec: dict, *, dry_run: bool = True
-) -> list[str]:
+def generate_team_scaffold(spec: dict, *, dry_run: bool = True) -> list[str]:
     """Generate directory structure for a new team.
 
     Returns list of file paths that would be (or were) created.

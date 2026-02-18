@@ -299,20 +299,30 @@ class GTMIntelligence:
         for category, is_fresh in freshness.items():
             if not is_fresh:
                 meta = GTM_INTEL_CATEGORIES.get(category, {})
-                if category in ("competitor_products", "competitor_pricing", "seo_trends"):
+                if category in (
+                    "competitor_products",
+                    "competitor_pricing",
+                    "seo_trends",
+                ):
                     priority = "high"
-                elif category in ("marketplace_economics", "referral_effectiveness", "marketing_regulations"):
+                elif category in (
+                    "marketplace_economics",
+                    "referral_effectiveness",
+                    "marketing_regulations",
+                ):
                     priority = "medium"
                 else:
                     priority = "medium"
 
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": priority,
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": priority,
+                    }
+                )
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         agenda.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))

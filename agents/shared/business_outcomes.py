@@ -262,7 +262,9 @@ def score_alignment(outcomes: list[str]) -> float:
 def get_business_impact(category: str, severity: str) -> str:
     """Generate a business impact statement from finding category + severity."""
     templates = _IMPACT_TEMPLATES.get(category, _DEFAULT_IMPACT)
-    return templates.get(severity, _DEFAULT_IMPACT.get(severity, "Impact to be assessed"))
+    return templates.get(
+        severity, _DEFAULT_IMPACT.get(severity, "Impact to be assessed")
+    )
 
 
 def get_aligned_outcomes(category: str) -> list[str]:

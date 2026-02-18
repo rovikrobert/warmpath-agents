@@ -26,28 +26,40 @@ logger = logging.getLogger(__name__)
 
 PII_PATTERNS: list[str] = [
     r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
-    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",                          # Phone
-    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",                    # LinkedIn profile
+    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",  # Phone
+    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",  # LinkedIn profile
 ]
 
 # Financial-specific PII patterns
 FINANCIAL_PII_PATTERNS: list[str] = [
-    r"\bsk_(?:live|test)_[A-Za-z0-9]+\b",                      # Stripe secret key
-    r"\bpk_(?:live|test)_[A-Za-z0-9]+\b",                      # Stripe publishable key
-    r"\bwhsec_[A-Za-z0-9]+\b",                                 # Stripe webhook secret
-    r"\bcus_[A-Za-z0-9]+\b",                                   # Stripe customer ID
-    r"\bpm_[A-Za-z0-9]+\b",                                    # Stripe payment method ID
-    r"\bpi_[A-Za-z0-9]+\b",                                    # Stripe payment intent ID
-    r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",           # Credit card number
+    r"\bsk_(?:live|test)_[A-Za-z0-9]+\b",  # Stripe secret key
+    r"\bpk_(?:live|test)_[A-Za-z0-9]+\b",  # Stripe publishable key
+    r"\bwhsec_[A-Za-z0-9]+\b",  # Stripe webhook secret
+    r"\bcus_[A-Za-z0-9]+\b",  # Stripe customer ID
+    r"\bpm_[A-Za-z0-9]+\b",  # Stripe payment method ID
+    r"\bpi_[A-Za-z0-9]+\b",  # Stripe payment intent ID
+    r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",  # Credit card number
 ]
 
-PII_COLUMN_NAMES: frozenset[str] = frozenset({
-    "first_name", "last_name", "full_name", "email",
-    "linkedin_url", "current_title", "current_company",
-    "location", "notes", "how_you_know",
-    "email_blind_index", "name_company_blind_index", "raw_csv_row",
-    "stripe_customer_id", "payment_method_id",
-})
+PII_COLUMN_NAMES: frozenset[str] = frozenset(
+    {
+        "first_name",
+        "last_name",
+        "full_name",
+        "email",
+        "linkedin_url",
+        "current_title",
+        "current_company",
+        "location",
+        "notes",
+        "how_you_know",
+        "email_blind_index",
+        "name_company_blind_index",
+        "raw_csv_row",
+        "stripe_customer_id",
+        "payment_method_id",
+    }
+)
 
 # Finance-specific forbidden actions
 FORBIDDEN_ACTIONS: list[str] = [
@@ -201,11 +213,13 @@ class FinancePrivacyGuard:
 
     def _log(self, text: str, context: str) -> None:
         """Audit trail for validated outputs."""
-        self._audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "context": context,
-            "text_preview": text[:120].replace("\n", " "),
-        })
+        self._audit_log.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "context": context,
+                "text_preview": text[:120].replace("\n", " "),
+            }
+        )
         self._audit_log = self._audit_log[-500:]
 
 

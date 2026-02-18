@@ -95,40 +95,59 @@ def _check_money_transmitter_risk(
             risk_signals_found.append(signal)
 
     metrics["money_transmitter_risk_signals_found"] = len(risk_signals_found)
-    metrics["money_transmitter_risk_signals_checked"] = len(MONEY_TRANSMITTER_RISK_SIGNALS)
+    metrics["money_transmitter_risk_signals_checked"] = len(
+        MONEY_TRANSMITTER_RISK_SIGNALS
+    )
 
     if risk_signals_found:
-        severity = "critical" if any(
-            s in risk_signals_found for s in ("transfer_credits", "cash_out", "peer_to_peer")
-        ) else "high"
-        findings.append(Finding(
-            id="lc-mtr-001",
-            severity=severity,
-            category="money_transmitter",
-            title=f"Money transmitter risk signals found: {', '.join(risk_signals_found)}",
-            detail=(
-                f"Detected {len(risk_signals_found)} risk signal(s) across app/services/ and app/api/. "
-                f"Signals: {', '.join(risk_signals_found)}"
-            ),
-            recommendation=(
-                "Remove or rename functions that imply transferability, cash conversion, or "
-                "withdrawal. Credits must remain non-transferable to stay outside FinCEN/PSA scope."
-            ),
-        ))
-        for signal in risk_signals_found:
-            compliance_findings.append(ComplianceFinding(
-                id=f"lc-mtr-{signal[:8]}",
-                category="money_transmitter",
+        severity = (
+            "critical"
+            if any(
+                s in risk_signals_found
+                for s in ("transfer_credits", "cash_out", "peer_to_peer")
+            )
+            else "high"
+        )
+        findings.append(
+            Finding(
+                id="lc-mtr-001",
                 severity=severity,
-                title=f"Risk signal '{signal}' detected in codebase",
-                detail=f"Matches pattern '{signal}' in combined app/services + app/api source",
-                regulation="FinCEN" if signal in ("transfer_credits", "cash_out", "exchange_rate",
-                                                   "convert_to_cash", "withdraw") else "PSA",
-                recommendation=(
-                    "Credits must be non-transferable loyalty points, not virtual currency. "
-                    "Consult CLAUDE.md section on credit economy and money transmitter regulations."
+                category="money_transmitter",
+                title=f"Money transmitter risk signals found: {', '.join(risk_signals_found)}",
+                detail=(
+                    f"Detected {len(risk_signals_found)} risk signal(s) across app/services/ and app/api/. "
+                    f"Signals: {', '.join(risk_signals_found)}"
                 ),
-            ))
+                recommendation=(
+                    "Remove or rename functions that imply transferability, cash conversion, or "
+                    "withdrawal. Credits must remain non-transferable to stay outside FinCEN/PSA scope."
+                ),
+            )
+        )
+        for signal in risk_signals_found:
+            compliance_findings.append(
+                ComplianceFinding(
+                    id=f"lc-mtr-{signal[:8]}",
+                    category="money_transmitter",
+                    severity=severity,
+                    title=f"Risk signal '{signal}' detected in codebase",
+                    detail=f"Matches pattern '{signal}' in combined app/services + app/api source",
+                    regulation="FinCEN"
+                    if signal
+                    in (
+                        "transfer_credits",
+                        "cash_out",
+                        "exchange_rate",
+                        "convert_to_cash",
+                        "withdraw",
+                    )
+                    else "PSA",
+                    recommendation=(
+                        "Credits must be non-transferable loyalty points, not virtual currency. "
+                        "Consult CLAUDE.md section on credit economy and money transmitter regulations."
+                    ),
+                )
+            )
     else:
         metrics["money_transmitter_clean"] = True
 
@@ -143,34 +162,38 @@ def _check_money_transmitter_risk(
     metrics["safe_credit_patterns_checked"] = len(SAFE_CREDIT_PATTERNS)
 
     if safe_patterns_found:
-        compliance_findings.append(ComplianceFinding(
-            id="lc-mtr-safe-001",
-            category="money_transmitter",
-            severity="info",
-            title=f"Safe credit patterns present: {', '.join(safe_patterns_found)}",
-            detail=(
-                f"Found {len(safe_patterns_found)}/{len(SAFE_CREDIT_PATTERNS)} safe patterns: "
-                f"{', '.join(safe_patterns_found)}"
-            ),
-            regulation="FinCEN",
-            recommendation="Maintain these patterns to keep credits in loyalty-program territory.",
-        ))
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-mtr-safe-001",
+                category="money_transmitter",
+                severity="info",
+                title=f"Safe credit patterns present: {', '.join(safe_patterns_found)}",
+                detail=(
+                    f"Found {len(safe_patterns_found)}/{len(SAFE_CREDIT_PATTERNS)} safe patterns: "
+                    f"{', '.join(safe_patterns_found)}"
+                ),
+                regulation="FinCEN",
+                recommendation="Maintain these patterns to keep credits in loyalty-program territory.",
+            )
+        )
 
     if not safe_patterns_found:
-        findings.append(Finding(
-            id="lc-mtr-002",
-            severity="medium",
-            category="money_transmitter",
-            title="No safe credit patterns found in services/API source",
-            detail=(
-                f"Expected one or more of: {', '.join(SAFE_CREDIT_PATTERNS)}. "
-                "Missing patterns weaken FinCEN/PSA defense."
-            ),
-            recommendation=(
-                "Add non_transferable, expires_at, or loyalty_program markers "
-                "to credits service to reinforce compliance posture."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-mtr-002",
+                severity="medium",
+                category="money_transmitter",
+                title="No safe credit patterns found in services/API source",
+                detail=(
+                    f"Expected one or more of: {', '.join(SAFE_CREDIT_PATTERNS)}. "
+                    "Missing patterns weaken FinCEN/PSA defense."
+                ),
+                recommendation=(
+                    "Add non_transferable, expires_at, or loyalty_program markers "
+                    "to credits service to reinforce compliance posture."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -198,24 +221,28 @@ def _check_gdpr_deletion_paths(
     metrics["gdpr_privacy_model_exists"] = privacy_model_exists
 
     if not privacy_model_exists:
-        findings.append(Finding(
-            id="lc-gdpr-001",
-            severity="critical",
-            category="gdpr",
-            title="app/models/privacy.py not found",
-            detail="GDPR compliance requires a privacy model with suppression and data request tables",
-            file=_relative(privacy_model_path),
-            recommendation="Create app/models/privacy.py with SuppressionList, DataRequest models",
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-gdpr-c001",
-            category="gdpr",
-            severity="critical",
-            title="Privacy model missing — GDPR right to erasure cannot be fulfilled",
-            file=_relative(privacy_model_path),
-            regulation="GDPR",
-            recommendation="app/models/privacy.py is required for GDPR/CCPA/PDPA deletion rights",
-        ))
+        findings.append(
+            Finding(
+                id="lc-gdpr-001",
+                severity="critical",
+                category="gdpr",
+                title="app/models/privacy.py not found",
+                detail="GDPR compliance requires a privacy model with suppression and data request tables",
+                file=_relative(privacy_model_path),
+                recommendation="Create app/models/privacy.py with SuppressionList, DataRequest models",
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-gdpr-c001",
+                category="gdpr",
+                severity="critical",
+                title="Privacy model missing — GDPR right to erasure cannot be fulfilled",
+                file=_relative(privacy_model_path),
+                regulation="GDPR",
+                recommendation="app/models/privacy.py is required for GDPR/CCPA/PDPA deletion rights",
+            )
+        )
     else:
         # Check for required table/class references
         required_privacy_refs = {
@@ -236,27 +263,31 @@ def _check_gdpr_deletion_paths(
 
         if missing_refs:
             severity = "high" if "suppression_list" in missing_refs else "medium"
-            findings.append(Finding(
-                id="lc-gdpr-002",
-                severity=severity,
-                category="gdpr",
-                title=f"Privacy model missing {len(missing_refs)} required reference(s)",
-                detail=f"Missing: {', '.join(missing_refs)}. Found: {', '.join(found_refs)}",
-                file=_relative(privacy_model_path),
-                recommendation=(
-                    "Ensure app/models/privacy.py defines suppression_list table, "
-                    "DataRequest model, and data_requests relationship."
-                ),
-            ))
-            compliance_findings.append(ComplianceFinding(
-                id="lc-gdpr-c002",
-                category="gdpr",
-                severity=severity,
-                title=f"GDPR deletion infrastructure incomplete: missing {', '.join(missing_refs)}",
-                file=_relative(privacy_model_path),
-                regulation="GDPR",
-                recommendation="All three references required for GDPR/CCPA/PDPA right to erasure",
-            ))
+            findings.append(
+                Finding(
+                    id="lc-gdpr-002",
+                    severity=severity,
+                    category="gdpr",
+                    title=f"Privacy model missing {len(missing_refs)} required reference(s)",
+                    detail=f"Missing: {', '.join(missing_refs)}. Found: {', '.join(found_refs)}",
+                    file=_relative(privacy_model_path),
+                    recommendation=(
+                        "Ensure app/models/privacy.py defines suppression_list table, "
+                        "DataRequest model, and data_requests relationship."
+                    ),
+                )
+            )
+            compliance_findings.append(
+                ComplianceFinding(
+                    id="lc-gdpr-c002",
+                    category="gdpr",
+                    severity=severity,
+                    title=f"GDPR deletion infrastructure incomplete: missing {', '.join(missing_refs)}",
+                    file=_relative(privacy_model_path),
+                    regulation="GDPR",
+                    recommendation="All three references required for GDPR/CCPA/PDPA right to erasure",
+                )
+            )
 
     # --- Services deletion/purge logic ---
     deletion_patterns = {
@@ -283,28 +314,32 @@ def _check_gdpr_deletion_paths(
 
     if deletion_missing:
         severity = "high" if "delete_user_data" in deletion_missing else "medium"
-        findings.append(Finding(
-            id="lc-gdpr-003",
-            severity=severity,
-            category="gdpr",
-            title=f"GDPR deletion logic missing: {', '.join(deletion_missing)}",
-            detail=(
-                f"Expected in app/services/: {', '.join(deletion_patterns.keys())}. "
-                f"Missing: {', '.join(deletion_missing)}"
-            ),
-            recommendation=(
-                "Implement delete_user_data, purge, and anonymize functions in app/services/ "
-                "to fulfill GDPR/CCPA/PDPA right to erasure."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-gdpr-c003",
-            category="gdpr",
-            severity=severity,
-            title=f"Deletion service functions missing: {', '.join(deletion_missing)}",
-            regulation="GDPR",
-            recommendation="GDPR Article 17 requires erasure capability across all user data",
-        ))
+        findings.append(
+            Finding(
+                id="lc-gdpr-003",
+                severity=severity,
+                category="gdpr",
+                title=f"GDPR deletion logic missing: {', '.join(deletion_missing)}",
+                detail=(
+                    f"Expected in app/services/: {', '.join(deletion_patterns.keys())}. "
+                    f"Missing: {', '.join(deletion_missing)}"
+                ),
+                recommendation=(
+                    "Implement delete_user_data, purge, and anonymize functions in app/services/ "
+                    "to fulfill GDPR/CCPA/PDPA right to erasure."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-gdpr-c003",
+                category="gdpr",
+                severity=severity,
+                title=f"Deletion service functions missing: {', '.join(deletion_missing)}",
+                regulation="GDPR",
+                recommendation="GDPR Article 17 requires erasure capability across all user data",
+            )
+        )
 
     # --- PRIVACY_DELETION_PATHS config references ---
     deletion_path_refs_found: list[str] = []
@@ -321,21 +356,23 @@ def _check_gdpr_deletion_paths(
     metrics["gdpr_deletion_paths_expected"] = len(PRIVACY_DELETION_PATHS)
 
     if deletion_path_refs_missing:
-        compliance_findings.append(ComplianceFinding(
-            id="lc-gdpr-c004",
-            category="gdpr",
-            severity="medium",
-            title=f"PRIVACY_DELETION_PATHS not all referenced: missing {', '.join(deletion_path_refs_missing)}",
-            detail=(
-                f"Config defines: {', '.join(PRIVACY_DELETION_PATHS)}. "
-                f"Missing from code: {', '.join(deletion_path_refs_missing)}"
-            ),
-            regulation="GDPR",
-            recommendation=(
-                "Ensure all PRIVACY_DELETION_PATHS (suppression_list, data_requests, "
-                "archived_credit_transactions) are swept during deletion flows."
-            ),
-        ))
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-gdpr-c004",
+                category="gdpr",
+                severity="medium",
+                title=f"PRIVACY_DELETION_PATHS not all referenced: missing {', '.join(deletion_path_refs_missing)}",
+                detail=(
+                    f"Config defines: {', '.join(PRIVACY_DELETION_PATHS)}. "
+                    f"Missing from code: {', '.join(deletion_path_refs_missing)}"
+                ),
+                regulation="GDPR",
+                recommendation=(
+                    "Ensure all PRIVACY_DELETION_PATHS (suppression_list, data_requests, "
+                    "archived_credit_transactions) are swept during deletion flows."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -379,35 +416,41 @@ def _check_consent_gates(
     metrics["consent_gates_expected"] = len(consent_patterns)
 
     if consent_missing:
-        severity = "high" if any(
-            c in consent_missing for c in ("opt_in", "consent", "approve")
-        ) else "medium"
-        findings.append(Finding(
-            id="lc-consent-001",
-            severity=severity,
-            category="consent",
-            title=f"Consent gate patterns missing: {', '.join(consent_missing)}",
-            detail=(
-                f"Checked app/models/marketplace.py + app/api/marketplace.py. "
-                f"Found: {', '.join(consent_found)}. Missing: {', '.join(consent_missing)}"
-            ),
-            recommendation=(
-                "Privacy architecture requires explicit consent gates: opt_in toggle, "
-                "approve/decline actions, and ConsentRecord model for audit trail."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-consent-c001",
-            category="consent",
-            severity=severity,
-            title=f"Consent infrastructure incomplete: missing {', '.join(consent_missing)}",
-            file=_relative(marketplace_model_path),
-            regulation="GDPR",
-            recommendation=(
-                "GDPR requires consent records. PDPA requires valid consent for data collection. "
-                "All marketplace contact disclosures must flow through explicit NH approval."
-            ),
-        ))
+        severity = (
+            "high"
+            if any(c in consent_missing for c in ("opt_in", "consent", "approve"))
+            else "medium"
+        )
+        findings.append(
+            Finding(
+                id="lc-consent-001",
+                severity=severity,
+                category="consent",
+                title=f"Consent gate patterns missing: {', '.join(consent_missing)}",
+                detail=(
+                    f"Checked app/models/marketplace.py + app/api/marketplace.py. "
+                    f"Found: {', '.join(consent_found)}. Missing: {', '.join(consent_missing)}"
+                ),
+                recommendation=(
+                    "Privacy architecture requires explicit consent gates: opt_in toggle, "
+                    "approve/decline actions, and ConsentRecord model for audit trail."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-consent-c001",
+                category="consent",
+                severity=severity,
+                title=f"Consent infrastructure incomplete: missing {', '.join(consent_missing)}",
+                file=_relative(marketplace_model_path),
+                regulation="GDPR",
+                recommendation=(
+                    "GDPR requires consent records. PDPA requires valid consent for data collection. "
+                    "All marketplace contact disclosures must flow through explicit NH approval."
+                ),
+            )
+        )
 
     # --- email_verified check (separate — auth layer) ---
     auth_api_path = API_DIR / "auth.py"
@@ -422,29 +465,33 @@ def _check_consent_gates(
     metrics["has_email_verified"] = has_email_verified
 
     if not has_email_verified:
-        findings.append(Finding(
-            id="lc-consent-002",
-            severity="high",
-            category="consent",
-            title="email_verified field not found in auth/user layer",
-            detail="CLAUDE.md requires email verification before marketplace access",
-            recommendation=(
-                "Add email_verified to user model and enforce verification check "
-                "before granting marketplace search and intro request access."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-consent-c002",
-            category="consent",
-            severity="high",
-            title="Email verification gate missing — unverified users may access marketplace",
-            file=_relative(auth_api_path),
-            regulation="PDPA",
-            recommendation=(
-                "Singapore PDPA requires verified identity for services handling third-party contacts. "
-                "Email verification is a minimum identity assurance step."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-consent-002",
+                severity="high",
+                category="consent",
+                title="email_verified field not found in auth/user layer",
+                detail="CLAUDE.md requires email verification before marketplace access",
+                recommendation=(
+                    "Add email_verified to user model and enforce verification check "
+                    "before granting marketplace search and intro request access."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-consent-c002",
+                category="consent",
+                severity="high",
+                title="Email verification gate missing — unverified users may access marketplace",
+                file=_relative(auth_api_path),
+                regulation="PDPA",
+                recommendation=(
+                    "Singapore PDPA requires verified identity for services handling third-party contacts. "
+                    "Email verification is a minimum identity assurance step."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -469,30 +516,34 @@ def _check_suppression_list(
     metrics["has_suppression_model"] = has_suppression_model
 
     if not has_suppression_model:
-        findings.append(Finding(
-            id="lc-supp-001",
-            severity="high",
-            category="suppression",
-            title="SuppressionList model not found in app/models/privacy.py",
-            detail="The suppression list table/model is missing",
-            file=_relative(privacy_model_path),
-            recommendation=(
-                "Define SuppressionList model with SHA-256 hashed email and name+company "
-                "for cross-vault suppression sweep."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-supp-c001",
-            category="suppression",
-            severity="high",
-            title="SuppressionList model absent — deletion requests cannot be fulfilled",
-            file=_relative(privacy_model_path),
-            regulation="GDPR",
-            recommendation=(
-                "GDPR/CCPA/PDPA require a mechanism for contacts to opt out of all vaults. "
-                "The SuppressionList is that mechanism."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-supp-001",
+                severity="high",
+                category="suppression",
+                title="SuppressionList model not found in app/models/privacy.py",
+                detail="The suppression list table/model is missing",
+                file=_relative(privacy_model_path),
+                recommendation=(
+                    "Define SuppressionList model with SHA-256 hashed email and name+company "
+                    "for cross-vault suppression sweep."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-supp-c001",
+                category="suppression",
+                severity="high",
+                title="SuppressionList model absent — deletion requests cannot be fulfilled",
+                file=_relative(privacy_model_path),
+                regulation="GDPR",
+                recommendation=(
+                    "GDPR/CCPA/PDPA require a mechanism for contacts to opt out of all vaults. "
+                    "The SuppressionList is that mechanism."
+                ),
+            )
+        )
 
     # --- hash_for_suppression utility ---
     service_files = sorted(SERVICES_DIR.glob("*.py")) if SERVICES_DIR.is_dir() else []
@@ -510,28 +561,32 @@ def _check_suppression_list(
     metrics["has_hash_for_suppression"] = hash_util_found
 
     if not hash_util_found:
-        findings.append(Finding(
-            id="lc-supp-002",
-            severity="high",
-            category="suppression",
-            title="hash_for_suppression utility not found in services or API",
-            detail="SHA-256 hashing utility for suppression matching not detected",
-            recommendation=(
-                "Implement hash_for_suppression(value) -> str using SHA-256 on normalized "
-                "(lowercased, trimmed) inputs per CLAUDE.md PII hashing conventions."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-supp-c002",
-            category="suppression",
-            severity="high",
-            title="SHA-256 suppression hash utility absent — vault boundary cannot be protected",
-            regulation="GDPR",
-            recommendation=(
-                "The hash utility prevents PII from crossing vault boundaries while still "
-                "allowing suppression checks. Required for privacy architecture compliance."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-supp-002",
+                severity="high",
+                category="suppression",
+                title="hash_for_suppression utility not found in services or API",
+                detail="SHA-256 hashing utility for suppression matching not detected",
+                recommendation=(
+                    "Implement hash_for_suppression(value) -> str using SHA-256 on normalized "
+                    "(lowercased, trimmed) inputs per CLAUDE.md PII hashing conventions."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-supp-c002",
+                category="suppression",
+                severity="high",
+                title="SHA-256 suppression hash utility absent — vault boundary cannot be protected",
+                regulation="GDPR",
+                recommendation=(
+                    "The hash utility prevents PII from crossing vault boundaries while still "
+                    "allowing suppression checks. Required for privacy architecture compliance."
+                ),
+            )
+        )
 
     # --- Import-time suppression sweep ---
     csv_parser_path = SERVICES_DIR / "csv_parser.py"
@@ -546,53 +601,62 @@ def _check_suppression_list(
     metrics["has_import_time_suppression_check"] = has_import_check
 
     if not has_import_check:
-        findings.append(Finding(
-            id="lc-supp-003",
-            severity="high",
-            category="suppression",
-            title="Suppression check not found at CSV import time",
-            detail=(
-                "Neither app/services/csv_parser.py nor app/services/suppression.py "
-                "references suppression list at import time"
-            ),
-            file=_relative(csv_parser_path),
-            recommendation=(
-                "Per CLAUDE.md: suppression list must be checked at every CSV import. "
-                "Add suppression sweep to csv_parser.py or call from Celery CSV task."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-supp-c003",
-            category="suppression",
-            severity="high",
-            title="Suppression not enforced at CSV upload — contacts in suppression list may be stored",
-            file=_relative(csv_parser_path),
-            regulation="GDPR",
-            recommendation=(
-                "GDPR erasure requests must prevent re-ingestion of suppressed contacts. "
-                "The import-time sweep is the primary enforcement point."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-supp-003",
+                severity="high",
+                category="suppression",
+                title="Suppression check not found at CSV import time",
+                detail=(
+                    "Neither app/services/csv_parser.py nor app/services/suppression.py "
+                    "references suppression list at import time"
+                ),
+                file=_relative(csv_parser_path),
+                recommendation=(
+                    "Per CLAUDE.md: suppression list must be checked at every CSV import. "
+                    "Add suppression sweep to csv_parser.py or call from Celery CSV task."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-supp-c003",
+                category="suppression",
+                severity="high",
+                title="Suppression not enforced at CSV upload — contacts in suppression list may be stored",
+                file=_relative(csv_parser_path),
+                regulation="GDPR",
+                recommendation=(
+                    "GDPR erasure requests must prevent re-ingestion of suppressed contacts. "
+                    "The import-time sweep is the primary enforcement point."
+                ),
+            )
+        )
 
     # --- Suppression sweep in services ---
     has_sweep = bool(
-        re.search(r"\bsuppression.*sweep\b|\bsweep.*suppression\b|\bcheck_suppression\b|\bsuppress\b",
-                  suppression_svc_source, re.IGNORECASE)
+        re.search(
+            r"\bsuppression.*sweep\b|\bsweep.*suppression\b|\bcheck_suppression\b|\bsuppress\b",
+            suppression_svc_source,
+            re.IGNORECASE,
+        )
         or re.search(r"\bsuppression\b", suppression_svc_source, re.IGNORECASE)
     )
     metrics["has_suppression_sweep_service"] = has_sweep
 
     if suppression_svc_source and has_sweep:
-        compliance_findings.append(ComplianceFinding(
-            id="lc-supp-c004",
-            category="suppression",
-            severity="info",
-            title="Suppression service found and references suppression logic",
-            file=_relative(suppression_svc_path),
-            detail="app/services/suppression.py is present and contains suppression references",
-            regulation="GDPR",
-            recommendation="Verify periodic sweep covers all network holder vaults, not just new uploads.",
-        ))
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-supp-c004",
+                category="suppression",
+                severity="info",
+                title="Suppression service found and references suppression logic",
+                file=_relative(suppression_svc_path),
+                detail="app/services/suppression.py is present and contains suppression references",
+                regulation="GDPR",
+                recommendation="Verify periodic sweep covers all network holder vaults, not just new uploads.",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -659,8 +723,11 @@ def _check_security_compliance(
 
     # Security headers middleware
     has_security_headers = bool(
-        re.search(r"\bsecurity.?headers\b|\bSecurityHeaders\b|\bhsts\b|\bX.Frame.Options\b",
-                  middleware_source, re.IGNORECASE)
+        re.search(
+            r"\bsecurity.?headers\b|\bSecurityHeaders\b|\bhsts\b|\bX.Frame.Options\b",
+            middleware_source,
+            re.IGNORECASE,
+        )
         or middleware_source  # file exists at all is a signal
     )
     security_checks["security_headers_middleware"] = (
@@ -672,7 +739,9 @@ def _check_security_compliance(
 
     # CORS configuration
     has_cors = bool(
-        re.search(r"\bCORSMiddleware\b|\bcors\b|\bCORS_ORIGINS\b", cors_source, re.IGNORECASE)
+        re.search(
+            r"\bCORSMiddleware\b|\bcors\b|\bCORS_ORIGINS\b", cors_source, re.IGNORECASE
+        )
     )
     security_checks["cors_configuration"] = (
         has_cors,
@@ -704,32 +773,38 @@ def _check_security_compliance(
     # Report failures
     for check_name, (passed, file_hint, rationale) in security_checks.items():
         if not passed:
-            severity = "critical" if check_name in ("token_version", "audit_logs") else "high"
-            findings.append(Finding(
-                id=f"lc-sec-{check_name[:12]}",
-                severity=severity,
-                category="security_compliance",
-                title=f"Security check failed: {check_name}",
-                detail=rationale,
-                file=file_hint,
-                recommendation=(
-                    f"Add or restore {check_name} per CLAUDE.md security architecture. "
-                    f"See Security Architecture section for full context."
-                ),
-            ))
-            compliance_findings.append(ComplianceFinding(
-                id=f"lc-sec-c-{check_name[:10]}",
-                category="security_compliance",
-                severity=severity,
-                title=f"Security compliance gap: {check_name} missing",
-                file=file_hint,
-                detail=rationale,
-                regulation="GDPR",
-                recommendation=(
-                    "GDPR Article 32 requires appropriate technical security measures. "
-                    f"{check_name} is part of the defense-in-depth architecture."
-                ),
-            ))
+            severity = (
+                "critical" if check_name in ("token_version", "audit_logs") else "high"
+            )
+            findings.append(
+                Finding(
+                    id=f"lc-sec-{check_name[:12]}",
+                    severity=severity,
+                    category="security_compliance",
+                    title=f"Security check failed: {check_name}",
+                    detail=rationale,
+                    file=file_hint,
+                    recommendation=(
+                        f"Add or restore {check_name} per CLAUDE.md security architecture. "
+                        f"See Security Architecture section for full context."
+                    ),
+                )
+            )
+            compliance_findings.append(
+                ComplianceFinding(
+                    id=f"lc-sec-c-{check_name[:10]}",
+                    category="security_compliance",
+                    severity=severity,
+                    title=f"Security compliance gap: {check_name} missing",
+                    file=file_hint,
+                    detail=rationale,
+                    regulation="GDPR",
+                    recommendation=(
+                        "GDPR Article 32 requires appropriate technical security measures. "
+                        f"{check_name} is part of the defense-in-depth architecture."
+                    ),
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -779,64 +854,72 @@ def _check_breach_notification(
 
     if not breach_found:
         severity = "high"
-        findings.append(Finding(
-            id="lc-breach-001",
-            severity=severity,
-            category="breach_notification",
-            title="Breach notification infrastructure not found",
-            detail=(
-                "No breach_notification, notify_breach, or BreachNotification "
-                "patterns found in app/services/ or app/utils/"
-            ),
-            recommendation=(
-                "Implement breach notification service (app/services/breach_notification.py) "
-                "per GDPR Article 33 (72-hour regulator notification) and Article 34 "
-                "(data subject notification for high-risk breaches)."
-            ),
-        ))
-        compliance_findings.append(ComplianceFinding(
-            id="lc-breach-c001",
-            category="breach_notification",
-            severity=severity,
-            title="Breach notification service absent — GDPR Article 33 compliance gap",
-            regulation="GDPR",
-            recommendation=(
-                "GDPR requires notification to supervisory authority within 72 hours of a breach. "
-                "PDPA (Singapore) requires notification to PDPC within 3 days for significant breaches. "
-                "Implement breach_notification.py with email alerts and regulator notification flow."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="lc-breach-001",
+                severity=severity,
+                category="breach_notification",
+                title="Breach notification infrastructure not found",
+                detail=(
+                    "No breach_notification, notify_breach, or BreachNotification "
+                    "patterns found in app/services/ or app/utils/"
+                ),
+                recommendation=(
+                    "Implement breach notification service (app/services/breach_notification.py) "
+                    "per GDPR Article 33 (72-hour regulator notification) and Article 34 "
+                    "(data subject notification for high-risk breaches)."
+                ),
+            )
+        )
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-breach-c001",
+                category="breach_notification",
+                severity=severity,
+                title="Breach notification service absent — GDPR Article 33 compliance gap",
+                regulation="GDPR",
+                recommendation=(
+                    "GDPR requires notification to supervisory authority within 72 hours of a breach. "
+                    "PDPA (Singapore) requires notification to PDPC within 3 days for significant breaches. "
+                    "Implement breach_notification.py with email alerts and regulator notification flow."
+                ),
+            )
+        )
     else:
         patterns_missing = [p for p in breach_patterns if p not in breach_found]
         if patterns_missing:
-            compliance_findings.append(ComplianceFinding(
-                id="lc-breach-c002",
-                category="breach_notification",
-                severity="medium",
-                title=f"Partial breach notification coverage: missing {', '.join(patterns_missing)}",
-                detail=(
-                    f"Found: {', '.join(f'{k} in {v}' for k, v in breach_found.items())}. "
-                    f"Missing patterns: {', '.join(patterns_missing)}"
-                ),
-                regulation="GDPR",
-                recommendation=(
-                    "Ensure breach notification covers both regulator notification (notify_breach) "
-                    "and data subject notification (BreachNotification model/record)."
-                ),
-            ))
+            compliance_findings.append(
+                ComplianceFinding(
+                    id="lc-breach-c002",
+                    category="breach_notification",
+                    severity="medium",
+                    title=f"Partial breach notification coverage: missing {', '.join(patterns_missing)}",
+                    detail=(
+                        f"Found: {', '.join(f'{k} in {v}' for k, v in breach_found.items())}. "
+                        f"Missing patterns: {', '.join(patterns_missing)}"
+                    ),
+                    regulation="GDPR",
+                    recommendation=(
+                        "Ensure breach notification covers both regulator notification (notify_breach) "
+                        "and data subject notification (BreachNotification model/record)."
+                    ),
+                )
+            )
         else:
-            compliance_findings.append(ComplianceFinding(
-                id="lc-breach-c003",
-                category="breach_notification",
-                severity="info",
-                title="Breach notification infrastructure present",
-                detail=(
-                    f"All {len(breach_found)} patterns found: "
-                    + ", ".join(f"{k} in {v}" for k, v in breach_found.items())
-                ),
-                regulation="GDPR",
-                recommendation="Review notification flow covers 72-hour GDPR and 3-day PDPA deadlines.",
-            ))
+            compliance_findings.append(
+                ComplianceFinding(
+                    id="lc-breach-c003",
+                    category="breach_notification",
+                    severity="info",
+                    title="Breach notification infrastructure present",
+                    detail=(
+                        f"All {len(breach_found)} patterns found: "
+                        + ", ".join(f"{k} in {v}" for k, v in breach_found.items())
+                    ),
+                    regulation="GDPR",
+                    recommendation="Review notification flow covers 72-hour GDPR and 3-day PDPA deadlines.",
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -852,7 +935,9 @@ def scan() -> FinanceTeamReport:
     metrics: dict = {}
 
     # Count files available
-    service_py_count = len(list(SERVICES_DIR.glob("*.py"))) if SERVICES_DIR.is_dir() else 0
+    service_py_count = (
+        len(list(SERVICES_DIR.glob("*.py"))) if SERVICES_DIR.is_dir() else 0
+    )
     api_py_count = len(list(API_DIR.glob("*.py"))) if API_DIR.is_dir() else 0
     model_py_count = len(list(MODELS_DIR.glob("*.py"))) if MODELS_DIR.is_dir() else 0
     metrics["services_files_available"] = service_py_count
@@ -891,25 +976,29 @@ def scan() -> FinanceTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": getattr(f, "file", None) or "",
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": getattr(f, "file", None) or "",
+            }
+        )
         file_hint = getattr(f, "file", None) or ""
         if file_hint:
             file_findings[file_hint] = file_findings.get(file_hint, 0) + 1
 
     for cf in compliance_findings:
-        ls.record_finding({
-            "id": cf.id,
-            "severity": cf.severity,
-            "category": cf.category,
-            "title": cf.title,
-            "file": cf.file or "",
-        })
+        ls.record_finding(
+            {
+                "id": cf.id,
+                "severity": cf.severity,
+                "category": cf.category,
+                "title": cf.title,
+                "file": cf.file or "",
+            }
+        )
 
     if file_findings:
         ls.update_attention_weights(file_findings)
@@ -925,14 +1014,21 @@ def scan() -> FinanceTeamReport:
 
     # KPI tracking
     ls.track_kpi("compliance_score", compliance_score)
-    ls.track_kpi("money_transmitter_risk_signals_found",
-                 metrics.get("money_transmitter_risk_signals_found", 0))
-    ls.track_kpi("gdpr_deletion_functions_found",
-                 metrics.get("gdpr_deletion_functions_found", 0))
+    ls.track_kpi(
+        "money_transmitter_risk_signals_found",
+        metrics.get("money_transmitter_risk_signals_found", 0),
+    )
+    ls.track_kpi(
+        "gdpr_deletion_functions_found", metrics.get("gdpr_deletion_functions_found", 0)
+    )
     ls.track_kpi("consent_gates_found", metrics.get("consent_gates_found", 0))
-    ls.track_kpi("security_compliance_score", metrics.get("security_compliance_score", 0.0))
-    ls.track_kpi("breach_notification_patterns_found",
-                 metrics.get("breach_notification_patterns_found", 0))
+    ls.track_kpi(
+        "security_compliance_score", metrics.get("security_compliance_score", 0.0)
+    )
+    ls.track_kpi(
+        "breach_notification_patterns_found",
+        metrics.get("breach_notification_patterns_found", 0),
+    )
 
     # Learning updates
     learning_updates: list[str] = [

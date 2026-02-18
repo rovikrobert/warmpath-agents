@@ -20,7 +20,9 @@ class MarketInsight:
     """A market or competitive insight."""
 
     id: str
-    category: str  # competitive | market_entry | pricing | channel | partnership | compliance
+    category: (
+        str  # competitive | market_entry | pricing | channel | partnership | compliance
+    )
     title: str
     evidence: str = ""
     strategic_impact: str = ""
@@ -35,7 +37,9 @@ class PartnershipOpportunity:
 
     id: str
     partner_name: str
-    partner_type: str = ""  # bootcamp | university | association | co_marketing | strategic
+    partner_type: str = (
+        ""  # bootcamp | university | association | co_marketing | strategic
+    )
     value_prop_to_them: str = ""
     value_prop_to_us: str = ""
     estimated_user_impact: str = ""
@@ -44,7 +48,9 @@ class PartnershipOpportunity:
     stage: str = "identified"  # identified | outreach | conversation | proposal | negotiation | signed
     next_action: str = ""
     legal_review_required: bool = False
-    legal_review_status: str = "not_required"  # pending | approved | blocked | not_required
+    legal_review_status: str = (
+        "not_required"  # pending | approved | blocked | not_required
+    )
 
 
 @dataclass
@@ -66,7 +72,9 @@ class ComplianceReviewItem:
     """A marketing compliance review request/result."""
 
     id: str
-    asset_type: str = ""  # email_campaign | landing_page | content | ad | partnership | launch
+    asset_type: str = (
+        ""  # email_campaign | landing_page | content | ad | partnership | launch
+    )
     description: str = ""
     jurisdiction: str = "global"  # US | Singapore | EU | APAC | global
     submitted_date: str = ""
@@ -91,7 +99,9 @@ class GTMTeamReport:
     scan_duration_seconds: float = 0
     findings: list[Finding] = field(default_factory=list)
     market_insights: list[MarketInsight] = field(default_factory=list)
-    partnership_opportunities: list[PartnershipOpportunity] = field(default_factory=list)
+    partnership_opportunities: list[PartnershipOpportunity] = field(
+        default_factory=list
+    )
     pricing_experiments: list[PricingExperiment] = field(default_factory=list)
     compliance_reviews: list[ComplianceReviewItem] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
@@ -116,9 +126,14 @@ class GTMTeamReport:
     def from_dict(cls, data: dict) -> GTMTeamReport:
         findings = [Finding(**f) for f in data.pop("findings", [])]
         market_insights = [MarketInsight(**i) for i in data.pop("market_insights", [])]
-        partnerships = [PartnershipOpportunity(**p) for p in data.pop("partnership_opportunities", [])]
+        partnerships = [
+            PartnershipOpportunity(**p)
+            for p in data.pop("partnership_opportunities", [])
+        ]
         pricing = [PricingExperiment(**e) for e in data.pop("pricing_experiments", [])]
-        compliance = [ComplianceReviewItem(**c) for c in data.pop("compliance_reviews", [])]
+        compliance = [
+            ComplianceReviewItem(**c) for c in data.pop("compliance_reviews", [])
+        ]
         return cls(
             findings=findings,
             market_insights=market_insights,
@@ -142,7 +157,9 @@ class GTMTeamReport:
             lines.append(f"## Market Insights ({len(self.market_insights)})\n")
             for i in self.market_insights:
                 lines.append(f"### [{i.id}] {i.title}")
-                lines.append(f"**Category:** {i.category} | **Urgency:** {i.urgency} | **Confidence:** {i.confidence}")
+                lines.append(
+                    f"**Category:** {i.category} | **Urgency:** {i.urgency} | **Confidence:** {i.confidence}"
+                )
                 if i.evidence:
                     lines.append(f"{i.evidence}")
                 if i.strategic_impact:
@@ -153,9 +170,13 @@ class GTMTeamReport:
 
         # Partnership opportunities
         if self.partnership_opportunities:
-            lines.append(f"## Partnership Opportunities ({len(self.partnership_opportunities)})\n")
+            lines.append(
+                f"## Partnership Opportunities ({len(self.partnership_opportunities)})\n"
+            )
             for p in self.partnership_opportunities:
-                lines.append(f"- **[{p.id}] {p.partner_name}** ({p.partner_type}, stage: {p.stage})")
+                lines.append(
+                    f"- **[{p.id}] {p.partner_name}** ({p.partner_type}, stage: {p.stage})"
+                )
                 if p.value_prop_to_us:
                     lines.append(f"  - Value to us: {p.value_prop_to_us}")
                 if p.next_action:
@@ -173,12 +194,20 @@ class GTMTeamReport:
         if self.compliance_reviews:
             lines.append(f"## Compliance Reviews ({len(self.compliance_reviews)})\n")
             for c in self.compliance_reviews:
-                lines.append(f"- **[{c.id}]** {c.asset_type}: {c.description} — {c.status}")
+                lines.append(
+                    f"- **[{c.id}]** {c.asset_type}: {c.description} — {c.status}"
+                )
             lines.append("")
 
         # Findings (same format as engineering)
         if self.findings:
-            sev_icons = {"critical": "!!", "high": "!", "medium": "~", "low": ".", "info": " "}
+            sev_icons = {
+                "critical": "!!",
+                "high": "!",
+                "medium": "~",
+                "low": ".",
+                "info": " ",
+            }
             lines.append(f"## Findings ({len(self.findings)})\n")
             for f in sorted(self.findings, key=lambda f: f.sort_key):
                 icon = sev_icons.get(f.severity, "")

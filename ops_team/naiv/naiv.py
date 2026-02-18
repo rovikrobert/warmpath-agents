@@ -70,9 +70,7 @@ _EMPTY_STATE_PATTERNS = re.compile(
 
 # Usage tracking patterns
 _USAGE_LOG_RE = re.compile(r"\bUsageLog\b")
-_TRACKED_ACTION_RE = re.compile(
-    r"action\s*=\s*[\"']([^\"']+)[\"']", re.MULTILINE
-)
+_TRACKED_ACTION_RE = re.compile(r"action\s*=\s*[\"']([^\"']+)[\"']", re.MULTILINE)
 
 
 # ---------------------------------------------------------------------------
@@ -103,9 +101,7 @@ def _find_api_files() -> list[Path]:
     if not API_DIR.exists():
         logger.warning("API directory not found: %s", API_DIR)
         return []
-    return sorted(
-        p for p in API_DIR.glob("*.py") if p.name != "__init__.py"
-    )
+    return sorted(p for p in API_DIR.glob("*.py") if p.name != "__init__.py")
 
 
 def _find_jsx_files() -> list[Path]:
@@ -332,10 +328,14 @@ def _check_journey_milestones(
         all_source += _read_safe(path)
 
     has_first_upload = bool(
-        re.search(r"first.?upload|upload.*success|csv.*success", all_source, re.IGNORECASE)
+        re.search(
+            r"first.?upload|upload.*success|csv.*success", all_source, re.IGNORECASE
+        )
     )
     has_first_search = bool(
-        re.search(r"first.?search|search.*complete|results.*found", all_source, re.IGNORECASE)
+        re.search(
+            r"first.?search|search.*complete|results.*found", all_source, re.IGNORECASE
+        )
     )
 
     if not has_first_upload:
@@ -461,9 +461,7 @@ def _check_usage_tracking(
             )
 
     total = len(api_files)
-    tracking_coverage = (
-        round(files_with_tracking / total, 2) if total > 0 else 0
-    )
+    tracking_coverage = round(files_with_tracking / total, 2) if total > 0 else 0
     metrics["usage_tracking_files_with"] = files_with_tracking
     metrics["usage_tracking_files_without"] = files_without_tracking
     metrics["usage_tracking_coverage"] = tracking_coverage
@@ -490,8 +488,14 @@ def _check_empty_states(
 
     # Pages that are likely to need empty states (data-driven pages)
     data_pages = {
-        "ContactsPage", "ApplicationsPage", "CreditsPage", "Dashboard",
-        "FindReferrals", "SearchResults", "ReferralResults", "MyRequests",
+        "ContactsPage",
+        "ApplicationsPage",
+        "CreditsPage",
+        "Dashboard",
+        "FindReferrals",
+        "SearchResults",
+        "ReferralResults",
+        "MyRequests",
         "MarketplaceDashboard",
     }
 
@@ -597,7 +601,9 @@ def scan() -> OpsTeamReport:
         metrics["milestones_check_error"] = str(exc)
 
     try:
-        _check_usage_tracking(api_files, middleware_source, findings, sat_findings, metrics)
+        _check_usage_tracking(
+            api_files, middleware_source, findings, sat_findings, metrics
+        )
     except Exception as exc:
         logger.error("Usage tracking check failed: %s", exc)
         metrics["tracking_check_error"] = str(exc)
@@ -636,11 +642,17 @@ def scan() -> OpsTeamReport:
 
         # Track satisfaction KPIs
         if "error_handling_coverage" in metrics:
-            learner.track_kpi("error_handling_coverage", metrics["error_handling_coverage"])
+            learner.track_kpi(
+                "error_handling_coverage", metrics["error_handling_coverage"]
+            )
         if "feedback_collection_points" in metrics:
-            learner.track_kpi("feedback_collection_points", metrics["feedback_collection_points"])
+            learner.track_kpi(
+                "feedback_collection_points", metrics["feedback_collection_points"]
+            )
         if "usage_tracking_coverage" in metrics:
-            learner.track_kpi("usage_tracking_coverage", metrics["usage_tracking_coverage"])
+            learner.track_kpi(
+                "usage_tracking_coverage", metrics["usage_tracking_coverage"]
+            )
 
         # Record scan
         learner.record_scan(
@@ -672,7 +684,9 @@ def scan() -> OpsTeamReport:
         # Check trends for learning updates
         err_trend = learner.get_kpi_trend("error_handling_coverage")
         if err_trend == "improving":
-            learning_updates.append("Error handling coverage is IMPROVING across scans.")
+            learning_updates.append(
+                "Error handling coverage is IMPROVING across scans."
+            )
         elif err_trend == "degrading":
             learning_updates.append(
                 "Error handling coverage is DEGRADING — new endpoints may lack custom errors."

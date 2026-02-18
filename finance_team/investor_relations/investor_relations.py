@@ -75,21 +75,25 @@ def _check_test_count_claims(
     metrics["test_count_claimed"] = claimed_count
 
     if claimed_count is None:
-        findings.append(Finding(
-            id="ir-tests-000",
-            severity="low",
-            category="investor_readiness",
-            title="No test count claim found in CLAUDE.md",
-            detail="Could not detect a '**N tests**' or 'N tests' pattern in CLAUDE.md",
-            file=_relative(claude_md_path),
-            recommendation="Add test count to CLAUDE.md Current Status section for data room accuracy",
-        ))
+        findings.append(
+            Finding(
+                id="ir-tests-000",
+                severity="low",
+                category="investor_readiness",
+                title="No test count claim found in CLAUDE.md",
+                detail="Could not detect a '**N tests**' or 'N tests' pattern in CLAUDE.md",
+                file=_relative(claude_md_path),
+                recommendation="Add test count to CLAUDE.md Current Status section for data room accuracy",
+            )
+        )
         metrics["test_count_actual"] = None
         metrics["test_count_delta_pct"] = None
         return
 
     # Count actual test functions/classes across tests/ directory
-    test_files = list(TESTS_DIR.glob("test_*.py")) + list(TESTS_DIR.glob("**/test_*.py"))
+    test_files = list(TESTS_DIR.glob("test_*.py")) + list(
+        TESTS_DIR.glob("**/test_*.py")
+    )
     test_files = list(set(test_files))  # deduplicate
     metrics["test_file_count"] = len(test_files)
 
@@ -111,34 +115,40 @@ def _check_test_count_claims(
 
     if delta_pct > 10:
         severity = "high" if delta_pct > 30 else "medium"
-        findings.append(Finding(
-            id="ir-tests-001",
-            severity=severity,
-            category="investor_readiness",
-            title=f"Test count claim in CLAUDE.md is off by {delta_pct:.1f}%",
-            detail=(
-                f"CLAUDE.md claims {claimed_count} tests; "
-                f"found {actual_count} test functions/classes across {len(test_files)} files"
-            ),
-            file=_relative(claude_md_path),
-            recommendation=(
-                f"Update CLAUDE.md to reflect actual test count (~{actual_count}). "
-                "Investors rely on this number for due diligence."
-            ),
-        ))
-        fin_findings.append(FinancialFinding(
-            id="ir-fin-tests-001",
-            category="billing",
-            severity=severity,
-            title=f"Data room test count inaccurate: claimed {claimed_count}, actual ~{actual_count}",
-            file=_relative(claude_md_path),
-            detail=f"Delta: {delta_pct:.1f}% off. Data room accuracy matters for investor trust.",
-            recommendation="Sync CLAUDE.md test count with pytest output before sharing with investors.",
-        ))
+        findings.append(
+            Finding(
+                id="ir-tests-001",
+                severity=severity,
+                category="investor_readiness",
+                title=f"Test count claim in CLAUDE.md is off by {delta_pct:.1f}%",
+                detail=(
+                    f"CLAUDE.md claims {claimed_count} tests; "
+                    f"found {actual_count} test functions/classes across {len(test_files)} files"
+                ),
+                file=_relative(claude_md_path),
+                recommendation=(
+                    f"Update CLAUDE.md to reflect actual test count (~{actual_count}). "
+                    "Investors rely on this number for due diligence."
+                ),
+            )
+        )
+        fin_findings.append(
+            FinancialFinding(
+                id="ir-fin-tests-001",
+                category="billing",
+                severity=severity,
+                title=f"Data room test count inaccurate: claimed {claimed_count}, actual ~{actual_count}",
+                file=_relative(claude_md_path),
+                detail=f"Delta: {delta_pct:.1f}% off. Data room accuracy matters for investor trust.",
+                recommendation="Sync CLAUDE.md test count with pytest output before sharing with investors.",
+            )
+        )
     else:
         logger.info(
             "investor_relations: test count within tolerance — claimed=%d actual=%d delta=%.1f%%",
-            claimed_count, actual_count, delta_pct,
+            claimed_count,
+            actual_count,
+            delta_pct,
         )
 
 
@@ -178,33 +188,42 @@ def _check_todo_fixme_debt(
         title = f"High technical debt: {total_debt} TODO/FIXME/HACK/XXX markers in app/"
     elif total_debt > 20:
         severity = "medium"
-        title = f"Moderate technical debt: {total_debt} TODO/FIXME/HACK/XXX markers in app/"
+        title = (
+            f"Moderate technical debt: {total_debt} TODO/FIXME/HACK/XXX markers in app/"
+        )
     else:
-        logger.info("investor_relations: technical debt within acceptable range (%d markers)", total_debt)
+        logger.info(
+            "investor_relations: technical debt within acceptable range (%d markers)",
+            total_debt,
+        )
         return
 
-    findings.append(Finding(
-        id="ir-debt-001",
-        severity=severity,
-        category="investor_readiness",
-        title=title,
-        detail=(
-            f"{total_debt} debt markers across {len(debt_by_file)} files. "
-            f"Top files: {', '.join(f for f, _ in top_files)}"
-        ),
-        recommendation=(
-            "Resolve or document debt before investor due diligence. "
-            "High TODO counts signal incomplete work to technical reviewers."
-        ),
-    ))
-    fin_findings.append(FinancialFinding(
-        id="ir-fin-debt-001",
-        category="billing",
-        severity=severity,
-        title=f"Technical debt ({total_debt} markers) may concern investors in due diligence",
-        detail=f"{len(debt_by_file)} files affected. Top: {', '.join(f for f, _ in top_files)}",
-        recommendation="Address critical TODOs and annotate deferred items with issue references.",
-    ))
+    findings.append(
+        Finding(
+            id="ir-debt-001",
+            severity=severity,
+            category="investor_readiness",
+            title=title,
+            detail=(
+                f"{total_debt} debt markers across {len(debt_by_file)} files. "
+                f"Top files: {', '.join(f for f, _ in top_files)}"
+            ),
+            recommendation=(
+                "Resolve or document debt before investor due diligence. "
+                "High TODO counts signal incomplete work to technical reviewers."
+            ),
+        )
+    )
+    fin_findings.append(
+        FinancialFinding(
+            id="ir-fin-debt-001",
+            category="billing",
+            severity=severity,
+            title=f"Technical debt ({total_debt} markers) may concern investors in due diligence",
+            detail=f"{len(debt_by_file)} files affected. Top: {', '.join(f for f, _ in top_files)}",
+            recommendation="Address critical TODOs and annotate deferred items with issue references.",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -244,26 +263,31 @@ def _check_schema_maturity(
 
     logger.info(
         "investor_relations: schema maturity — models=%d columns=%d relationships=%d migrations=%d",
-        model_count, column_count, relationship_count, migration_count,
+        model_count,
+        column_count,
+        relationship_count,
+        migration_count,
     )
 
     if migration_count < model_count:
-        findings.append(Finding(
-            id="ir-schema-001",
-            severity="medium",
-            category="investor_readiness",
-            title=f"Migration count ({migration_count}) is less than model count ({model_count})",
-            detail=(
-                f"{model_count} model files found in app/models/ but only {migration_count} "
-                f"Alembic migration files in alembic/versions/. "
-                f"Some models may not be covered by migrations."
-            ),
-            file=_relative(MODELS_DIR),
-            recommendation=(
-                "Run 'alembic revision --autogenerate' to detect schema drift. "
-                "All production models must have corresponding migrations for reliable deploys."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="ir-schema-001",
+                severity="medium",
+                category="investor_readiness",
+                title=f"Migration count ({migration_count}) is less than model count ({model_count})",
+                detail=(
+                    f"{model_count} model files found in app/models/ but only {migration_count} "
+                    f"Alembic migration files in alembic/versions/. "
+                    f"Some models may not be covered by migrations."
+                ),
+                file=_relative(MODELS_DIR),
+                recommendation=(
+                    "Run 'alembic revision --autogenerate' to detect schema drift. "
+                    "All production models must have corresponding migrations for reliable deploys."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +308,9 @@ def _check_feature_completeness(
     source = _read_safe(claude_md_path)
 
     # Isolate the Current Status section to avoid counting unrelated checkboxes
-    status_match = re.search(r"##\s+Current Status(.*?)(?=\n##\s|\Z)", source, re.DOTALL)
+    status_match = re.search(
+        r"##\s+Current Status(.*?)(?=\n##\s|\Z)", source, re.DOTALL
+    )
     search_text = status_match.group(1) if status_match else source
 
     done_count = len(_CHECKBOX_DONE.findall(search_text))
@@ -297,7 +323,9 @@ def _check_feature_completeness(
 
     if total == 0:
         metrics["feature_completion_ratio"] = None
-        logger.info("investor_relations: no checkboxes found in CLAUDE.md Current Status section")
+        logger.info(
+            "investor_relations: no checkboxes found in CLAUDE.md Current Status section"
+        )
         return
 
     ratio = done_count / total
@@ -305,34 +333,40 @@ def _check_feature_completeness(
 
     logger.info(
         "investor_relations: feature completion — done=%d pending=%d ratio=%.2f",
-        done_count, pending_count, ratio,
+        done_count,
+        pending_count,
+        ratio,
     )
 
     if ratio < 0.5:
-        findings.append(Finding(
-            id="ir-completeness-001",
-            severity="medium",
-            category="investor_readiness",
-            title=f"Feature completion ratio is {ratio:.0%} ({done_count}/{total} items done)",
-            detail=(
-                f"{pending_count} roadmap items remain incomplete. "
-                f"Investors reviewing CLAUDE.md will see significant pending work."
-            ),
-            file=_relative(claude_md_path),
-            recommendation=(
-                "Prioritise completing post-launch items or explicitly move them to a "
-                "backlog section so the Current Status section reflects ship-ready state."
-            ),
-        ))
-        fin_findings.append(FinancialFinding(
-            id="ir-fin-completeness-001",
-            category="billing",
-            severity="medium",
-            title=f"Only {ratio:.0%} of tracked features complete — investor perception risk",
-            file=_relative(claude_md_path),
-            detail=f"{pending_count} incomplete items visible in CLAUDE.md data room document.",
-            recommendation="Complete or deprioritise pending items before investor calls.",
-        ))
+        findings.append(
+            Finding(
+                id="ir-completeness-001",
+                severity="medium",
+                category="investor_readiness",
+                title=f"Feature completion ratio is {ratio:.0%} ({done_count}/{total} items done)",
+                detail=(
+                    f"{pending_count} roadmap items remain incomplete. "
+                    f"Investors reviewing CLAUDE.md will see significant pending work."
+                ),
+                file=_relative(claude_md_path),
+                recommendation=(
+                    "Prioritise completing post-launch items or explicitly move them to a "
+                    "backlog section so the Current Status section reflects ship-ready state."
+                ),
+            )
+        )
+        fin_findings.append(
+            FinancialFinding(
+                id="ir-fin-completeness-001",
+                category="billing",
+                severity="medium",
+                title=f"Only {ratio:.0%} of tracked features complete — investor perception risk",
+                file=_relative(claude_md_path),
+                detail=f"{pending_count} incomplete items visible in CLAUDE.md data room document.",
+                recommendation="Complete or deprioritise pending items before investor calls.",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -372,12 +406,16 @@ def _check_security_posture(
         APP_DIR / "utils" / "security.py",
     ]:
         content = _read_safe(candidate)
-        if content and ("jwt" in content.lower() or "jose" in content.lower() or "JWT" in content):
+        if content and (
+            "jwt" in content.lower() or "jose" in content.lower() or "JWT" in content
+        ):
             jwt_found = True
             break
     if not jwt_found:
         # Broader search across all utils/*.py
-        for util_file in (APP_DIR / "utils").glob("*.py") if (APP_DIR / "utils").is_dir() else []:
+        for util_file in (
+            (APP_DIR / "utils").glob("*.py") if (APP_DIR / "utils").is_dir() else []
+        ):
             content = _read_safe(util_file)
             if "jwt" in content.lower() or "jose" in content.lower():
                 jwt_found = True
@@ -400,7 +438,11 @@ def _check_security_posture(
             break
     if not rate_limit_found:
         # Broader search
-        for src in (APP_DIR / "middleware").glob("*.py") if (APP_DIR / "middleware").is_dir() else []:
+        for src in (
+            (APP_DIR / "middleware").glob("*.py")
+            if (APP_DIR / "middleware").is_dir()
+            else []
+        ):
             content = _read_safe(src)
             if re.search(r"rate.?limit", content, re.IGNORECASE):
                 rate_limit_found = True
@@ -449,34 +491,40 @@ def _check_security_posture(
 
     logger.info(
         "investor_relations: security posture score=%d (%d/%d checks passed)",
-        score, len(checks_passed), total_checks,
+        score,
+        len(checks_passed),
+        total_checks,
     )
 
     if checks_failed:
         severity = "high" if len(checks_failed) >= 3 else "medium"
-        findings.append(Finding(
-            id="ir-security-001",
-            severity=severity,
-            category="investor_readiness",
-            title=f"Security posture score: {score}/100 — {len(checks_failed)} checks failed",
-            detail=f"Failed: {', '.join(checks_failed)}. Passed: {', '.join(checks_passed)}.",
-            recommendation=(
-                "Implement missing security controls before investor technical due diligence. "
-                "Investors will assess security posture as a proxy for engineering maturity."
-            ),
-        ))
-        if score < 60:
-            fin_findings.append(FinancialFinding(
-                id="ir-fin-security-001",
-                category="billing",
+        findings.append(
+            Finding(
+                id="ir-security-001",
                 severity=severity,
-                title=f"Low security posture ({score}/100) is a fundraising risk",
-                detail=f"Missing: {', '.join(checks_failed)}",
+                category="investor_readiness",
+                title=f"Security posture score: {score}/100 — {len(checks_failed)} checks failed",
+                detail=f"Failed: {', '.join(checks_failed)}. Passed: {', '.join(checks_passed)}.",
                 recommendation=(
-                    "Security gaps discovered in due diligence can block or delay funding rounds. "
-                    "Address high-priority gaps before Series A conversations."
+                    "Implement missing security controls before investor technical due diligence. "
+                    "Investors will assess security posture as a proxy for engineering maturity."
                 ),
-            ))
+            )
+        )
+        if score < 60:
+            fin_findings.append(
+                FinancialFinding(
+                    id="ir-fin-security-001",
+                    category="billing",
+                    severity=severity,
+                    title=f"Low security posture ({score}/100) is a fundraising risk",
+                    detail=f"Missing: {', '.join(checks_failed)}",
+                    recommendation=(
+                        "Security gaps discovered in due diligence can block or delay funding rounds. "
+                        "Address high-priority gaps before Series A conversations."
+                    ),
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -524,26 +572,30 @@ def _check_agent_team_maturity(
 
     logger.info(
         "investor_relations: agent team maturity — %d teams, %d/%d with orchestrator",
-        team_count, len(teams_with_orchestrator), team_count,
+        team_count,
+        len(teams_with_orchestrator),
+        team_count,
     )
 
     if teams_missing_orchestrator:
-        findings.append(Finding(
-            id="ir-agents-001",
-            severity="low",
-            category="investor_readiness",
-            title=(
-                f"{len(teams_missing_orchestrator)} agent team(s) missing orchestrator.py"
-            ),
-            detail=(
-                f"Teams without orchestrator: {', '.join(teams_missing_orchestrator)}. "
-                f"Coverage: {coverage_ratio:.0%} ({len(teams_with_orchestrator)}/{team_count})."
-            ),
-            recommendation=(
-                "Each agent team should have an orchestrator.py as the CLI entry point. "
-                "Incomplete teams reduce the investor story around autonomous engineering operations."
-            ),
-        ))
+        findings.append(
+            Finding(
+                id="ir-agents-001",
+                severity="low",
+                category="investor_readiness",
+                title=(
+                    f"{len(teams_missing_orchestrator)} agent team(s) missing orchestrator.py"
+                ),
+                detail=(
+                    f"Teams without orchestrator: {', '.join(teams_missing_orchestrator)}. "
+                    f"Coverage: {coverage_ratio:.0%} ({len(teams_with_orchestrator)}/{team_count})."
+                ),
+                recommendation=(
+                    "Each agent team should have an orchestrator.py as the CLI entry point. "
+                    "Incomplete teams reduce the investor story around autonomous engineering operations."
+                ),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -577,13 +629,15 @@ def scan() -> FinanceTeamReport:
 
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({
-            "id": f.id,
-            "severity": f.severity,
-            "category": f.category,
-            "title": f.title,
-            "file": f.file,
-        })
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
 

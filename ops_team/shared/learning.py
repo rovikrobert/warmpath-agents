@@ -130,7 +130,9 @@ def _migrate_state(state: dict) -> dict:
     """Add missing keys with sane defaults — never modifies existing keys."""
     for key, default in _STATE_DEFAULTS.items():
         if key not in state:
-            state[key] = default if not isinstance(default, (list, dict)) else type(default)()
+            state[key] = (
+                default if not isinstance(default, (list, dict)) else type(default)()
+            )
     return state
 
 
@@ -151,7 +153,10 @@ def _load_state(agent: str) -> dict:
             return _migrate_state(state)
         except (json.JSONDecodeError, OSError):
             logger.warning("Corrupt state for %s, resetting", agent)
-    return {k: (v if not isinstance(v, (list, dict)) else type(v)()) for k, v in _STATE_DEFAULTS.items()}
+    return {
+        k: (v if not isinstance(v, (list, dict)) else type(v)())
+        for k, v in _STATE_DEFAULTS.items()
+    }
 
 
 def _save_state(agent: str, state: dict) -> None:
@@ -183,10 +188,12 @@ class OpsLearningState:
     def record_scan(self, metrics: dict[str, Any]) -> None:
         self.state["last_scan"] = datetime.now(timezone.utc).isoformat()
         self.state["total_scans"] = self.state.get("total_scans", 0) + 1
-        self.state["metrics_history"].append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "metrics": metrics,
-        })
+        self.state["metrics_history"].append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "metrics": metrics,
+            }
+        )
         self.state["metrics_history"] = self.state["metrics_history"][-90:]
         self.save()
 
@@ -379,7 +386,9 @@ class OpsLearningState:
             if isinstance(existing, dict):
                 current_val = existing.get("weight", 1.0)
                 try:
-                    last_dt = datetime.fromisoformat(existing.get("last_updated", now_iso))
+                    last_dt = datetime.fromisoformat(
+                        existing.get("last_updated", now_iso)
+                    )
                     if last_dt.tzinfo is None:
                         last_dt = last_dt.replace(tzinfo=timezone.utc)
                     days_since = (datetime.now(timezone.utc) - last_dt).days
@@ -408,12 +417,14 @@ class OpsLearningState:
         items = []
         for filepath, data in weights.items():
             if isinstance(data, dict):
-                items.append(AttentionWeight(
-                    file=filepath,
-                    weight=data.get("weight", 1.0),
-                    last_updated=data.get("last_updated", ""),
-                    reason=data.get("reason", ""),
-                ))
+                items.append(
+                    AttentionWeight(
+                        file=filepath,
+                        weight=data.get("weight", 1.0),
+                        last_updated=data.get("last_updated", ""),
+                        reason=data.get("reason", ""),
+                    )
+                )
             elif isinstance(data, (int, float)):
                 items.append(AttentionWeight(file=filepath, weight=float(data)))
         items.sort(key=lambda x: x.weight, reverse=True)
@@ -433,10 +444,12 @@ class OpsLearningState:
 
     def track_kpi(self, kpi_name: str, value: float | str) -> None:
         history = self.state["kpi_history"].setdefault(kpi_name, [])
-        history.append({
-            "value": value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        history.append(
+            {
+                "value": value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self.state["kpi_history"][kpi_name] = history[-90:]
         self.save()
 
@@ -444,7 +457,9 @@ class OpsLearningState:
         history = self.state["kpi_history"].get(kpi_name, [])
         if len(history) < 2:
             return "insufficient_data"
-        values = [h["value"] for h in history if isinstance(h.get("value"), (int, float))]
+        values = [
+            h["value"] for h in history if isinstance(h.get("value"), (int, float))
+        ]
         if len(values) < 2:
             return "insufficient_data"
         mid = len(values) // 2
@@ -459,10 +474,12 @@ class OpsLearningState:
     # -- Prediction tracking -------------------------------------------------
 
     def record_prediction(self, prediction: dict) -> None:
-        self.state["predictions"].append({
-            **prediction,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self.state["predictions"].append(
+            {
+                **prediction,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self.state["predictions"] = self.state["predictions"][-50:]
         self.save()
 
@@ -516,9 +533,7 @@ class OpsLearningState:
         self, name: str, source: str, effectiveness: float = 0.0
     ) -> None:
         """Record a methodology/best practice adopted."""
-        entry = MethodologyRecord(
-            name=name, source=source, effectiveness=effectiveness
-        )
+        entry = MethodologyRecord(name=name, source=source, effectiveness=effectiveness)
         self.state["methodologies"].append(asdict(entry))
         self.state["methodologies"] = self.state["methodologies"][-50:]
         self.save()
@@ -531,7 +546,9 @@ class OpsLearningState:
         """Record a point-in-time ops health score."""
         snapshot = HealthSnapshot(score=score, finding_counts=finding_counts)
         self.state["codebase_health_history"].append(asdict(snapshot))
-        self.state["codebase_health_history"] = self.state["codebase_health_history"][-90:]
+        self.state["codebase_health_history"] = self.state["codebase_health_history"][
+            -90:
+        ]
         self.save()
 
     def get_health_trajectory(self, window: int = 90) -> str:
@@ -576,9 +593,7 @@ class OpsLearningState:
         escalated = [
             {"key": k, **v} for k, v in patterns.items() if v.get("auto_escalated")
         ]
-        systemic = [
-            {"key": k, **v} for k, v in patterns.items() if v.get("systemic")
-        ]
+        systemic = [{"key": k, **v} for k, v in patterns.items() if v.get("systemic")]
 
         # Fix effectiveness
         resolutions = self.state.get("resolutions", {})
@@ -590,7 +605,9 @@ class OpsLearningState:
 
         effective_count = sum(1 for r in fix_records if r.get("effective"))
         total_checked = len(fix_records)
-        fix_rate = round(effective_count / total_checked, 3) if total_checked > 0 else None
+        fix_rate = (
+            round(effective_count / total_checked, 3) if total_checked > 0 else None
+        )
 
         # Tool reliability
         tool_reliability = self.get_tool_reliability()

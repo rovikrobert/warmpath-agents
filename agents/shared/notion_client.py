@@ -64,7 +64,9 @@ class NotionClient:
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as e:
-            logger.error("Notion API error %s: %s", e.response.status_code, e.response.text)
+            logger.error(
+                "Notion API error %s: %s", e.response.status_code, e.response.text
+            )
             return {
                 "object": "error",
                 "status": e.response.status_code,

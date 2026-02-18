@@ -98,8 +98,12 @@ def generate_daily_brief(reports: list[OpsTeamReport] | None = None) -> str:
 
     lines.append(f"| Coaching Quality | {coaching_score} | {_status(coaching_score)} |")
     lines.append(f"| Supply Activation | {supply_score} | {_status(supply_score)} |")
-    lines.append(f"| User Satisfaction | {satisfaction_score} | {_status(satisfaction_score)} |")
-    lines.append(f"| Marketplace Health | {marketplace_score} | {_status(marketplace_score)} |")
+    lines.append(
+        f"| User Satisfaction | {satisfaction_score} | {_status(satisfaction_score)} |"
+    )
+    lines.append(
+        f"| Marketplace Health | {marketplace_score} | {_status(marketplace_score)} |"
+    )
     lines.append("")
 
     # Top findings
@@ -139,7 +143,9 @@ def generate_daily_brief(reports: list[OpsTeamReport] | None = None) -> str:
             if any(f.severity == sev for f in r.findings):
                 worst = sev
                 break
-        lines.append(f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s")
+        lines.append(
+            f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s"
+        )
     lines.append("")
 
     # Learning Updates
@@ -156,8 +162,10 @@ def generate_daily_brief(reports: list[OpsTeamReport] | None = None) -> str:
             total_scans = report.get("total_scans", 0)
             escalated = len(report.get("escalated_patterns", []))
             if total_scans > 0:
-                lines.append(f"- **{agent_name} meta**: {total_scans} scans, "
-                             f"health={trajectory}, escalated={escalated}")
+                lines.append(
+                    f"- **{agent_name} meta**: {total_scans} scans, "
+                    f"health={trajectory}, escalated={escalated}"
+                )
         except Exception:
             pass
     lines.append("")
@@ -213,9 +221,15 @@ def generate_weekly_report(reports: list[OpsTeamReport] | None = None) -> str:
     mkt = all_metrics.get("marketplace_completeness", 0)
     mkt_val = mkt if isinstance(mkt, (int, float)) else 0
 
-    lines.append(f"| Coaching | {'Good' if coaching_val >= 0.80 else 'Needs Work'} | Score: {coaching} |")
-    lines.append(f"| Supply Activation | {'Good' if supply_val >= 0.70 else 'Needs Work'} | Score: {supply} |")
-    lines.append(f"| Marketplace | {'Good' if mkt_val >= 0.80 else 'Needs Work'} | Score: {mkt} |")
+    lines.append(
+        f"| Coaching | {'Good' if coaching_val >= 0.80 else 'Needs Work'} | Score: {coaching} |"
+    )
+    lines.append(
+        f"| Supply Activation | {'Good' if supply_val >= 0.70 else 'Needs Work'} | Score: {supply} |"
+    )
+    lines.append(
+        f"| Marketplace | {'Good' if mkt_val >= 0.80 else 'Needs Work'} | Score: {mkt} |"
+    )
     lines.append("")
 
     # Findings by category
@@ -266,6 +280,7 @@ def generate_monthly_review(reports: list[OpsTeamReport] | None = None) -> str:
     # KPI Progress
     lines.append("## KPI Progress\n")
     from ops_team.shared.config import KPI_TARGETS
+
     lines.append("| KPI | Target | Current | Status |")
     lines.append("|-----|--------|---------|--------|")
     for kpi_name, kpi_def in KPI_TARGETS.items():
@@ -287,9 +302,13 @@ def generate_monthly_review(reports: list[OpsTeamReport] | None = None) -> str:
     if critical_count == 0:
         lines.append("- Ecosystem is healthy. Focus on scaling supply side.")
     elif critical_count <= 3:
-        lines.append(f"- {critical_count} critical/high issues need attention before launch push.")
+        lines.append(
+            f"- {critical_count} critical/high issues need attention before launch push."
+        )
     else:
-        lines.append(f"- {critical_count} critical/high issues detected. Prioritize fixes before expanding.")
+        lines.append(
+            f"- {critical_count} critical/high issues detected. Prioritize fixes before expanding."
+        )
     lines.append(f"- Total findings across ops: {total_count}")
     lines.append("")
 
@@ -322,13 +341,15 @@ def scan() -> OpsTeamReport:
         if f.severity in ("critical", "high") and f.category:
             target = _infer_target_team(f.category)
             if target:
-                cross_team.append({
-                    "target_team": target,
-                    "urgency": f.severity,
-                    "request": f"Fix: {f.title}",
-                    "source_agent": f.id.split("-")[0] if "-" in f.id else "ops",
-                    "finding_id": f.id,
-                })
+                cross_team.append(
+                    {
+                        "target_team": target,
+                        "urgency": f.severity,
+                        "request": f"Fix: {f.title}",
+                        "source_agent": f.id.split("-")[0] if "-" in f.id else "ops",
+                        "finding_id": f.id,
+                    }
+                )
 
     # Ecosystem summary metrics
     metrics["ops_agents_reporting"] = len(reports)
@@ -360,9 +381,20 @@ def scan() -> OpsTeamReport:
 
 def _infer_target_team(category: str) -> str | None:
     """Map finding category to target team for cross-team requests."""
-    engineering_cats = {"streaming", "api_quality", "error_handling", "security", "performance"}
+    engineering_cats = {
+        "streaming",
+        "api_quality",
+        "error_handling",
+        "security",
+        "performance",
+    }
     data_cats = {"instrumentation", "data_quality", "model_calibration"}
-    product_cats = {"ux_quality", "empty_state", "journey_milestone", "feedback_collection"}
+    product_cats = {
+        "ux_quality",
+        "empty_state",
+        "journey_milestone",
+        "feedback_collection",
+    }
 
     if category in engineering_cats:
         return "engineering"

@@ -277,13 +277,17 @@ class ExternalIntelligence:
         for category, is_fresh in freshness.items():
             if not is_fresh:
                 meta = INTEL_CATEGORIES.get(category, {})
-                agenda.append({
-                    "category": category,
-                    "question": f"What are the latest updates for: {meta.get('description', category)}?",
-                    "source": meta.get("source", "unknown"),
-                    "relevant_agents": meta.get("agents", []),
-                    "priority": "high" if category in ("python_advisories", "api_status") else "medium",
-                })
+                agenda.append(
+                    {
+                        "category": category,
+                        "question": f"What are the latest updates for: {meta.get('description', category)}?",
+                        "source": meta.get("source", "unknown"),
+                        "relevant_agents": meta.get("agents", []),
+                        "priority": "high"
+                        if category in ("python_advisories", "api_status")
+                        else "medium",
+                    }
+                )
 
         # Sort by priority
         priority_order = {"high": 0, "medium": 1, "low": 2}

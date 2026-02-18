@@ -42,9 +42,7 @@ def get_team_cost_summary(reports: list[AgentReport]) -> dict[str, Any]:
     }
 
 
-def check_budget_alerts(
-    costs: dict[str, Any], budgets: dict[str, Any]
-) -> list[str]:
+def check_budget_alerts(costs: dict[str, Any], budgets: dict[str, Any]) -> list[str]:
     """Flag agents/teams exceeding budget thresholds.
 
     Args:
@@ -66,9 +64,11 @@ def check_budget_alerts(
             )
 
     cos_max = budgets.get("cos_daily_max_tokens", 3000)
-    cos_tokens = costs.get("agent_breakdown", {}).get(
-        "chief_of_staff", {}
-    ).get("estimated_tokens", 0)
+    cos_tokens = (
+        costs.get("agent_breakdown", {})
+        .get("chief_of_staff", {})
+        .get("estimated_tokens", 0)
+    )
     if cos_max > 0 and cos_tokens > 0:
         cos_util = (cos_tokens / cos_max) * 100
         if cos_util >= threshold_pct:

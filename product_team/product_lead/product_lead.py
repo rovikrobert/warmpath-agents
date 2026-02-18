@@ -114,7 +114,9 @@ def generate_daily_brief(reports: list[ProductTeamReport] | None = None) -> str:
             if any(f.severity == sev for f in r.findings):
                 worst = sev
                 break
-        lines.append(f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s")
+        lines.append(
+            f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s"
+        )
     lines.append("")
 
     # Learning Updates
@@ -131,8 +133,10 @@ def generate_daily_brief(reports: list[ProductTeamReport] | None = None) -> str:
             total_scans = report.get("total_scans", 0)
             escalated = len(report.get("escalated_patterns", []))
             if total_scans > 0:
-                lines.append(f"- **{agent_name} meta**: {total_scans} scans, "
-                             f"health={trajectory}, escalated={escalated}")
+                lines.append(
+                    f"- **{agent_name} meta**: {total_scans} scans, "
+                    f"health={trajectory}, escalated={escalated}"
+                )
         except Exception:
             pass
     lines.append("")
@@ -188,9 +192,15 @@ def generate_weekly_report(reports: list[ProductTeamReport] | None = None) -> st
     fc_ok = all_metrics.get("feature_coverage_score", 0)
     fc_ok_val = fc_ok if isinstance(fc_ok, (int, float)) else 0
 
-    lines.append(f"| UX Health | {'Good' if ux_ok_val >= 70 else 'Needs Work'} | Score: {ux_ok} |")
-    lines.append(f"| Design System | {'Good' if ds_ok_val >= 90 else 'Needs Work'} | Score: {ds_ok}% |")
-    lines.append(f"| Feature Coverage | {'Good' if fc_ok_val >= 0.9 else 'Gaps'} | Score: {fc_ok} |")
+    lines.append(
+        f"| UX Health | {'Good' if ux_ok_val >= 70 else 'Needs Work'} | Score: {ux_ok} |"
+    )
+    lines.append(
+        f"| Design System | {'Good' if ds_ok_val >= 90 else 'Needs Work'} | Score: {ds_ok}% |"
+    )
+    lines.append(
+        f"| Feature Coverage | {'Good' if fc_ok_val >= 0.9 else 'Gaps'} | Score: {fc_ok} |"
+    )
     lines.append("")
 
     # Findings by category
@@ -209,11 +219,15 @@ def generate_weekly_report(reports: list[ProductTeamReport] | None = None) -> st
             ls = ProductLearningState(agent_name)
             report = ls.generate_meta_learning_report()
             lines.append(f"### {agent_name}")
-            lines.append(f"- Scans: {report['total_scans']}, "
-                         f"Findings tracked: {report['total_findings_tracked']}")
+            lines.append(
+                f"- Scans: {report['total_scans']}, "
+                f"Findings tracked: {report['total_findings_tracked']}"
+            )
             lines.append(f"- Health trajectory: {report['health_trajectory']}")
             if report.get("escalated_patterns"):
-                lines.append(f"- Escalated patterns: {len(report['escalated_patterns'])}")
+                lines.append(
+                    f"- Escalated patterns: {len(report['escalated_patterns'])}"
+                )
             lines.append("")
         except Exception:
             pass
@@ -223,10 +237,14 @@ def generate_weekly_report(reports: list[ProductTeamReport] | None = None) -> st
         pi = ProductIntelligence()
         intel_report = pi.generate_intel_report()
         lines.append("## Intelligence Status\n")
-        lines.append(f"- Categories: {intel_report['categories_fresh']} fresh / "
-                     f"{intel_report['categories_stale']} stale of {intel_report['categories_total']}")
-        lines.append(f"- Total items: {intel_report['total_items']}, "
-                     f"Urgent: {intel_report['urgent_items']}")
+        lines.append(
+            f"- Categories: {intel_report['categories_fresh']} fresh / "
+            f"{intel_report['categories_stale']} stale of {intel_report['categories_total']}"
+        )
+        lines.append(
+            f"- Total items: {intel_report['total_items']}, "
+            f"Urgent: {intel_report['urgent_items']}"
+        )
         agenda = pi.generate_research_agenda()
         if agenda:
             lines.append(f"- Research agenda: {len(agenda)} items pending")
@@ -272,22 +290,33 @@ def generate_monthly_review(reports: list[ProductTeamReport] | None = None) -> s
     if all_metrics.get("total_api_endpoints", 0) >= 20:
         maturity_score += 1
 
-    level = "Foundational" if maturity_score <= 2 else "Developing" if maturity_score <= 4 else "Mature"
+    level = (
+        "Foundational"
+        if maturity_score <= 2
+        else "Developing"
+        if maturity_score <= 4
+        else "Mature"
+    )
     lines.append(f"**Level: {level}** ({maturity_score}/{total_checks} criteria met)\n")
 
     lines.append("## Persona Refresh\n")
     from product_team.shared.config import PERSONAS
+
     for pid, persona in PERSONAS.items():
         lines.append(f"### {persona['label']}")
         lines.append(f"- Tier: {persona['tier']}")
-        lines.append(f"- Page coverage: {all_metrics.get(f'{pid}_page_coverage', 'N/A')}")
+        lines.append(
+            f"- Page coverage: {all_metrics.get(f'{pid}_page_coverage', 'N/A')}"
+        )
         lines.append(f"- Key pages: {', '.join(persona.get('key_pages', []))}")
         lines.append("")
 
     lines.append("## Roadmap\n")
     lines.append("1. **Phase 1 (Current):** UX audit, design system, feature mapping")
     lines.append("2. **Phase 2:** User research, persona validation, usability testing")
-    lines.append("3. **Phase 3:** Competitive analysis, feature prioritization, PRD generation")
+    lines.append(
+        "3. **Phase 3:** Competitive analysis, feature prioritization, PRD generation"
+    )
     lines.append("")
 
     return "\n".join(lines)
@@ -322,29 +351,35 @@ def scan() -> ProductTeamReport:
     # Check for critical findings needing engineering attention
     critical_findings = [f for f in findings if f.severity == "critical"]
     if critical_findings:
-        cross_team_requests.append({
-            "team": "engineering",
-            "request": f"{len(critical_findings)} critical product findings need engineering attention",
-            "urgency": "high",
-        })
+        cross_team_requests.append(
+            {
+                "team": "engineering",
+                "request": f"{len(critical_findings)} critical product findings need engineering attention",
+                "urgency": "high",
+            }
+        )
 
     # Check UX health for cross-team escalation
     ux_score = metrics.get("ux_health_score", 100)
     if isinstance(ux_score, (int, float)) and ux_score < 50:
-        cross_team_requests.append({
-            "team": "engineering",
-            "request": f"UX health score is {ux_score} — frontend needs accessibility improvements",
-            "urgency": "medium",
-        })
+        cross_team_requests.append(
+            {
+                "team": "engineering",
+                "request": f"UX health score is {ux_score} — frontend needs accessibility improvements",
+                "urgency": "medium",
+            }
+        )
 
     # Check feature coverage gaps
     fc_score = metrics.get("feature_coverage_score", 1.0)
     if isinstance(fc_score, (int, float)) and fc_score < 0.7:
-        cross_team_requests.append({
-            "team": "engineering",
-            "request": f"Feature coverage at {fc_score:.0%} — API-frontend alignment needed",
-            "urgency": "medium",
-        })
+        cross_team_requests.append(
+            {
+                "team": "engineering",
+                "request": f"Feature coverage at {fc_score:.0%} — API-frontend alignment needed",
+                "urgency": "medium",
+            }
+        )
 
     duration = time.time() - start
 
@@ -352,7 +387,14 @@ def scan() -> ProductTeamReport:
     ls = ProductLearningState(AGENT_NAME)
     ls.record_scan(metrics)
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category, "title": f.title})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+            }
+        )
         ls.record_severity_calibration(f.severity)
 
     severity_penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}

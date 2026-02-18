@@ -38,8 +38,14 @@ FUNNEL_STEPS = [
 
 # Application status enum values (expected)
 APPLICATION_STATUSES = [
-    "applied", "referred", "screening", "interviewing",
-    "offer", "accepted", "rejected", "withdrawn",
+    "applied",
+    "referred",
+    "screening",
+    "interviewing",
+    "offer",
+    "accepted",
+    "rejected",
+    "withdrawn",
 ]
 
 
@@ -57,7 +63,10 @@ def _scan_for_action_strings(directory: Path) -> set[str]:
         source = path.read_text()
         for match in re.finditer(r'action\s*=\s*["\']([^"\']+)["\']', source):
             actions.add(match.group(1))
-        for match in re.finditer(r'["\'](csv_upload|smart_search|intro_draft|intro_request|marketplace_search|job_scan|application_create|search_create|contacts_list|contact_delete|coach_chat|ai_match|resume_parse)["\']', source):
+        for match in re.finditer(
+            r'["\'](csv_upload|smart_search|intro_draft|intro_request|marketplace_search|job_scan|application_create|search_create|contacts_list|contact_delete|coach_chat|ai_match|resume_parse)["\']',
+            source,
+        ):
             actions.add(match.group(1))
     return actions
 
@@ -75,15 +84,22 @@ def _find_api_endpoints(api_dir: Path) -> list[dict]:
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.AsyncFunctionDef) or isinstance(node, ast.FunctionDef):
+            if isinstance(node, ast.AsyncFunctionDef) or isinstance(
+                node, ast.FunctionDef
+            ):
                 for deco in node.decorator_list:
                     deco_str = ast.dump(deco)
-                    if any(m in deco_str for m in ["'get'", "'post'", "'put'", "'delete'", "'patch'"]):
-                        endpoints.append({
-                            "name": node.name,
-                            "file": str(path),
-                            "line": node.lineno,
-                        })
+                    if any(
+                        m in deco_str
+                        for m in ["'get'", "'post'", "'put'", "'delete'", "'patch'"]
+                    ):
+                        endpoints.append(
+                            {
+                                "name": node.name,
+                                "file": str(path),
+                                "line": node.lineno,
+                            }
+                        )
     return endpoints
 
 
@@ -104,15 +120,17 @@ def _check_application_statuses(findings: list[Finding], metrics: dict) -> None:
     missing = set(APPLICATION_STATUSES) - found_statuses
 
     if missing:
-        findings.append(Finding(
-            id="analyst-003",
-            severity="info",
-            category="instrumentation",
-            title=f"{len(missing)} application statuses not found in model",
-            detail=f"Missing: {', '.join(sorted(missing))}. May be defined elsewhere.",
-            file=str(job_model),
-            recommendation="Verify application funnel completeness for outcome tracking",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-003",
+                severity="info",
+                category="instrumentation",
+                title=f"{len(missing)} application statuses not found in model",
+                detail=f"Missing: {', '.join(sorted(missing))}. May be defined elsewhere.",
+                file=str(job_model),
+                recommendation="Verify application funnel completeness for outcome tracking",
+            )
+        )
 
 
 def _check_marketplace_endpoints(
@@ -123,14 +141,16 @@ def _check_marketplace_endpoints(
     """Check marketplace endpoint coverage."""
     marketplace_file = APP_DIR / "api" / "marketplace.py"
     if not marketplace_file.exists():
-        findings.append(Finding(
-            id="analyst-004",
-            severity="high",
-            category="instrumentation",
-            title="No marketplace API file found",
-            detail="app/api/marketplace.py missing",
-            recommendation="Marketplace endpoints are critical for supply/demand analytics",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-004",
+                severity="high",
+                category="instrumentation",
+                title="No marketplace API file found",
+                detail="app/api/marketplace.py missing",
+                recommendation="Marketplace endpoints are critical for supply/demand analytics",
+            )
+        )
         return
 
     source = marketplace_file.read_text()
@@ -140,15 +160,17 @@ def _check_marketplace_endpoints(
 
     missing_patterns = [p for p in expected_patterns if p not in source.lower()]
     if missing_patterns:
-        findings.append(Finding(
-            id="analyst-005",
-            severity="medium",
-            category="instrumentation",
-            title=f"Marketplace API may lack {len(missing_patterns)} action patterns",
-            detail=f"Not found: {', '.join(missing_patterns)}",
-            file=str(marketplace_file),
-            recommendation="Ensure all marketplace actions are instrumented for analytics",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-005",
+                severity="medium",
+                category="instrumentation",
+                title=f"Marketplace API may lack {len(missing_patterns)} action patterns",
+                detail=f"Not found: {', '.join(missing_patterns)}",
+                file=str(marketplace_file),
+                recommendation="Ensure all marketplace actions are instrumented for analytics",
+            )
+        )
 
 
 def _check_credit_transaction_types(
@@ -161,21 +183,31 @@ def _check_credit_transaction_types(
         return
 
     source = credits_service.read_text()
-    expected_types = ["earn", "spend", "purchase", "upload", "intro", "search", "refund"]
+    expected_types = [
+        "earn",
+        "spend",
+        "purchase",
+        "upload",
+        "intro",
+        "search",
+        "refund",
+    ]
     found = [t for t in expected_types if t in source.lower()]
     metrics["credit_types_found"] = len(found)
 
     missing = [t for t in expected_types if t not in source.lower()]
     if len(missing) > 3:
-        findings.append(Finding(
-            id="analyst-006",
-            severity="medium",
-            category="instrumentation",
-            title="Credit transaction types may be incomplete",
-            detail=f"Expected terms not found: {', '.join(missing[:3])}",
-            file=str(credits_service),
-            recommendation="Verify all earn/spend scenarios have transaction_type strings",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-006",
+                severity="medium",
+                category="instrumentation",
+                title="Credit transaction types may be incomplete",
+                detail=f"Expected terms not found: {', '.join(missing[:3])}",
+                file=str(credits_service),
+                recommendation="Verify all earn/spend scenarios have transaction_type strings",
+            )
+        )
 
 
 def _check_funnel_instrumentation(
@@ -214,25 +246,29 @@ def _check_funnel_instrumentation(
     metrics["funnel_coverage"] = round(instrumented / len(FUNNEL_STEPS), 2)
 
     if gaps:
-        findings.append(Finding(
-            id="analyst-001",
-            severity="medium",
-            category="instrumentation",
-            title=f"{len(gaps)} funnel steps not instrumented in usage_logs",
-            detail=f"Gaps: {', '.join(gaps)}",
-            recommendation="Add usage_log entries for each funnel step to enable end-to-end conversion analysis",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-001",
+                severity="medium",
+                category="instrumentation",
+                title=f"{len(gaps)} funnel steps not instrumented in usage_logs",
+                detail=f"Gaps: {', '.join(gaps)}",
+                recommendation="Add usage_log entries for each funnel step to enable end-to-end conversion analysis",
+            )
+        )
 
-    insights.append(Insight(
-        id="analyst-insight-001",
-        category="funnel",
-        title="Funnel instrumentation readiness",
-        evidence=f"{instrumented}/{len(FUNNEL_STEPS)} steps instrumented ({metrics['funnel_coverage']:.0%})",
-        impact="Incomplete instrumentation prevents accurate conversion analysis",
-        recommendation="Instrument all funnel steps before launching analytics dashboard",
-        confidence=0.85,
-        sample_size=len(actions),
-    ))
+    insights.append(
+        Insight(
+            id="analyst-insight-001",
+            category="funnel",
+            title="Funnel instrumentation readiness",
+            evidence=f"{instrumented}/{len(FUNNEL_STEPS)} steps instrumented ({metrics['funnel_coverage']:.0%})",
+            impact="Incomplete instrumentation prevents accurate conversion analysis",
+            recommendation="Instrument all funnel steps before launching analytics dashboard",
+            confidence=0.85,
+            sample_size=len(actions),
+        )
+    )
 
 
 def _check_engagement_tracking(
@@ -242,8 +278,12 @@ def _check_engagement_tracking(
 ) -> None:
     """Check engagement event coverage."""
     engagement_events = {
-        "coach_chat", "contacts_list", "search_create",
-        "smart_search", "intro_draft", "intro_request",
+        "coach_chat",
+        "contacts_list",
+        "search_create",
+        "smart_search",
+        "intro_draft",
+        "intro_request",
     }
     found = engagement_events & actions
     metrics["engagement_events_instrumented"] = len(found)
@@ -251,14 +291,16 @@ def _check_engagement_tracking(
 
     missing = engagement_events - actions
     if missing:
-        findings.append(Finding(
-            id="analyst-002",
-            severity="low",
-            category="instrumentation",
-            title=f"{len(missing)} engagement events may not be instrumented",
-            detail=f"Missing: {', '.join(sorted(missing))}",
-            recommendation="Verify these events are tracked for engagement analytics",
-        ))
+        findings.append(
+            Finding(
+                id="analyst-002",
+                severity="low",
+                category="instrumentation",
+                title=f"{len(missing)} engagement events may not be instrumented",
+                detail=f"Missing: {', '.join(sorted(missing))}",
+                recommendation="Verify these events are tracked for engagement analytics",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -295,8 +337,15 @@ def scan() -> DataTeamReport:
     ls.record_scan(metrics)
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
-                           "title": f.title, "file": getattr(f, "file", None)})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": getattr(f, "file", None),
+            }
+        )
         if getattr(f, "file", None):
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
     if file_findings:
@@ -320,12 +369,23 @@ def scan() -> DataTeamReport:
 
     # Record insights to learning state
     for i in insights:
-        ls.record_insight({"id": i.id, "category": i.category, "title": i.title, "confidence": i.confidence})
+        ls.record_insight(
+            {
+                "id": i.id,
+                "category": i.category,
+                "title": i.title,
+                "confidence": i.confidence,
+            }
+        )
 
-    learning_updates = [f"Scanned {len(endpoints)} endpoints, {len(all_actions)} actions"]
+    learning_updates = [
+        f"Scanned {len(endpoints)} endpoints, {len(all_actions)} actions"
+    ]
     hot_spots = ls.get_hot_spots(top_n=3)
     if hot_spots:
-        learning_updates.append(f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}")
+        learning_updates.append(
+            f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}"
+        )
     patterns = ls.state.get("recurring_patterns", {})
     escalated = [k for k, v in patterns.items() if v.get("auto_escalated")]
     if escalated:
@@ -344,6 +404,7 @@ def scan() -> DataTeamReport:
 def save_report(report: DataTeamReport) -> Path:
     """Save report to data_team/reports/."""
     from data_team.shared.config import REPORTS_DIR
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"{AGENT_NAME}_latest.json"
     path.write_text(report.serialize())

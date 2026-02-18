@@ -86,10 +86,18 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
     sql_valid = all_metrics.get("sql_templates_valid", 0)
     sql_total = all_metrics.get("sql_templates_count", 0)
 
-    lines.append(f"| Instrumentation | {'green' if instrumentation_coverage >= 0.8 else 'yellow'} | {instrumentation_coverage:.0%} coverage |")
-    lines.append(f"| Funnel Coverage | {'green' if funnel_coverage >= 0.8 else 'yellow'} | {funnel_coverage:.0%} steps instrumented |")
-    lines.append(f"| Schema Coverage | {'green' if tables_found >= 20 else 'yellow'} | {tables_found} tables found |")
-    lines.append(f"| SQL Templates | {'green' if sql_valid == sql_total else 'red'} | {sql_valid}/{sql_total} valid |")
+    lines.append(
+        f"| Instrumentation | {'green' if instrumentation_coverage >= 0.8 else 'yellow'} | {instrumentation_coverage:.0%} coverage |"
+    )
+    lines.append(
+        f"| Funnel Coverage | {'green' if funnel_coverage >= 0.8 else 'yellow'} | {funnel_coverage:.0%} steps instrumented |"
+    )
+    lines.append(
+        f"| Schema Coverage | {'green' if tables_found >= 20 else 'yellow'} | {tables_found} tables found |"
+    )
+    lines.append(
+        f"| SQL Templates | {'green' if sql_valid == sql_total else 'red'} | {sql_valid}/{sql_total} valid |"
+    )
     lines.append("")
 
     # Top findings
@@ -106,7 +114,9 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
     if all_insights:
         lines.append(f"## Insights ({len(all_insights)})\n")
         for i in all_insights[:5]:
-            lines.append(f"- **{i.title}** ({i.category}, confidence={i.confidence:.0%})")
+            lines.append(
+                f"- **{i.title}** ({i.category}, confidence={i.confidence:.0%})"
+            )
             lines.append(f"  - {i.evidence}")
         lines.append("")
 
@@ -119,7 +129,9 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
             if any(f.severity == sev for f in r.findings):
                 worst = sev
                 break
-        lines.append(f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s")
+        lines.append(
+            f"- **{r.agent}**: {finding_count} findings (worst: {worst}), {r.scan_duration_seconds:.1f}s"
+        )
     lines.append("")
 
     # Learning Updates section
@@ -137,8 +149,10 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
             total_scans = report.get("total_scans", 0)
             escalated = len(report.get("escalated_patterns", []))
             if total_scans > 0:
-                lines.append(f"- **{agent_name} meta**: {total_scans} scans, "
-                             f"health={trajectory}, escalated={escalated}")
+                lines.append(
+                    f"- **{agent_name} meta**: {total_scans} scans, "
+                    f"health={trajectory}, escalated={escalated}"
+                )
         except Exception:
             pass
     lines.append("")
@@ -190,12 +204,22 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
     schema_ok = all_metrics.get("tables_in_models", 0) >= 20
     funnel_ok = all_metrics.get("funnel_coverage", 0) >= 0.8
     model_ok = bool(all_metrics.get("warm_score_weights"))
-    privacy_ok = all_metrics.get("sql_templates_valid", 0) == all_metrics.get("sql_templates_count", 0)
+    privacy_ok = all_metrics.get("sql_templates_valid", 0) == all_metrics.get(
+        "sql_templates_count", 0
+    )
 
-    lines.append(f"| Schema Coverage | {'Ready' if schema_ok else 'Gaps'} | {all_metrics.get('tables_in_models', '?')} tables |")
-    lines.append(f"| Funnel Instrumentation | {'Ready' if funnel_ok else 'Gaps'} | {all_metrics.get('funnel_coverage', '?')} |")
-    lines.append(f"| Model Calibration | {'Ready' if model_ok else 'Needs Work'} | {len(all_metrics.get('warm_score_weights', {}))} weights defined |")
-    lines.append(f"| Privacy Compliance | {'Passing' if privacy_ok else 'Failing'} | {all_metrics.get('sql_templates_valid', '?')}/{all_metrics.get('sql_templates_count', '?')} templates |")
+    lines.append(
+        f"| Schema Coverage | {'Ready' if schema_ok else 'Gaps'} | {all_metrics.get('tables_in_models', '?')} tables |"
+    )
+    lines.append(
+        f"| Funnel Instrumentation | {'Ready' if funnel_ok else 'Gaps'} | {all_metrics.get('funnel_coverage', '?')} |"
+    )
+    lines.append(
+        f"| Model Calibration | {'Ready' if model_ok else 'Needs Work'} | {len(all_metrics.get('warm_score_weights', {}))} weights defined |"
+    )
+    lines.append(
+        f"| Privacy Compliance | {'Passing' if privacy_ok else 'Failing'} | {all_metrics.get('sql_templates_valid', '?')}/{all_metrics.get('sql_templates_count', '?')} templates |"
+    )
     lines.append("")
 
     # Category breakdown
@@ -210,11 +234,17 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
     # Recommendations
     lines.append("## Recommendations\n")
     if not funnel_ok:
-        lines.append("1. **Instrument remaining funnel steps** — critical for conversion analysis")
+        lines.append(
+            "1. **Instrument remaining funnel steps** — critical for conversion analysis"
+        )
     if not model_ok:
-        lines.append("2. **Add outcome feedback loop** — correlate warm_score with intro approval")
+        lines.append(
+            "2. **Add outcome feedback loop** — correlate warm_score with intro approval"
+        )
     if not schema_ok:
-        lines.append("3. **Verify table registry** — update config.py to match actual models")
+        lines.append(
+            "3. **Verify table registry** — update config.py to match actual models"
+        )
     if not any([not funnel_ok, not model_ok, not schema_ok]):
         lines.append("All major areas are in good shape.")
     lines.append("")
@@ -226,13 +256,19 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
             ls = DataLearningState(agent_name)
             report = ls.generate_meta_learning_report()
             lines.append(f"### {agent_name}")
-            lines.append(f"- Scans: {report['total_scans']}, "
-                         f"Findings tracked: {report['total_findings_tracked']}")
+            lines.append(
+                f"- Scans: {report['total_scans']}, "
+                f"Findings tracked: {report['total_findings_tracked']}"
+            )
             lines.append(f"- Health trajectory: {report['health_trajectory']}")
             if report.get("fix_effectiveness_rate") is not None:
-                lines.append(f"- Fix effectiveness: {report['fix_effectiveness_rate']:.0%}")
+                lines.append(
+                    f"- Fix effectiveness: {report['fix_effectiveness_rate']:.0%}"
+                )
             if report.get("escalated_patterns"):
-                lines.append(f"- Escalated patterns: {len(report['escalated_patterns'])}")
+                lines.append(
+                    f"- Escalated patterns: {len(report['escalated_patterns'])}"
+                )
             if report.get("systemic_patterns"):
                 lines.append(f"- Systemic patterns: {len(report['systemic_patterns'])}")
             lines.append("")
@@ -244,11 +280,15 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
         di = DataIntelligence()
         intel_report = di.generate_intel_report()
         lines.append("## Intelligence Status\n")
-        lines.append(f"- Categories: {intel_report['categories_fresh']} fresh / "
-                     f"{intel_report['categories_stale']} stale of {intel_report['categories_total']}")
-        lines.append(f"- Total items: {intel_report['total_items']}, "
-                     f"Urgent: {intel_report['urgent_items']}, "
-                     f"Unadopted: {intel_report['unadopted_items']}")
+        lines.append(
+            f"- Categories: {intel_report['categories_fresh']} fresh / "
+            f"{intel_report['categories_stale']} stale of {intel_report['categories_total']}"
+        )
+        lines.append(
+            f"- Total items: {intel_report['total_items']}, "
+            f"Urgent: {intel_report['urgent_items']}, "
+            f"Unadopted: {intel_report['unadopted_items']}"
+        )
         agenda = di.generate_research_agenda()
         if agenda:
             lines.append(f"- Research agenda: {len(agenda)} items pending")
@@ -291,10 +331,18 @@ def generate_monthly_review(reports: list[DataTeamReport] | None = None) -> str:
         maturity_score += 1
     if all_metrics.get("outcome_feedback_column"):
         maturity_score += 1
-    if all_metrics.get("sql_templates_valid", 0) == all_metrics.get("sql_templates_count", 0):
+    if all_metrics.get("sql_templates_valid", 0) == all_metrics.get(
+        "sql_templates_count", 0
+    ):
         maturity_score += 1
 
-    level = "Foundational" if maturity_score <= 2 else "Developing" if maturity_score <= 4 else "Mature"
+    level = (
+        "Foundational"
+        if maturity_score <= 2
+        else "Developing"
+        if maturity_score <= 4
+        else "Mature"
+    )
     lines.append(f"**Level: {level}** ({maturity_score}/{total_checks} criteria met)\n")
 
     lines.append("## KPI Targets\n")
@@ -305,9 +353,15 @@ def generate_monthly_review(reports: list[DataTeamReport] | None = None) -> str:
     lines.append("")
 
     lines.append("## Roadmap\n")
-    lines.append("1. **Phase 1 (Current):** Code audit, instrumentation gaps, query templates")
-    lines.append("2. **Phase 2:** Live data connection, dashboard, A/B testing framework")
-    lines.append("3. **Phase 3:** ML pipeline, automated calibration, anomaly detection")
+    lines.append(
+        "1. **Phase 1 (Current):** Code audit, instrumentation gaps, query templates"
+    )
+    lines.append(
+        "2. **Phase 2:** Live data connection, dashboard, A/B testing framework"
+    )
+    lines.append(
+        "3. **Phase 3:** ML pipeline, automated calibration, anomaly detection"
+    )
     lines.append("")
 
     return "\n".join(lines)
@@ -342,20 +396,24 @@ def scan() -> DataTeamReport:
     # Check for critical findings that need cross-team attention
     critical_findings = [f for f in findings if f.severity == "critical"]
     if critical_findings:
-        cross_team_requests.append({
-            "team": "engineering",
-            "request": f"{len(critical_findings)} critical data findings need engineering attention",
-            "urgency": "high",
-        })
+        cross_team_requests.append(
+            {
+                "team": "engineering",
+                "request": f"{len(critical_findings)} critical data findings need engineering attention",
+                "urgency": "high",
+            }
+        )
 
     # Check if instrumentation gaps need engineering work
     funnel_coverage = metrics.get("funnel_coverage", 0)
     if isinstance(funnel_coverage, (int, float)) and funnel_coverage < 0.7:
-        cross_team_requests.append({
-            "team": "engineering",
-            "request": f"Funnel instrumentation at {funnel_coverage:.0%} — need usage_log entries for missing steps",
-            "urgency": "medium",
-        })
+        cross_team_requests.append(
+            {
+                "team": "engineering",
+                "request": f"Funnel instrumentation at {funnel_coverage:.0%} — need usage_log entries for missing steps",
+                "urgency": "medium",
+            }
+        )
 
     duration = time.time() - start
 
@@ -363,7 +421,14 @@ def scan() -> DataTeamReport:
     ls = DataLearningState(AGENT_NAME)
     ls.record_scan(metrics)
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category, "title": f.title})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+            }
+        )
         ls.record_severity_calibration(f.severity)
 
     # Health snapshot

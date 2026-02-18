@@ -76,9 +76,9 @@ def _check_accessibility(
         if not source:
             continue
 
-        has_aria = bool(re.search(r'aria-\w+', source))
-        has_role = bool(re.search(r'role\s*=', source))
-        has_alt = bool(re.search(r'alt\s*=', source))
+        has_aria = bool(re.search(r"aria-\w+", source))
+        has_role = bool(re.search(r"role\s*=", source))
+        has_alt = bool(re.search(r"alt\s*=", source))
 
         if has_aria:
             files_with_aria += 1
@@ -88,37 +88,41 @@ def _check_accessibility(
             files_with_alt += 1
 
         # Check for buttons without accessible labels
-        button_count = len(re.findall(r'<button\b', source))
-        labeled_buttons = len(re.findall(r'<button\b[^>]*(?:aria-label|title)', source))
-        text_buttons = len(re.findall(r'<button\b[^>]*>[^<]+</button>', source))
+        button_count = len(re.findall(r"<button\b", source))
+        labeled_buttons = len(re.findall(r"<button\b[^>]*(?:aria-label|title)", source))
+        text_buttons = len(re.findall(r"<button\b[^>]*>[^<]+</button>", source))
 
         if button_count > 0 and (labeled_buttons + text_buttons) < button_count:
             missing_aria_files.append(_relative(path))
-            ux_findings.append(UXFinding(
-                id=f"ux-a11y-{path.stem}",
-                category="accessibility",
-                severity="medium",
-                title=f"Buttons may lack accessible labels in {path.name}",
-                file=_relative(path),
-                detail=f"{button_count} buttons found, {labeled_buttons + text_buttons} with text/aria-label",
-                heuristic="Accessibility — button labeling",
-                recommendation="Add aria-label or visible text to all buttons",
-            ))
+            ux_findings.append(
+                UXFinding(
+                    id=f"ux-a11y-{path.stem}",
+                    category="accessibility",
+                    severity="medium",
+                    title=f"Buttons may lack accessible labels in {path.name}",
+                    file=_relative(path),
+                    detail=f"{button_count} buttons found, {labeled_buttons + text_buttons} with text/aria-label",
+                    heuristic="Accessibility — button labeling",
+                    recommendation="Add aria-label or visible text to all buttons",
+                )
+            )
 
         # Check for images without alt text
-        img_count = len(re.findall(r'<img\b', source))
-        img_with_alt = len(re.findall(r'<img\b[^>]*alt\s*=', source))
+        img_count = len(re.findall(r"<img\b", source))
+        img_with_alt = len(re.findall(r"<img\b[^>]*alt\s*=", source))
         if img_count > img_with_alt:
-            ux_findings.append(UXFinding(
-                id=f"ux-alt-{path.stem}",
-                category="accessibility",
-                severity="medium",
-                title=f"Images missing alt text in {path.name}",
-                file=_relative(path),
-                detail=f"{img_count} images, {img_with_alt} with alt text",
-                heuristic="Accessibility — image alt text",
-                recommendation="Add alt attributes to all <img> tags",
-            ))
+            ux_findings.append(
+                UXFinding(
+                    id=f"ux-alt-{path.stem}",
+                    category="accessibility",
+                    severity="medium",
+                    title=f"Images missing alt text in {path.name}",
+                    file=_relative(path),
+                    detail=f"{img_count} images, {img_with_alt} with alt text",
+                    heuristic="Accessibility — image alt text",
+                    recommendation="Add alt attributes to all <img> tags",
+                )
+            )
 
     aria_pct = files_with_aria / max(1, total_files)
     metrics["accessibility_aria_coverage"] = round(aria_pct, 2)
@@ -126,14 +130,16 @@ def _check_accessibility(
     metrics["accessibility_alt_files"] = files_with_alt
 
     if aria_pct < 0.3:
-        findings.append(Finding(
-            id="ux-001",
-            severity="high",
-            category="ux_quality",
-            title=f"Low ARIA attribute coverage ({aria_pct:.0%})",
-            detail=f"Only {files_with_aria}/{total_files} JSX files use aria-* attributes",
-            recommendation="Add ARIA labels to interactive elements for screen reader support",
-        ))
+        findings.append(
+            Finding(
+                id="ux-001",
+                severity="high",
+                category="ux_quality",
+                title=f"Low ARIA attribute coverage ({aria_pct:.0%})",
+                detail=f"Only {files_with_aria}/{total_files} JSX files use aria-* attributes",
+                recommendation="Add ARIA labels to interactive elements for screen reader support",
+            )
+        )
 
 
 def _check_loading_states(
@@ -146,7 +152,7 @@ def _check_loading_states(
     total_pages = 0
     pages_with_loading = 0
     loading_patterns = re.compile(
-        r'(?:loading|isLoading|spinner|skeleton|Spinner|Loading|CircularProgress)',
+        r"(?:loading|isLoading|spinner|skeleton|Spinner|Loading|CircularProgress)",
         re.IGNORECASE,
     )
 
@@ -158,16 +164,18 @@ def _check_loading_states(
         if loading_patterns.search(source):
             pages_with_loading += 1
         else:
-            ux_findings.append(UXFinding(
-                id=f"ux-load-{path.stem}",
-                category="loading_state",
-                severity="medium",
-                title=f"No loading state detected in {path.name}",
-                file=_relative(path),
-                detail="Page may show blank content during data fetching",
-                heuristic="Visibility of system status",
-                recommendation="Add loading spinner or skeleton screen",
-            ))
+            ux_findings.append(
+                UXFinding(
+                    id=f"ux-load-{path.stem}",
+                    category="loading_state",
+                    severity="medium",
+                    title=f"No loading state detected in {path.name}",
+                    file=_relative(path),
+                    detail="Page may show blank content during data fetching",
+                    heuristic="Visibility of system status",
+                    recommendation="Add loading spinner or skeleton screen",
+                )
+            )
 
     coverage = pages_with_loading / max(1, total_pages)
     metrics["loading_state_coverage"] = round(coverage, 2)
@@ -185,7 +193,7 @@ def _check_error_states(
     total_pages = 0
     pages_with_errors = 0
     error_patterns = re.compile(
-        r'(?:error|Error|catch\b|\.catch\(|onError|errorMessage|isError|err\b)',
+        r"(?:error|Error|catch\b|\.catch\(|onError|errorMessage|isError|err\b)",
     )
 
     for path in jsx_files:
@@ -196,16 +204,18 @@ def _check_error_states(
         if error_patterns.search(source):
             pages_with_errors += 1
         else:
-            ux_findings.append(UXFinding(
-                id=f"ux-err-{path.stem}",
-                category="error_state",
-                severity="medium",
-                title=f"No error handling detected in {path.name}",
-                file=_relative(path),
-                detail="Page may fail silently without user feedback",
-                heuristic="Error prevention & recovery",
-                recommendation="Add try/catch, error state display, or error boundary",
-            ))
+            ux_findings.append(
+                UXFinding(
+                    id=f"ux-err-{path.stem}",
+                    category="error_state",
+                    severity="medium",
+                    title=f"No error handling detected in {path.name}",
+                    file=_relative(path),
+                    detail="Page may fail silently without user feedback",
+                    heuristic="Error prevention & recovery",
+                    recommendation="Add try/catch, error state display, or error boundary",
+                )
+            )
 
     coverage = pages_with_errors / max(1, total_pages)
     metrics["error_state_coverage"] = round(coverage, 2)
@@ -221,7 +231,7 @@ def _check_empty_states(
     total_pages = 0
     pages_with_empty = 0
     empty_patterns = re.compile(
-        r'(?:no\s+(?:data|results|contacts|items|applications)|empty|nothing\s+(?:here|to\s+show|found)|\.length\s*===?\s*0)',
+        r"(?:no\s+(?:data|results|contacts|items|applications)|empty|nothing\s+(?:here|to\s+show|found)|\.length\s*===?\s*0)",
         re.IGNORECASE,
     )
 
@@ -246,9 +256,9 @@ def _check_form_validation(
     """Check for inline form validation patterns."""
     files_with_forms = 0
     files_with_validation = 0
-    form_pattern = re.compile(r'<form\b|onSubmit|handleSubmit')
+    form_pattern = re.compile(r"<form\b|onSubmit|handleSubmit")
     validation_pattern = re.compile(
-        r'(?:required|pattern=|validate|validation|setError|formError|invalid)',
+        r"(?:required|pattern=|validate|validation|setError|formError|invalid)",
         re.IGNORECASE,
     )
 
@@ -259,16 +269,18 @@ def _check_form_validation(
             if validation_pattern.search(source):
                 files_with_validation += 1
             else:
-                ux_findings.append(UXFinding(
-                    id=f"ux-form-{path.stem}",
-                    category="form_validation",
-                    severity="low",
-                    title=f"Form without inline validation in {path.name}",
-                    file=_relative(path),
-                    detail="Form may lack client-side validation feedback",
-                    heuristic="Error prevention",
-                    recommendation="Add inline validation for required fields",
-                ))
+                ux_findings.append(
+                    UXFinding(
+                        id=f"ux-form-{path.stem}",
+                        category="form_validation",
+                        severity="low",
+                        title=f"Form without inline validation in {path.name}",
+                        file=_relative(path),
+                        detail="Form may lack client-side validation feedback",
+                        heuristic="Error prevention",
+                        recommendation="Add inline validation for required fields",
+                    )
+                )
 
     metrics["forms_total"] = files_with_forms
     metrics["forms_with_validation"] = files_with_validation
@@ -282,7 +294,7 @@ def _check_responsive(
     """Check for Tailwind responsive prefixes (sm:, md:, lg:, xl:)."""
     total_files = len(jsx_files)
     files_with_responsive = 0
-    responsive_pattern = re.compile(r'\b(?:sm:|md:|lg:|xl:|2xl:)\w')
+    responsive_pattern = re.compile(r"\b(?:sm:|md:|lg:|xl:|2xl:)\w")
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -301,7 +313,7 @@ def _check_privacy_indicators(
 ) -> None:
     """Check for privacy-related UI references (vault, private, anonymous, consent)."""
     privacy_pattern = re.compile(
-        r'(?:vault|private|anonymous|consent|privacy|confidential|encrypted|secure)',
+        r"(?:vault|private|anonymous|consent|privacy|confidential|encrypted|secure)",
         re.IGNORECASE,
     )
     files_with_privacy = 0
@@ -322,7 +334,7 @@ def _check_flow_efficiency(
     """Estimate clicks to complete critical paths by counting page transitions."""
     # Count pages and navigation patterns
     page_files = [p for p in jsx_files if "pages/" in str(p)]
-    nav_pattern = re.compile(r'(?:navigate\(|useNavigate|Link\s+to=|href=)')
+    nav_pattern = re.compile(r"(?:navigate\(|useNavigate|Link\s+to=|href=)")
 
     total_nav_links = 0
     for path in page_files:
@@ -351,14 +363,16 @@ def scan() -> ProductTeamReport:
     metrics["total_jsx_files"] = len(jsx_files)
 
     if not jsx_files:
-        findings.append(Finding(
-            id="ux-000",
-            severity="info",
-            category="ux_quality",
-            title="No JSX files found in frontend/src/",
-            detail="Frontend may not be initialized yet",
-            recommendation="Initialize React frontend under frontend/src/",
-        ))
+        findings.append(
+            Finding(
+                id="ux-000",
+                severity="info",
+                category="ux_quality",
+                title="No JSX files found in frontend/src/",
+                detail="Frontend may not be initialized yet",
+                recommendation="Initialize React frontend under frontend/src/",
+            )
+        )
     else:
         _check_accessibility(jsx_files, ux_findings, findings, metrics)
         _check_loading_states(jsx_files, ux_findings, findings, metrics)
@@ -392,13 +406,27 @@ def scan() -> ProductTeamReport:
     ls.record_scan(metrics)
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
-                           "title": f.title, "file": f.file})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
     for uf in ux_findings:
-        ls.record_finding({"id": uf.id, "severity": uf.severity, "category": uf.category,
-                           "title": uf.title, "file": uf.file})
+        ls.record_finding(
+            {
+                "id": uf.id,
+                "severity": uf.severity,
+                "category": uf.category,
+                "title": uf.title,
+                "file": uf.file,
+            }
+        )
         if uf.file:
             file_findings[uf.file] = file_findings.get(uf.file, 0) + 1
     if file_findings:
@@ -426,7 +454,9 @@ def scan() -> ProductTeamReport:
     learning_updates = [f"Scanned {len(jsx_files)} JSX files, UX score={ux_score}"]
     hot_spots = ls.get_hot_spots(top_n=3)
     if hot_spots:
-        learning_updates.append(f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}")
+        learning_updates.append(
+            f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}"
+        )
 
     return ProductTeamReport(
         agent=AGENT_NAME,
@@ -441,6 +471,7 @@ def scan() -> ProductTeamReport:
 def save_report(report: ProductTeamReport) -> Path:
     """Save report to product_team/reports/."""
     from product_team.shared.config import REPORTS_DIR
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"{AGENT_NAME}_latest.json"
     path.write_text(report.serialize())

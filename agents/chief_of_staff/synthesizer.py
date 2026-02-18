@@ -76,12 +76,8 @@ def synthesize_daily(
     enriched.sort(key=_score_finding, reverse=True)
 
     # Classify
-    decisions_needed = [
-        cf for cf in enriched if cf.severity in ("critical", "high")
-    ]
-    key_updates = [
-        cf for cf in enriched if cf.severity == "medium"
-    ]
+    decisions_needed = [cf for cf in enriched if cf.severity in ("critical", "high")]
+    key_updates = [cf for cf in enriched if cf.severity == "medium"]
     progress_items = _build_progress(reports)
 
     # Build the brief model
@@ -117,15 +113,25 @@ def synthesize_daily(
 def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
     """Identify areas that are going well."""
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    _product_agents = {
+        "user_researcher",
+        "product_manager",
+        "ux_lead",
+        "design_lead",
+        "product_lead",
+    }
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _finance_agents = {
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+        "finance_lead",
+    }
     _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
     progress: list[dict[str, Any]] = []
     for r in reports:
-        critical_high = [
-            f for f in r.findings if f.severity in ("critical", "high")
-        ]
+        critical_high = [f for f in r.findings if f.severity in ("critical", "high")]
         if not critical_high:
             if r.agent in _data_agents:
                 team = "data"
@@ -139,11 +145,13 @@ def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
                 team = "gtm"
             else:
                 team = "engineering"
-            progress.append({
-                "team": team,
-                "agent": r.agent,
-                "note": f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)",
-            })
+            progress.append(
+                {
+                    "team": team,
+                    "agent": r.agent,
+                    "note": f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)",
+                }
+            )
     return progress
 
 
@@ -165,9 +173,7 @@ def _render_daily_brief(brief: FounderBrief, alerts: list[str]) -> str:
             if d.get("recommended_action"):
                 lines.append(f"  - Action: {d['recommended_action']}")
             if d.get("outcomes"):
-                labels = [
-                    OUTCOME_LABELS.get(o, o) for o in d["outcomes"]
-                ]
+                labels = [OUTCOME_LABELS.get(o, o) for o in d["outcomes"]]
                 lines.append(f"  - Outcomes: {', '.join(labels)}")
     else:
         lines.append("No decisions needed today.")
@@ -199,9 +205,7 @@ def _render_daily_brief(brief: FounderBrief, alerts: list[str]) -> str:
         total = brief.cost_summary.get("total_estimated_cost_usd", 0)
         tokens = brief.cost_summary.get("total_estimated_tokens", 0)
         duration = brief.cost_summary.get("total_duration_seconds", 0)
-        lines.append(
-            f"- Total: ${total:.4f} | {tokens} tokens | {duration:.1f}s"
-        )
+        lines.append(f"- Total: ${total:.4f} | {tokens} tokens | {duration:.1f}s")
         if alerts:
             for alert in alerts:
                 lines.append(f"- **ALERT:** {alert}")
@@ -242,9 +246,7 @@ def synthesize_weekly(
     for outcome in OUTCOME_PRIORITY:
         label = OUTCOME_LABELS[outcome]
         aligned = [cf for cf in enriched if outcome in cf.outcome_alignment]
-        critical_count = sum(
-            1 for cf in aligned if cf.severity in ("critical", "high")
-        )
+        critical_count = sum(1 for cf in aligned if cf.severity in ("critical", "high"))
         if critical_count > 0:
             status = "At Risk"
             signal = f"{critical_count} critical/high findings"
@@ -260,9 +262,7 @@ def synthesize_weekly(
     # Top 3 priorities
     lines.append("## Top 3 Priorities")
     for i, cf in enumerate(enriched[:3], 1):
-        lines.append(
-            f"{i}. **[{cf.id}]** {cf.summary} ({cf.severity})"
-        )
+        lines.append(f"{i}. **[{cf.id}]** {cf.summary} ({cf.severity})")
         lines.append(f"   - {cf.business_impact}")
     if not enriched:
         lines.append("No priorities — all clear.")
@@ -274,9 +274,7 @@ def synthesize_weekly(
     for cf in enriched:
         category_counts[cf.category] = category_counts.get(cf.category, 0) + 1
     if category_counts:
-        top_categories = sorted(
-            category_counts.items(), key=lambda x: -x[1]
-        )[:3]
+        top_categories = sorted(category_counts.items(), key=lambda x: -x[1])[:3]
         for cat, count in top_categories:
             lines.append(f"- **{cat}**: {count} findings")
     else:
@@ -334,11 +332,31 @@ def synthesize_status(reports: list[AgentReport]) -> str:
 
     # Split reports by team
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    _product_agents = {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"}
+    _product_agents = {
+        "user_researcher",
+        "product_manager",
+        "ux_lead",
+        "design_lead",
+        "product_lead",
+    }
     _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    _finance_agents = {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"}
+    _finance_agents = {
+        "finance_manager",
+        "credits_manager",
+        "investor_relations",
+        "legal_compliance",
+        "finance_lead",
+    }
     _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
-    eng_reports = [r for r in reports if r.agent not in _data_agents and r.agent not in _product_agents and r.agent not in _ops_agents and r.agent not in _finance_agents and r.agent not in _gtm_agents]
+    eng_reports = [
+        r
+        for r in reports
+        if r.agent not in _data_agents
+        and r.agent not in _product_agents
+        and r.agent not in _ops_agents
+        and r.agent not in _finance_agents
+        and r.agent not in _gtm_agents
+    ]
     data_reports = [r for r in reports if r.agent in _data_agents]
     product_reports = [r for r in reports if r.agent in _product_agents]
     ops_reports = [r for r in reports if r.agent in _ops_agents]
@@ -472,9 +490,7 @@ def synthesize_status(reports: list[AgentReport]) -> str:
         lines.append("")
 
     # Active teams
-    active = [
-        name for name, cfg in COS_CONFIG["teams"].items() if cfg.get("active")
-    ]
+    active = [name for name, cfg in COS_CONFIG["teams"].items() if cfg.get("active")]
     inactive = [
         name for name, cfg in COS_CONFIG["teams"].items() if not cfg.get("active")
     ]

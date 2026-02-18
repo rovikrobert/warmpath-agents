@@ -25,16 +25,27 @@ logger = logging.getLogger(__name__)
 
 PII_PATTERNS: list[str] = [
     r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
-    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",                          # Phone
-    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",                    # LinkedIn profile
+    r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",  # Phone
+    r"\blinkedin\.com/in/[A-Za-z0-9_-]+\b",  # LinkedIn profile
 ]
 
-PII_COLUMN_NAMES: frozenset[str] = frozenset({
-    "first_name", "last_name", "full_name", "email",
-    "linkedin_url", "current_title", "current_company",
-    "location", "notes", "how_you_know",
-    "email_blind_index", "name_company_blind_index", "raw_csv_row",
-})
+PII_COLUMN_NAMES: frozenset[str] = frozenset(
+    {
+        "first_name",
+        "last_name",
+        "full_name",
+        "email",
+        "linkedin_url",
+        "current_title",
+        "current_company",
+        "location",
+        "notes",
+        "how_you_know",
+        "email_blind_index",
+        "name_company_blind_index",
+        "raw_csv_row",
+    }
+)
 
 # Ops-specific forbidden actions
 FORBIDDEN_ACTIONS: list[str] = [
@@ -175,11 +186,13 @@ class OpsPrivacyGuard:
 
     def _log(self, text: str, context: str) -> None:
         """Audit trail for validated outputs."""
-        self._audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "context": context,
-            "text_preview": text[:120].replace("\n", " "),
-        })
+        self._audit_log.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "context": context,
+                "text_preview": text[:120].replace("\n", " "),
+            }
+        )
         self._audit_log = self._audit_log[-500:]
 
 

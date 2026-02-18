@@ -106,6 +106,7 @@ def extract_competitive_info(docs: dict[str, str] | None = None) -> dict[str, An
 
     competitors_mentioned = []
     from gtm_team.shared.config import TRACKED_COMPETITORS
+
     for comp in TRACKED_COMPETITORS:
         if comp.lower() in all_text.lower():
             competitors_mentioned.append(comp)
@@ -114,8 +115,16 @@ def extract_competitive_info(docs: dict[str, str] | None = None) -> dict[str, An
         "competitors_mentioned": competitors_mentioned,
         "total_tracked": len(TRACKED_COMPETITORS),
         "coverage_ratio": len(competitors_mentioned) / max(1, len(TRACKED_COMPETITORS)),
-        "has_positioning": bool(re.search(r"differentiator|positioning|competitive\s+advantage", all_text, re.IGNORECASE)),
-        "has_market_sizing": bool(re.search(r"TAM|SAM|SOM|total\s+addressable", all_text, re.IGNORECASE)),
+        "has_positioning": bool(
+            re.search(
+                r"differentiator|positioning|competitive\s+advantage",
+                all_text,
+                re.IGNORECASE,
+            )
+        ),
+        "has_market_sizing": bool(
+            re.search(r"TAM|SAM|SOM|total\s+addressable", all_text, re.IGNORECASE)
+        ),
     }
 
 
@@ -127,10 +136,18 @@ def extract_personas(docs: dict[str, str] | None = None) -> dict[str, Any]:
     all_text = "\n".join(docs.values())
 
     return {
-        "has_job_seeker_persona": bool(re.search(r"job\s+seeker|demand\s+side", all_text, re.IGNORECASE)),
-        "has_network_holder_persona": bool(re.search(r"network\s+holder|supply\s+side", all_text, re.IGNORECASE)),
-        "has_bootcamp_persona": bool(re.search(r"bootcamp|career\s+changer", all_text, re.IGNORECASE)),
-        "has_coach_persona": bool(re.search(r"career\s+coach|white.?label", all_text, re.IGNORECASE)),
+        "has_job_seeker_persona": bool(
+            re.search(r"job\s+seeker|demand\s+side", all_text, re.IGNORECASE)
+        ),
+        "has_network_holder_persona": bool(
+            re.search(r"network\s+holder|supply\s+side", all_text, re.IGNORECASE)
+        ),
+        "has_bootcamp_persona": bool(
+            re.search(r"bootcamp|career\s+changer", all_text, re.IGNORECASE)
+        ),
+        "has_coach_persona": bool(
+            re.search(r"career\s+coach|white.?label", all_text, re.IGNORECASE)
+        ),
     }
 
 
@@ -151,8 +168,14 @@ def extract_geographic_strategy(docs: dict[str, str] | None = None) -> dict[str,
 
     return {
         "markets_mentioned": {k: v for k, v in markets.items() if v},
-        "has_entry_sequence": bool(re.search(r"entry\s+sequence|market\s+entry|expansion", all_text, re.IGNORECASE)),
-        "has_regulatory_notes": bool(re.search(r"PDPA|GDPR|CCPA|regulatory", all_text, re.IGNORECASE)),
+        "has_entry_sequence": bool(
+            re.search(
+                r"entry\s+sequence|market\s+entry|expansion", all_text, re.IGNORECASE
+            )
+        ),
+        "has_regulatory_notes": bool(
+            re.search(r"PDPA|GDPR|CCPA|regulatory", all_text, re.IGNORECASE)
+        ),
     }
 
 
@@ -164,10 +187,18 @@ def extract_privacy_constraints(docs: dict[str, str] | None = None) -> dict[str,
     all_text = "\n".join(docs.values())
 
     return {
-        "has_vault_model": bool(re.search(r"private\s+vault|vault\s+boundary", all_text, re.IGNORECASE)),
-        "has_anonymization": bool(re.search(r"anonymi[sz]ed|marketplace\s+index", all_text, re.IGNORECASE)),
-        "has_suppression_list": bool(re.search(r"suppression\s+list", all_text, re.IGNORECASE)),
-        "has_consent_gates": bool(re.search(r"consent\s+gate|opt.in", all_text, re.IGNORECASE)),
+        "has_vault_model": bool(
+            re.search(r"private\s+vault|vault\s+boundary", all_text, re.IGNORECASE)
+        ),
+        "has_anonymization": bool(
+            re.search(r"anonymi[sz]ed|marketplace\s+index", all_text, re.IGNORECASE)
+        ),
+        "has_suppression_list": bool(
+            re.search(r"suppression\s+list", all_text, re.IGNORECASE)
+        ),
+        "has_consent_gates": bool(
+            re.search(r"consent\s+gate|opt.in", all_text, re.IGNORECASE)
+        ),
         "has_gdpr": bool(re.search(r"GDPR", all_text)),
         "has_pdpa": bool(re.search(r"PDPA", all_text)),
         "has_ccpa": bool(re.search(r"CCPA", all_text)),
@@ -183,10 +214,14 @@ def check_alignment(recommendation: str, strategy_section: str) -> list[str]:
 
     # Check for pricing contradictions
     if "free" in rec_lower and "paid" in strat_lower:
-        divergences.append("Recommendation suggests free access where strategy docs specify paid tier")
+        divergences.append(
+            "Recommendation suggests free access where strategy docs specify paid tier"
+        )
 
     # Check for geographic contradictions
     if "us first" in rec_lower and "singapore" in strat_lower:
-        divergences.append("Recommendation suggests US-first but strategy docs specify Singapore as home base")
+        divergences.append(
+            "Recommendation suggests US-first but strategy docs specify Singapore as home base"
+        )
 
     return divergences

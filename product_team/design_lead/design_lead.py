@@ -83,14 +83,14 @@ def _check_color_consistency(
     tailwind_color_classes: set[str] = set()
     inline_color_count = 0
 
-    hex_pattern = re.compile(r'#(?:[0-9a-fA-F]{3,8})\b')
+    hex_pattern = re.compile(r"#(?:[0-9a-fA-F]{3,8})\b")
     tw_color_pattern = re.compile(
-        r'\b(?:text|bg|border|ring|shadow|outline|accent|fill|stroke|from|via|to)-'
-        r'(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|'
-        r'teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black|'
-        r'transparent|current|inherit)-?\d*(?:/\d+)?\b'
+        r"\b(?:text|bg|border|ring|shadow|outline|accent|fill|stroke|from|via|to)-"
+        r"(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|"
+        r"teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black|"
+        r"transparent|current|inherit)-?\d*(?:/\d+)?\b"
     )
-    inline_style_color = re.compile(r'style\s*=\s*\{?\{[^}]*color\s*:', re.IGNORECASE)
+    inline_style_color = re.compile(r"style\s*=\s*\{?\{[^}]*color\s*:", re.IGNORECASE)
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -111,24 +111,28 @@ def _check_color_consistency(
 
     max_colors = DESIGN_SYSTEM_TARGETS.get("max_unique_colors", 12)
     if len(hardcoded_hex) > max_colors:
-        design_findings.append(DesignFinding(
-            id="ds-color-001",
-            category="color",
-            severity="medium",
-            title=f"{len(hardcoded_hex)} unique hardcoded colors (target: <={max_colors})",
-            detail=f"Colors: {', '.join(sorted(hardcoded_hex)[:10])}{'...' if len(hardcoded_hex) > 10 else ''}",
-            recommendation="Consolidate to Tailwind color palette or CSS custom properties",
-        ))
+        design_findings.append(
+            DesignFinding(
+                id="ds-color-001",
+                category="color",
+                severity="medium",
+                title=f"{len(hardcoded_hex)} unique hardcoded colors (target: <={max_colors})",
+                detail=f"Colors: {', '.join(sorted(hardcoded_hex)[:10])}{'...' if len(hardcoded_hex) > 10 else ''}",
+                recommendation="Consolidate to Tailwind color palette or CSS custom properties",
+            )
+        )
 
     if inline_color_count > 0:
-        design_findings.append(DesignFinding(
-            id="ds-color-002",
-            category="color",
-            severity="low",
-            title=f"{inline_color_count} inline color styles found",
-            detail="Inline styles bypass the design system",
-            recommendation="Use Tailwind classes instead of inline color styles",
-        ))
+        design_findings.append(
+            DesignFinding(
+                id="ds-color-002",
+                category="color",
+                severity="low",
+                title=f"{inline_color_count} inline color styles found",
+                detail="Inline styles bypass the design system",
+                recommendation="Use Tailwind classes instead of inline color styles",
+            )
+        )
 
 
 def _check_spacing_consistency(
@@ -139,8 +143,8 @@ def _check_spacing_consistency(
     """Audit Tailwind spacing class usage patterns."""
     spacing_classes: dict[str, int] = {}
     spacing_pattern = re.compile(
-        r'\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-[xy])-'
-        r'(?:\d+(?:\.\d+)?|px|auto)\b'
+        r"\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-[xy])-"
+        r"(?:\d+(?:\.\d+)?|px|auto)\b"
     )
 
     for path in jsx_files:
@@ -153,7 +157,9 @@ def _check_spacing_consistency(
     metrics["total_spacing_usages"] = sum(spacing_classes.values())
 
     # Identify off-scale spacing (non-standard values)
-    standard_values = set("0 0.5 1 1.5 2 2.5 3 3.5 4 5 6 7 8 9 10 11 12 14 16 20 24 28 32 36 40 44 48 52 56 60 64 72 80 96 px auto".split())
+    standard_values = set(
+        "0 0.5 1 1.5 2 2.5 3 3.5 4 5 6 7 8 9 10 11 12 14 16 20 24 28 32 36 40 44 48 52 56 60 64 72 80 96 px auto".split()
+    )
     off_scale = []
     for cls in spacing_classes:
         val = cls.rsplit("-", 1)[-1]
@@ -161,14 +167,16 @@ def _check_spacing_consistency(
             off_scale.append(cls)
 
     if off_scale:
-        design_findings.append(DesignFinding(
-            id="ds-spacing-001",
-            category="spacing",
-            severity="low",
-            title=f"{len(off_scale)} non-standard spacing values",
-            detail=f"Off-scale: {', '.join(off_scale[:8])}",
-            recommendation="Use Tailwind's default spacing scale for consistency",
-        ))
+        design_findings.append(
+            DesignFinding(
+                id="ds-spacing-001",
+                category="spacing",
+                severity="low",
+                title=f"{len(off_scale)} non-standard spacing values",
+                detail=f"Off-scale: {', '.join(off_scale[:8])}",
+                recommendation="Use Tailwind's default spacing scale for consistency",
+            )
+        )
 
 
 def _check_typography(
@@ -179,8 +187,12 @@ def _check_typography(
     """Count unique text sizes and weights."""
     text_sizes: set[str] = set()
     font_weights: set[str] = set()
-    size_pattern = re.compile(r'\btext-(?:xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b')
-    weight_pattern = re.compile(r'\bfont-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b')
+    size_pattern = re.compile(
+        r"\btext-(?:xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b"
+    )
+    weight_pattern = re.compile(
+        r"\bfont-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b"
+    )
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -194,14 +206,16 @@ def _check_typography(
 
     max_sizes = DESIGN_SYSTEM_TARGETS.get("max_unique_text_sizes", 8)
     if len(text_sizes) > max_sizes:
-        design_findings.append(DesignFinding(
-            id="ds-type-001",
-            category="typography",
-            severity="low",
-            title=f"{len(text_sizes)} unique text sizes (target: <={max_sizes})",
-            detail=f"Sizes: {', '.join(sorted(text_sizes))}",
-            recommendation="Consolidate to a type scale with fewer sizes",
-        ))
+        design_findings.append(
+            DesignFinding(
+                id="ds-type-001",
+                category="typography",
+                severity="low",
+                title=f"{len(text_sizes)} unique text sizes (target: <={max_sizes})",
+                detail=f"Sizes: {', '.join(sorted(text_sizes))}",
+                recommendation="Consolidate to a type scale with fewer sizes",
+            )
+        )
 
 
 def _check_component_patterns(
@@ -215,8 +229,12 @@ def _check_component_patterns(
     modal_count = 0
 
     button_class_pattern = re.compile(r'<button\b[^>]*className\s*=\s*["\{]([^"}\n]+)')
-    card_pattern = re.compile(r'(?:rounded|shadow|border)[^"]*(?:rounded|shadow|border)', re.IGNORECASE)
-    modal_pattern = re.compile(r'(?:Modal|modal|Dialog|dialog|overlay|Overlay)', re.IGNORECASE)
+    card_pattern = re.compile(
+        r'(?:rounded|shadow|border)[^"]*(?:rounded|shadow|border)', re.IGNORECASE
+    )
+    modal_pattern = re.compile(
+        r"(?:Modal|modal|Dialog|dialog|overlay|Overlay)", re.IGNORECASE
+    )
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -237,7 +255,7 @@ def _check_dark_mode(
 ) -> None:
     """Check for dark: prefixes (dark mode readiness)."""
     files_with_dark = 0
-    dark_pattern = re.compile(r'\bdark:\w')
+    dark_pattern = re.compile(r"\bdark:\w")
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -258,8 +276,8 @@ def _check_animations(
     transition_count = 0
     animate_count = 0
 
-    transition_pattern = re.compile(r'\btransition(?:-\w+)?\b')
-    animate_pattern = re.compile(r'\banimate-\w+\b')
+    transition_pattern = re.compile(r"\btransition(?:-\w+)?\b")
+    animate_pattern = re.compile(r"\banimate-\w+\b")
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -278,8 +296,8 @@ def _compute_design_system_score(
     total_tw_classes = 0
     total_inline_styles = 0
 
-    tw_class_pattern = re.compile(r'\bclassName\s*=')
-    inline_pattern = re.compile(r'\bstyle\s*=\s*\{')
+    tw_class_pattern = re.compile(r"\bclassName\s*=")
+    inline_pattern = re.compile(r"\bstyle\s*=\s*\{")
 
     for path in jsx_files:
         source = _read_safe(path)
@@ -319,16 +337,20 @@ def scan() -> ProductTeamReport:
     metrics["tailwind_config_exists"] = tw_config is not None
 
     if not jsx_files:
-        findings.append(Finding(
-            id="ds-000",
-            severity="info",
-            category="design_system",
-            title="No JSX files found in frontend/src/",
-            detail="Frontend may not be initialized yet",
-            recommendation="Initialize React frontend under frontend/src/",
-        ))
+        findings.append(
+            Finding(
+                id="ds-000",
+                severity="info",
+                category="design_system",
+                title="No JSX files found in frontend/src/",
+                detail="Frontend may not be initialized yet",
+                recommendation="Initialize React frontend under frontend/src/",
+            )
+        )
     else:
-        _check_color_consistency(jsx_files, css_files, design_findings, findings, metrics)
+        _check_color_consistency(
+            jsx_files, css_files, design_findings, findings, metrics
+        )
         _check_spacing_consistency(jsx_files, design_findings, metrics)
         _check_typography(jsx_files, design_findings, metrics)
         _check_component_patterns(jsx_files, design_findings, metrics)
@@ -343,13 +365,27 @@ def scan() -> ProductTeamReport:
     ls.record_scan(metrics)
     file_findings: dict[str, int] = {}
     for f in findings:
-        ls.record_finding({"id": f.id, "severity": f.severity, "category": f.category,
-                           "title": f.title, "file": f.file})
+        ls.record_finding(
+            {
+                "id": f.id,
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "file": f.file,
+            }
+        )
         if f.file:
             file_findings[f.file] = file_findings.get(f.file, 0) + 1
     for df in design_findings:
-        ls.record_finding({"id": df.id, "severity": df.severity, "category": df.category,
-                           "title": df.title, "file": df.file})
+        ls.record_finding(
+            {
+                "id": df.id,
+                "severity": df.severity,
+                "category": df.category,
+                "title": df.title,
+                "file": df.file,
+            }
+        )
         if df.file:
             file_findings[df.file] = file_findings.get(df.file, 0) + 1
     if file_findings:
@@ -376,10 +412,14 @@ def scan() -> ProductTeamReport:
 
     learning_updates = [f"Scanned {len(jsx_files)} JSX + {len(css_files)} CSS files"]
     if jsx_files:
-        learning_updates.append(f"Design system score: {metrics.get('design_system_score', 0)}%")
+        learning_updates.append(
+            f"Design system score: {metrics.get('design_system_score', 0)}%"
+        )
     hot_spots = ls.get_hot_spots(top_n=3)
     if hot_spots:
-        learning_updates.append(f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}")
+        learning_updates.append(
+            f"Hot spots: {', '.join(h.file.split('/')[-1] for h in hot_spots)}"
+        )
 
     return ProductTeamReport(
         agent=AGENT_NAME,
@@ -394,6 +434,7 @@ def scan() -> ProductTeamReport:
 def save_report(report: ProductTeamReport) -> Path:
     """Save report to product_team/reports/."""
     from product_team.shared.config import REPORTS_DIR
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"{AGENT_NAME}_latest.json"
     path.write_text(report.serialize())
