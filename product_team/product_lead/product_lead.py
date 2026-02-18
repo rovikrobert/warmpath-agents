@@ -8,12 +8,19 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from agents.shared.report import Finding
-from product_team.shared.config import PRODUCT_AGENT_NAMES, REPORTS_DIR
+from product_team.shared.config import (
+    BETA_FEEDBACK_DB_ID,
+    FEEDBACK_SEVERITY_MAP,
+    PRODUCT_AGENT_NAMES,
+    REPORTS_DIR,
+)
 from product_team.shared.intelligence import ProductIntelligence
 from product_team.shared.learning import ProductLearningState
 from product_team.shared.report import ProductInsight, ProductTeamReport
@@ -45,6 +52,147 @@ def _load_latest_reports() -> list[ProductTeamReport]:
         except (json.JSONDecodeError, OSError, KeyError, TypeError):
             continue
     return reports
+
+
+# ---------------------------------------------------------------------------
+# PII stripping
+# ---------------------------------------------------------------------------
+
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+_PHONE_RE = re.compile(r"\+?\d[\d\s\-().]{7,}\d")
+_LINKEDIN_RE = re.compile(r"https?://(?:www\.)?linkedin\.com/in/[^\s]+", re.IGNORECASE)
+
+
+def _strip_pii(text: str) -> str:
+    """Remove emails, phone numbers, and LinkedIn profile URLs from text."""
+    text = _EMAIL_RE.sub("[email]", text)
+    text = _PHONE_RE.sub("[phone]", text)
+    text = _LINKEDIN_RE.sub("[linkedin]", text)
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Beta feedback from Notion
+# ---------------------------------------------------------------------------
+
+
+def _check_beta_feedback() -> tuple[list[Finding], list[ProductInsight], list[dict]]:
+    """Query Notion Beta Feedback DB for new items.
+
+    Returns (findings, insights, cross_team_requests).
+    Gracefully returns empty if NOTION_API_KEY is not set.
+    """
+    findings: list[Finding] = []
+    insights: list[ProductInsight] = []
+    cross_team_requests: list[dict] = []
+
+    if not os.environ.get("NOTION_API_KEY"):
+        return findings, insights, cross_team_requests
+
+    try:
+        from agents.shared.notion_client import NotionClient
+
+        client = NotionClient()
+        if not client.enabled:
+            return findings, insights, cross_team_requests
+
+        result = client.query_database(
+            database_id=BETA_FEEDBACK_DB_ID,
+            filter_obj={
+                "property": "Status",
+                "select": {"equals": "New"},
+            },
+            page_size=50,
+        )
+
+        pages = result.get("results", [])
+        if not pages:
+            return findings, insights, cross_team_requests
+
+        category_counts: dict[str, int] = {}
+        processed_ids: list[str] = []
+
+        for page in pages:
+            props = page.get("properties", {})
+            page_id = page.get("id", "")
+
+            # Extract fields from Notion properties
+            name_parts = props.get("Name", {}).get("title", [])
+            title = name_parts[0]["text"]["content"] if name_parts else "Untitled"
+            title = _strip_pii(title)
+
+            severity_sel = props.get("Severity", {}).get("select")
+            notion_severity = severity_sel["name"] if severity_sel else "Just a thought"
+            severity = FEEDBACK_SEVERITY_MAP.get(notion_severity, "low")
+
+            cat_sel = props.get("Category", {}).get("select")
+            category = cat_sel["name"] if cat_sel else "Other"
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+            desc_parts = props.get("Description", {}).get("rich_text", [])
+            detail = desc_parts[0]["text"]["content"] if desc_parts else ""
+            detail = _strip_pii(detail)
+
+            page_sel = props.get("Page/Feature", {}).get("select")
+            page_feature = page_sel["name"] if page_sel else "Unknown"
+
+            findings.append(
+                Finding(
+                    id=f"BETA-FB-{page_id[:8]}",
+                    severity=severity,
+                    category="beta_feedback",
+                    title=f"[{category}] {title}",
+                    detail=f"Page: {page_feature}. {detail[:200]}",
+                    recommendation=f"Review feedback from beta tester on {page_feature}",
+                )
+            )
+
+            # Route partnership offers and user pool contributions to GTM
+            if category in ("Partnership Offer", "User Pool Contribution"):
+                cross_team_requests.append(
+                    {
+                        "team": "gtm",
+                        "request": f"Beta feedback: {category} — {title}",
+                        "urgency": "medium",
+                    }
+                )
+
+            processed_ids.append(page_id)
+
+        # Mark processed items as Acknowledged in Notion
+        for pid in processed_ids:
+            try:
+                client.update_page(
+                    page_id=pid,
+                    properties={
+                        "Status": NotionClient.select_property("Acknowledged"),
+                    },
+                )
+            except Exception:
+                logger.warning("Failed to update Notion page %s to Acknowledged", pid)
+
+        # Summary insight
+        if category_counts:
+            counts_str = ", ".join(
+                f"{cat}: {n}" for cat, n in sorted(category_counts.items())
+            )
+            insights.append(
+                ProductInsight(
+                    id="BETA-FB-SUMMARY",
+                    category="beta_feedback",
+                    title=f"Beta Feedback: {len(pages)} new items",
+                    evidence=counts_str,
+                    impact="Direct user feedback informs product priorities",
+                    recommendation="Review and triage feedback items",
+                    confidence=1.0,
+                    persona="both",
+                )
+            )
+
+    except Exception:
+        logger.exception("Error checking beta feedback (non-critical)")
+
+    return findings, insights, cross_team_requests
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +252,16 @@ def generate_daily_brief(reports: list[ProductTeamReport] | None = None) -> str:
             lines.append(f"- **{i.title}** ({i.category}, {i.confidence:.0%})")
             lines.append(f"  - {i.evidence}")
         lines.append("")
+
+    # Beta Feedback section
+    fb_findings, fb_insights, _fb_xtr = _check_beta_feedback()
+    if fb_findings:
+        lines.append(f"## Beta Feedback ({len(fb_findings)} new items)\n")
+        for f in fb_findings[:10]:
+            lines.append(f"- **[{f.severity}]** {f.title}")
+        lines.append("")
+    if fb_insights:
+        all_insights.extend(fb_insights)
 
     # Agent status
     lines.append("## Agent Status\n")
@@ -344,9 +502,16 @@ def scan() -> ProductTeamReport:
         for k, v in r.metrics.items():
             metrics[k] = v
 
+    # Beta feedback from Notion
+    fb_findings, fb_insights, fb_xtr = _check_beta_feedback()
+    findings.extend(fb_findings)
+    insights.extend(fb_insights)
+    cross_team_requests.extend(fb_xtr)
+
     metrics["sub_agents_reporting"] = len(reports)
     metrics["total_findings"] = len(findings)
     metrics["total_insights"] = len(insights)
+    metrics["beta_feedback_items"] = len(fb_findings)
 
     # Check for critical findings needing engineering attention
     critical_findings = [f for f in findings if f.severity == "critical"]

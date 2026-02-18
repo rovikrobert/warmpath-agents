@@ -106,6 +106,19 @@ DESIGN_SYSTEM_TARGETS: dict[str, float] = {
 }
 
 # ---------------------------------------------------------------------------
+# Beta Feedback (Notion database)
+# ---------------------------------------------------------------------------
+
+BETA_FEEDBACK_DB_ID = "30b1a870-fe4a-81b4-9b9c-e1abfb30eb3c"
+
+FEEDBACK_SEVERITY_MAP: dict[str, str] = {
+    "Blocker": "critical",
+    "Annoying": "high",
+    "Minor": "medium",
+    "Just a thought": "low",
+}
+
+# ---------------------------------------------------------------------------
 # Self-learning thresholds
 # ---------------------------------------------------------------------------
 
