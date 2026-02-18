@@ -442,7 +442,7 @@ def _check_live_nh_funnel(
                 select(func.count())
                 .select_from(User)
                 .where(
-                    User.user_type == "network_holder",
+                    User.intent.in_(["share_network", "explore"]),
                     User.deleted_at.is_(None),
                 )
             ).scalar()
@@ -454,7 +454,7 @@ def _check_live_nh_funnel(
                 select(func.count(distinct(CsvUpload.user_id))).where(
                     CsvUpload.user_id.in_(
                         select(User.id).where(
-                            User.user_type == "network_holder",
+                            User.intent.in_(["share_network", "explore"]),
                             User.deleted_at.is_(None),
                         )
                     )
