@@ -867,6 +867,84 @@ def _check_billing_instrumentation(
 
 
 # ---------------------------------------------------------------------------
+# Cash runway forecasting (CoS audit gap fix)
+# ---------------------------------------------------------------------------
+
+
+def _check_cash_runway(
+    findings: list[Finding],
+    financial_findings: list[FinancialFinding],
+    metrics: dict,
+    cost_snapshots: list[CostSnapshot],
+) -> None:
+    """Estimate monthly burn rate and cash runway."""
+    from finance_team.shared.config import CASH_ON_HAND, MONTHLY_FIXED_COSTS
+
+    # Fixed costs
+    fixed_monthly = sum(MONTHLY_FIXED_COSTS.values())
+    metrics["monthly_fixed_costs"] = round(fixed_monthly, 2)
+
+    # Agent operation costs (from cost_snapshots already computed)
+    agent_monthly = 0.0
+    for snap in cost_snapshots:
+        # Extrapolate: assume agents run ~30 times/month
+        cost = (
+            getattr(snap, "estimated_cost_usd", 0.0)
+            if hasattr(snap, "estimated_cost_usd")
+            else 0.0
+        )
+        agent_monthly += cost * 30
+
+    metrics["monthly_agent_costs"] = round(agent_monthly, 4)
+
+    # Revenue (try Stripe client)
+    monthly_revenue = 0.0
+    try:
+        from finance_team.shared.stripe_client import get_stripe_client
+
+        client = get_stripe_client()
+        if client.is_available():
+            import time as _time
+
+            thirty_days_ago = int(_time.time()) - (30 * 86400)
+            charges = client.list_charges(limit=100, created_after=thirty_days_ago)
+            if charges and "data" in charges:
+                for charge in charges["data"]:
+                    if charge.get("paid") and not charge.get("refunded"):
+                        monthly_revenue += charge.get("amount", 0) / 100.0
+    except Exception:
+        pass
+
+    metrics["monthly_revenue"] = round(monthly_revenue, 2)
+
+    # Burn rate
+    monthly_burn = fixed_monthly + agent_monthly - monthly_revenue
+    metrics["monthly_burn_rate"] = round(monthly_burn, 2)
+
+    # Runway
+    if CASH_ON_HAND > 0 and monthly_burn > 0:
+        runway_months = CASH_ON_HAND / monthly_burn
+        metrics["cash_runway_months"] = round(runway_months, 1)
+
+        from finance_team.shared.config import KPI_TARGETS
+
+        target = KPI_TARGETS.get("cash_runway_months", {}).get("target", 6)
+        if runway_months < target:
+            financial_findings.append(
+                FinancialFinding(
+                    id="finmgr-runway-001",
+                    category="cash_runway",
+                    severity="high" if runway_months < 3 else "medium",
+                    title=f"Cash runway: {runway_months:.1f} months (target: {target})",
+                    detail=f"Burn: ${monthly_burn:.2f}/mo, Cash: ${CASH_ON_HAND:.2f}",
+                    recommendation="Reduce burn or accelerate revenue to extend runway.",
+                )
+            )
+    else:
+        metrics["cash_runway_months"] = None
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -885,6 +963,7 @@ def scan() -> FinanceTeamReport:
     _check_subscription_model(findings, financial_findings, metrics)
     _check_agent_team_costs(findings, financial_findings, metrics, cost_snapshots)
     _check_billing_instrumentation(findings, financial_findings, metrics)
+    _check_cash_runway(findings, financial_findings, metrics, cost_snapshots)
 
     duration = time.time() - start
 

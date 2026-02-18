@@ -223,3 +223,16 @@ PRIVACY_DELETION_PATHS: list[str] = [
     "data-request",
     "data_export",
 ]
+
+# ---------------------------------------------------------------------------
+# Monthly fixed costs (updated manually)
+# ---------------------------------------------------------------------------
+
+MONTHLY_FIXED_COSTS: dict[str, float] = {
+    "infrastructure": 20.0,  # Railway Starter plan
+    "domain": 1.0,  # Domain registration amortized
+    "email": 0.0,  # Resend free tier
+    "monitoring": 0.0,  # Railway built-in
+}
+
+CASH_ON_HAND: float = 0.0  # Update with actual amount when known
