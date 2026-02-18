@@ -385,9 +385,9 @@ class NotionSync:
             return {"synced": False}
 
         blocks = self._build_communication_guide_blocks()
-        result = self._client.create_page(
-            database_id=parent_id,
-            properties={"Title": NotionClient.title_property("Communication Guide")},
+        result = self._client.create_child_page(
+            parent_page_id=parent_id,
+            title="Communication Guide",
             children=blocks,
         )
 

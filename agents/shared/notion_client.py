@@ -128,6 +128,23 @@ class NotionClient:
             body["children"] = children
         return self._request("POST", "/pages", body)
 
+    def create_child_page(
+        self,
+        parent_page_id: str,
+        title: str,
+        children: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Create a page as a child of another page (not a database)."""
+        body: dict[str, Any] = {
+            "parent": {"page_id": parent_page_id},
+            "properties": {
+                "title": {"title": [{"text": {"content": title}}]}
+            },
+        }
+        if children:
+            body["children"] = children
+        return self._request("POST", "/pages", body)
+
     def update_page(
         self,
         page_id: str,

@@ -49,9 +49,6 @@ from .router import get_request_tracking_report, route_and_track_request
 from .schemas import Conflict
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
 from .telegram_bridge import TelegramBridge, TELEGRAM_DIR
-from .whatsapp_bridge import WhatsAppBridge
-
-from agents.shared.whatsapp_formatter import WHATSAPP_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +248,7 @@ def _log_resolutions_to_notion(resolutions: list, conflicts: list) -> None:
 
 
 def run_daily() -> str:
-    """Daily cycle: load reports -> synthesize -> output brief -> Notion + WhatsApp."""
+    """Daily cycle: load reports -> synthesize -> output brief -> Notion + Telegram."""
     reports, cross_team_requests = _load_reports()
     if not reports:
         return "# Founder Daily Brief\n\nNo engineering reports available. Run agent scans first."
@@ -273,7 +270,7 @@ def run_daily() -> str:
     except Exception:
         logger.debug("get_active_briefs skipped (Notion not configured)")
 
-    # Process async commands (Gap 8 — WhatsApp + Telegram)
+    # Process async commands (Gap 8 — Telegram)
     _process_async_commands()
 
     # Route and track cross-team requests (Gap 6)
@@ -378,7 +375,7 @@ def run_daily() -> str:
         update_team_reliability("gtm", gtm_reports)
     record_cost_snapshot(costs)
 
-    # Push to Notion and generate WhatsApp message
+    # Push to Notion and generate Telegram message
     _push_daily_outputs(brief, costs, alerts, brief_data)
 
     # Log conflict resolutions to Notion Decision Log
@@ -390,10 +387,10 @@ def run_daily() -> str:
 def _push_daily_outputs(
     brief: str, costs: dict, alerts: list[str], brief_data: dict | None = None
 ) -> None:
-    """Push daily brief to Notion and generate WhatsApp message (best-effort).
+    """Push daily brief to Notion and generate Telegram message (best-effort).
 
     Idempotent: skips if today's brief has already been pushed (prevents
-    duplicate Notion pages and WhatsApp spam from multiple deploys/triggers).
+    duplicate Notion pages and Telegram spam from multiple deploys/triggers).
     """
     from datetime import datetime, timezone
 
@@ -436,18 +433,6 @@ def _push_daily_outputs(
                 notion_page_id = result.get("page_id", "")
     except Exception:
         logger.debug("Notion sync skipped (not configured or error)")
-
-    # WhatsApp message — skip if already sent today
-    wa_marker = WHATSAPP_DIR / f"whatsapp-daily-{today}.txt"
-    if wa_marker.exists():
-        logger.info("Daily WhatsApp already sent for %s — skipping", today)
-    else:
-        try:
-            wa = WhatsAppBridge()
-            wa_data = brief_data or {"decisions_needed": [], "progress": []}
-            wa.generate_morning_brief(wa_data, costs, alerts, notion_page_id=notion_page_id)
-        except Exception:
-            logger.debug("WhatsApp message generation skipped")
 
     # Telegram message — skip if already sent today
     tg_marker = TELEGRAM_DIR / f"telegram-daily-{today}.txt"
@@ -512,27 +497,10 @@ def run_weekly() -> str:
     except Exception:
         logger.debug("Pod review skipped")
 
-    # Push weekly WhatsApp summary (best-effort, skip if already sent this week)
+    # Telegram weekly summary — skip if already sent
     from datetime import datetime, timezone
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    wa_weekly_marker = WHATSAPP_DIR / f"whatsapp-weekly-{today}.txt"
-    if wa_weekly_marker.exists():
-        logger.info("Weekly WhatsApp already sent for %s — skipping", today)
-    else:
-        try:
-            wa = WhatsAppBridge()
-            wa.generate_weekly_summary(
-                week_num=_current_week_number(),
-                metrics={
-                    "weekly_cost": f"${costs.get('total_estimated_cost_usd', 0) * 7:.2f}",
-                    "daily_avg": f"${costs.get('total_estimated_cost_usd', 0):.2f}/day",
-                },
-            )
-        except Exception:
-            logger.debug("Weekly WhatsApp summary skipped")
-
-    # Telegram weekly summary — skip if already sent
     tg_weekly_marker = TELEGRAM_DIR / f"telegram-weekly-{today}.txt"
     if tg_weekly_marker.exists():
         logger.info("Weekly Telegram already sent for %s — skipping", today)
@@ -576,20 +544,13 @@ def _current_week_number() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Async command processing (Gap 8 — WhatsApp + Telegram)
+# Async command processing (Gap 8 — Telegram)
 # ---------------------------------------------------------------------------
 
 
 def _process_async_commands() -> list[dict]:
-    """Scan for WhatsApp and Telegram reply files and process commands."""
+    """Scan for Telegram reply files and process commands."""
     results: list[dict] = []
-
-    # WhatsApp replies
-    if WHATSAPP_DIR.is_dir():
-        for reply_file in sorted(WHATSAPP_DIR.glob("whatsapp-reply-*.txt")):
-            parsed = _process_single_reply(reply_file, source="whatsapp")
-            if parsed:
-                results.append(parsed)
 
     # Telegram replies (file-based fallback before webhook is live)
     if TELEGRAM_DIR.is_dir():
