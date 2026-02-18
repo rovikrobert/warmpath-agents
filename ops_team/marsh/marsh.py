@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from agents.shared.api_client import check_health
+from agents.shared.railway_client import get_production_config
 from agents.shared.report import Finding
 from ops_team.shared.config import (
     API_DIR,
@@ -760,6 +761,91 @@ def _check_live_health(
             )
 
 
+def _check_production_config(
+    findings: list[Finding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Check Railway production environment variables via CLI."""
+    config = get_production_config()
+    metrics["production_config_reachable"] = config.reachable
+    metrics["production_config_summary"] = config.summary()
+
+    if not config.reachable:
+        insights.append(
+            OpsInsight(
+                id="marsh-insight-config-unreachable",
+                category="marketplace_health",
+                title="Railway CLI unavailable — cannot verify production config",
+                evidence=config.error,
+                impact="Agent scans will use codebase defaults, not live config. "
+                "May produce false positives about missing env vars.",
+                recommendation="Ensure Railway CLI is installed and linked: `railway link`",
+                confidence=0.9,
+                persona="both",
+                actionable_by="engineering",
+            )
+        )
+        return
+
+    # Report critical missing vars
+    for var in config.critical_missing:
+        findings.append(
+            Finding(
+                id=f"marsh-config-{var.name.lower()}",
+                severity="critical",
+                category="marketplace_health",
+                title=f"MISSING critical env var: {var.name}",
+                detail=f"{var.description}. Without this, core functionality is broken.",
+                recommendation=f"Set {var.name} in Railway: `railway variables set {var.name}=...`",
+            )
+        )
+
+    # Report disabled features
+    for var in config.features_disabled:
+        findings.append(
+            Finding(
+                id=f"marsh-config-{var.name.lower()}",
+                severity="medium",
+                category="marketplace_health",
+                title=f"Feature not configured: {var.name}",
+                detail=f"{var.description}. Feature will be disabled or use fallback.",
+                recommendation=f"Set {var.name} in Railway to enable this feature",
+            )
+        )
+
+    # Build config table for insights
+    set_vars = [v for v in config.variables if v.is_set]
+    unset_vars = [v for v in config.variables if not v.is_set]
+    metrics["production_vars_set"] = len(set_vars)
+    metrics["production_vars_total"] = len(config.variables)
+    metrics["production_critical_ok"] = config.all_critical_set
+
+    # Config details for the insight evidence
+    config_lines = []
+    for v in config.variables:
+        status = "SET" if v.is_set else "MISSING"
+        hint = f" = {v.value_hint}" if v.value_hint else ""
+        config_lines.append(f"  [{v.category.upper()}] {v.name}: {status}{hint}")
+
+    insights.append(
+        OpsInsight(
+            id="marsh-insight-production-config",
+            category="marketplace_health",
+            title=config.summary(),
+            evidence="\n".join(config_lines),
+            impact="Critical vars control email delivery, encryption, and auth. "
+            "Feature vars control AI quality, payments, and OAuth.",
+            recommendation="All critical vars must be set before beta invites"
+            if not config.all_critical_set
+            else "Production config is complete",
+            confidence=0.99,
+            persona="both",
+            actionable_by="engineering",
+        )
+    )
+
+
 def _check_coverage_signals(
     model_source: str,
     findings: list[Finding],
@@ -940,6 +1026,9 @@ def scan() -> OpsTeamReport:
 
     # Live production health check
     _check_live_health(findings, insights, metrics)
+
+    # Production environment config check
+    _check_production_config(findings, insights, metrics)
 
     duration = time.time() - start
 
