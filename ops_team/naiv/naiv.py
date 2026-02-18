@@ -10,7 +10,6 @@ Produces an OpsTeamReport with satisfaction findings and metrics.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import time
@@ -18,9 +17,9 @@ from pathlib import Path
 from typing import Any
 
 from agents.shared.report import Finding
-from ops_team.shared.config import API_DIR, FRONTEND_SRC, MIDDLEWARE_DIR, PAGES_DIR
+from ops_team.shared.config import API_DIR, MIDDLEWARE_DIR, PAGES_DIR
 from ops_team.shared.learning import OpsLearningState
-from ops_team.shared.report import OpsTeamReport, OpsInsight, SatisfactionFinding
+from ops_team.shared.report import OpsTeamReport, SatisfactionFinding
 
 logger = logging.getLogger(__name__)
 
@@ -570,6 +569,7 @@ def _check_live_satisfaction(
 
     session = get_session()
     if session is None:
+        logger.info("naiv: live satisfaction — no DB session, skipping")
         findings.append(
             Finding(
                 id="naiv-live-sat-skip",
@@ -585,13 +585,14 @@ def _check_live_satisfaction(
         from sqlalchemy import func, select
         from app.models.enrichment import UserFeedback
 
-        total = session.execute(
-            select(func.count()).select_from(UserFeedback)
-        ).scalar() or 0
+        logger.info("naiv: live satisfaction — querying user_feedback table")
+        total = (
+            session.execute(select(func.count()).select_from(UserFeedback)).scalar()
+            or 0
+        )
+        logger.info("naiv: live satisfaction — found %d feedback records", total)
 
-        avg_rating = session.execute(
-            select(func.avg(UserFeedback.rating))
-        ).scalar()
+        avg_rating = session.execute(select(func.avg(UserFeedback.rating))).scalar()
 
         feature_rows = session.execute(
             select(
@@ -606,24 +607,35 @@ def _check_live_satisfaction(
             for row in feature_rows
         }
 
-        positive = session.execute(
-            select(func.count()).select_from(UserFeedback).where(
-                UserFeedback.rating == 1
-            )
-        ).scalar() or 0
-        negative = session.execute(
-            select(func.count()).select_from(UserFeedback).where(
-                UserFeedback.rating == -1
-            )
-        ).scalar() or 0
-        neutral = session.execute(
-            select(func.count()).select_from(UserFeedback).where(
-                UserFeedback.rating == 0
-            )
-        ).scalar() or 0
+        positive = (
+            session.execute(
+                select(func.count())
+                .select_from(UserFeedback)
+                .where(UserFeedback.rating == 1)
+            ).scalar()
+            or 0
+        )
+        negative = (
+            session.execute(
+                select(func.count())
+                .select_from(UserFeedback)
+                .where(UserFeedback.rating == -1)
+            ).scalar()
+            or 0
+        )
+        neutral = (
+            session.execute(
+                select(func.count())
+                .select_from(UserFeedback)
+                .where(UserFeedback.rating == 0)
+            ).scalar()
+            or 0
+        )
 
         metrics["live_feedback_count"] = total
-        metrics["live_feedback_avg_rating"] = round(float(avg_rating), 2) if avg_rating is not None else None
+        metrics["live_feedback_avg_rating"] = (
+            round(float(avg_rating), 2) if avg_rating is not None else None
+        )
         metrics["live_feedback_by_feature"] = by_feature
         metrics["live_feedback_positive"] = positive
         metrics["live_feedback_negative"] = negative
@@ -685,6 +697,7 @@ def _check_live_error_telemetry(
 
     session = get_session()
     if session is None:
+        logger.info("naiv: live error telemetry — no DB session, skipping")
         findings.append(
             Finding(
                 id="naiv-live-err-skip",
@@ -701,6 +714,7 @@ def _check_live_error_telemetry(
         from sqlalchemy import func, select
         from app.models.enrichment import UsageLog
         from app.models.audit import AuditLog
+        logger.info("naiv: live error telemetry — querying usage_logs + audit_logs")
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
 
@@ -716,11 +730,14 @@ def _check_live_error_telemetry(
 
         total_actions_7d = sum(row[1] for row in error_actions)
 
-        security_events = session.execute(
-            select(func.count()).select_from(AuditLog).where(
-                AuditLog.created_at >= cutoff
-            )
-        ).scalar() or 0
+        security_events = (
+            session.execute(
+                select(func.count())
+                .select_from(AuditLog)
+                .where(AuditLog.created_at >= cutoff)
+            ).scalar()
+            or 0
+        )
 
         top_actions = {row[0]: row[1] for row in error_actions[:10]}
 
@@ -770,6 +787,7 @@ def _check_live_email_engagement(
 
     session = get_session()
     if session is None:
+        logger.info("naiv: live email engagement — no DB session, skipping")
         findings.append(
             Finding(
                 id="naiv-live-email-skip",
@@ -785,9 +803,11 @@ def _check_live_email_engagement(
         from sqlalchemy import func, select
         from app.models.email_campaign import EmailCampaignLog
 
-        total_sent = session.execute(
-            select(func.count()).select_from(EmailCampaignLog)
-        ).scalar() or 0
+        logger.info("naiv: live email engagement — querying email_campaign_logs")
+        total_sent = (
+            session.execute(select(func.count()).select_from(EmailCampaignLog)).scalar()
+            or 0
+        )
 
         if total_sent == 0:
             findings.append(
@@ -802,17 +822,23 @@ def _check_live_email_engagement(
             metrics["live_email_total_sent"] = 0
             return
 
-        total_opened = session.execute(
-            select(func.count()).select_from(EmailCampaignLog).where(
-                EmailCampaignLog.opened_at.is_not(None)
-            )
-        ).scalar() or 0
+        total_opened = (
+            session.execute(
+                select(func.count())
+                .select_from(EmailCampaignLog)
+                .where(EmailCampaignLog.opened_at.is_not(None))
+            ).scalar()
+            or 0
+        )
 
-        total_clicked = session.execute(
-            select(func.count()).select_from(EmailCampaignLog).where(
-                EmailCampaignLog.clicked_at.is_not(None)
-            )
-        ).scalar() or 0
+        total_clicked = (
+            session.execute(
+                select(func.count())
+                .select_from(EmailCampaignLog)
+                .where(EmailCampaignLog.clicked_at.is_not(None))
+            ).scalar()
+            or 0
+        )
 
         type_rows = session.execute(
             select(
