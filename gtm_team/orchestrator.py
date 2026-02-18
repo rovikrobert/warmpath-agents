@@ -11,6 +11,7 @@ Usage:
     python -m gtm_team.orchestrator --learning-report    # Meta-learning reports
     python -m gtm_team.orchestrator --research-agenda    # Research priorities
     python -m gtm_team.orchestrator --kpi-check          # KPI target status
+    python -m gtm_team.orchestrator --consult "What's our go-to-market readiness?"
 """
 
 from __future__ import annotations
@@ -322,8 +323,20 @@ def main() -> None:
         "--research-agenda", action="store_true", help="Research priorities"
     )
     group.add_argument("--kpi-check", action="store_true", help="KPI target status")
+    group.add_argument(
+        "--consult",
+        type=str,
+        metavar="QUERY",
+        help="Interactive consultation: ask a question",
+    )
 
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--team",
+        type=str,
+        default=None,
+        help="Override team routing (with --consult)",
+    )
 
     args = parser.parse_args()
 
@@ -350,6 +363,13 @@ def main() -> None:
         cmd_research_agenda()
     elif args.kpi_check:
         cmd_kpi_check()
+    elif args.consult:
+        from agents.shared.consultant import consult
+
+        team = args.team or "gtm"
+        print(f"Consulting {team} team...\n")
+        response = consult(args.consult, team=team)
+        print(response.to_markdown())
     else:
         # Default: run all
         cmd_all()

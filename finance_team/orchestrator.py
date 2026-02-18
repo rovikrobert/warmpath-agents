@@ -11,6 +11,7 @@ Usage:
     python -m finance_team.orchestrator --learning-report    # Meta-learning reports
     python -m finance_team.orchestrator --research-agenda    # Research priorities
     python -m finance_team.orchestrator --compliance-audit   # Compliance-focused report
+    python -m finance_team.orchestrator --consult "What's our credit economy health?"
 """
 
 from __future__ import annotations
@@ -332,8 +333,20 @@ def main() -> None:
     group.add_argument(
         "--compliance-audit", action="store_true", help="Compliance-focused report"
     )
+    group.add_argument(
+        "--consult",
+        type=str,
+        metavar="QUERY",
+        help="Interactive consultation: ask a question",
+    )
 
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--team",
+        type=str,
+        default=None,
+        help="Override team routing (with --consult)",
+    )
 
     args = parser.parse_args()
 
@@ -360,6 +373,13 @@ def main() -> None:
         cmd_research_agenda()
     elif args.compliance_audit:
         cmd_compliance_audit()
+    elif args.consult:
+        from agents.shared.consultant import consult
+
+        team = args.team or "finance"
+        print(f"Consulting {team} team...\n")
+        response = consult(args.consult, team=team)
+        print(response.to_markdown())
     else:
         # Default: run all
         cmd_all()

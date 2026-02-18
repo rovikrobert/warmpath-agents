@@ -10,6 +10,7 @@ Usage:
     python -m ops_team.orchestrator --intel-report       # Full intel summary
     python -m ops_team.orchestrator --learning-report    # Meta-learning reports
     python -m ops_team.orchestrator --research-agenda    # Research priorities
+    python -m ops_team.orchestrator --consult "How is marketplace health?"
 """
 
 from __future__ import annotations
@@ -283,8 +284,20 @@ def main() -> None:
     group.add_argument(
         "--research-agenda", action="store_true", help="Research priorities"
     )
+    group.add_argument(
+        "--consult",
+        type=str,
+        metavar="QUERY",
+        help="Interactive consultation: ask a question",
+    )
 
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--team",
+        type=str,
+        default=None,
+        help="Override team routing (with --consult)",
+    )
 
     args = parser.parse_args()
 
@@ -309,6 +322,13 @@ def main() -> None:
         cmd_learning_report()
     elif args.research_agenda:
         cmd_research_agenda()
+    elif args.consult:
+        from agents.shared.consultant import consult
+
+        team = args.team or "ops"
+        print(f"Consulting {team} team...\n")
+        response = consult(args.consult, team=team)
+        print(response.to_markdown())
     else:
         # Default: run all
         cmd_all()

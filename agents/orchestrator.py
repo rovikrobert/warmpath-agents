@@ -9,6 +9,8 @@ Usage:
     python -m agents.orchestrator --cos-daily    # Chief of Staff daily brief
     python -m agents.orchestrator --cos-weekly   # Chief of Staff weekly synthesis
     python -m agents.orchestrator --cos-status   # Chief of Staff status snapshot
+    python -m agents.orchestrator --consult "How should we improve onboarding?"
+    python -m agents.orchestrator --consult "What's our biggest security risk?" --team engineering
 """
 
 from __future__ import annotations
@@ -448,11 +450,23 @@ def main() -> None:
     group.add_argument(
         "--resolved", action="store_true", help="List all resolved findings"
     )
+    group.add_argument(
+        "--consult",
+        type=str,
+        metavar="QUERY",
+        help="Interactive consultation: ask a question to any team",
+    )
 
     parser.add_argument(
         "--skip-tests", action="store_true", help="Skip test_engineer (faster)"
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Debug logging")
+    parser.add_argument(
+        "--team",
+        type=str,
+        default=None,
+        help="Team to consult (with --consult). Options: engineering, data, product, ops, gtm, finance, cos",
+    )
 
     args = parser.parse_args()
 
@@ -500,6 +514,34 @@ def main() -> None:
         cmd_unresolve(args.unresolve)
     elif args.resolved:
         cmd_resolved()
+    elif args.consult:
+        cmd_consult(args.consult, team=args.team)
+
+
+def cmd_consult(query: str, team: str | None = None) -> None:
+    """Interactive consultation with an agent team."""
+    from agents.shared.consultant import consult
+    from agents.chief_of_staff.router import route_query
+
+    if team:
+        # Direct team consultation
+        print(f"Consulting {team} team...\n")
+        response = consult(query, team=team)
+        print(response.to_markdown())
+    else:
+        # Auto-route via CoS router
+        route = route_query(query)
+        print(f"Routing: {route.reasoning}\n")
+        print(f"Consulting {route.primary_team} team...\n")
+        response = consult(query, team=route.primary_team)
+        print(response.to_markdown())
+
+        # Consult secondary teams if confidence is low
+        if route.secondary_teams and route.confidence < 0.6:
+            for sec_team in route.secondary_teams[:1]:
+                print(f"\nAlso consulting {sec_team} team...\n")
+                sec_response = consult(query, team=sec_team)
+                print(sec_response.to_markdown())
 
 
 if __name__ == "__main__":
