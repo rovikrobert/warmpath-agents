@@ -33,6 +33,8 @@ from agents.shared.report import AgentReport
 from .cos_config import COS_CONFIG
 from .cos_learning import record_cost_snapshot, update_team_reliability
 from .notion_sync import NotionSync
+from .resolver import attempt_resolution
+from .schemas import Conflict
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
 from .whatsapp_bridge import WhatsAppBridge
 
@@ -135,6 +137,93 @@ def _get_kpi_snapshot(reports: list[AgentReport]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Conflict detection & resolution logging
+# ---------------------------------------------------------------------------
+
+
+def _detect_conflicts(cross_team_requests: list[dict]) -> list[Conflict]:
+    """Detect conflicts from cross-team requests.
+
+    A conflict exists when two different teams have requests touching the same
+    domain with a meaningful urgency gap (>= 2 levels apart).
+    """
+    conflicts: list[Conflict] = []
+    domain_keywords: dict[str, list[str]] = {
+        "security": ["security", "privacy", "breach", "pii", "vulnerability"],
+        "shipping": ["ship", "feature", "launch", "release", "sprint"],
+        "cost": ["cost", "budget", "spend", "credit", "billing"],
+        "data": ["schema", "migration", "database", "pipeline"],
+        "ux": ["ux", "accessibility", "onboarding", "journey", "conversion"],
+    }
+    domain_buckets: dict[str, list[dict]] = {d: [] for d in domain_keywords}
+    for req in cross_team_requests:
+        req_text = (req.get("request", "") + " " + (req.get("blocking", "") or "")).lower()
+        for domain, kws in domain_keywords.items():
+            if any(kw in req_text for kw in kws):
+                domain_buckets[domain].append(req)
+
+    conflict_id = 0
+    urgency_map = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    for domain, reqs in domain_buckets.items():
+        if len(reqs) < 2:
+            continue
+        teams = list({r.get("source_agent", r.get("team", "unknown")) for r in reqs})
+        if len(teams) < 2:
+            continue
+        urgencies = [urgency_map.get(r.get("urgency", "medium"), 2) for r in reqs]
+        if max(urgencies) - min(urgencies) >= 2:
+            conflict_id += 1
+            conflicts.append(Conflict(
+                id=f"conflict-{conflict_id:03d}-{domain}",
+                teams=teams[:2],
+                description=f"Conflicting urgency on {domain}: {teams[0]} vs {teams[1]}",
+                positions={
+                    r.get("source_agent", r.get("team", "unknown")): r.get("request", "")
+                    for r in reqs[:2]
+                },
+                evidence={
+                    r.get("source_agent", r.get("team", "unknown")): r.get("blocking", "") or ""
+                    for r in reqs[:2]
+                },
+                cos_recommendation=f"Prioritize {domain} concern by decision principles",
+                resolution_level=1,
+            ))
+    return conflicts
+
+
+def _log_resolutions_to_notion(
+    resolutions: list, conflicts: list
+) -> None:
+    """Log each conflict resolution to the Notion Decision Log (best-effort)."""
+    if not resolutions:
+        return
+    try:
+        notion = NotionSync()
+        if not notion.enabled:
+            return
+        conflict_map = {c.id: c for c in conflicts}
+        for res in resolutions:
+            conflict = conflict_map.get(res.conflict_id)
+            decider = "Founder" if res.escalated else "CoS"
+            context = conflict.description if conflict else f"conflict_id={res.conflict_id}"
+            business_outcomes = None
+            if conflict and any(
+                "privacy" in p.lower() or "security" in p.lower()
+                for p in conflict.positions.values()
+            ):
+                business_outcomes = ["#1 Job seekers land jobs"]
+            notion.log_decision(
+                decision=f"[{res.strategy_used}] {res.conflict_id}",
+                decider=decider,
+                context=context,
+                outcome=res.outcome,
+                business_outcomes=business_outcomes,
+            )
+    except Exception:
+        logger.debug("Resolution logging to Notion skipped")
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -148,8 +237,44 @@ def run_daily() -> str:
     kpi_snapshot = _get_kpi_snapshot(reports)
     costs = get_team_cost_summary(reports)
     alerts = check_budget_alerts(costs, COS_CONFIG["cost_budget"])
+
+    # Read active founder briefs from Notion (Rovik → CoS context)
+    founder_requests: list[dict] = []
+    try:
+        notion = NotionSync()
+        if notion.enabled:
+            founder_requests = notion.get_active_briefs()
+            if founder_requests:
+                logger.info(
+                    "Found %d active founder briefs from Notion", len(founder_requests)
+                )
+    except Exception:
+        logger.debug("get_active_briefs skipped (Notion not configured)")
+
+    # Detect and resolve cross-team conflicts
+    conflicts = _detect_conflicts(cross_team_requests)
+    resolutions = [attempt_resolution(c) for c in conflicts]
+    escalated = [r for r in resolutions if r.escalated]
+    auto_resolved = [r for r in resolutions if not r.escalated]
+    if conflicts:
+        logger.info(
+            "Resolved %d conflicts (%d escalated, %d auto-resolved)",
+            len(conflicts), len(escalated), len(auto_resolved),
+        )
+    # Inject escalated resolutions as critical cross-team requests
+    for res in escalated:
+        cross_team_requests.append({
+            "source_agent": "cos",
+            "team": "cos",
+            "request": f"[CONFLICT ESCALATED] {res.outcome}",
+            "urgency": "critical",
+            "blocking": f"conflict_id={res.conflict_id}",
+        })
+
     brief, brief_data = synthesize_daily(
-        reports, kpi_snapshot, costs, alerts, cross_team_requests
+        reports, kpi_snapshot, costs, alerts, cross_team_requests,
+        founder_requests=founder_requests,
+        resolutions=[r.model_dump() for r in resolutions],
     )
 
     # Update learning state
@@ -199,6 +324,9 @@ def run_daily() -> str:
 
     # Push to Notion and generate WhatsApp message
     _push_daily_outputs(brief, costs, alerts, brief_data)
+
+    # Log conflict resolutions to Notion Decision Log
+    _log_resolutions_to_notion(resolutions, conflicts)
 
     return brief
 

@@ -65,7 +65,9 @@ def synthesize_daily(
     costs: dict[str, Any] | None = None,
     alerts: list[str] | None = None,
     cross_team_requests: list[dict[str, Any]] | None = None,
-) -> str:
+    founder_requests: list[dict[str, Any]] | None = None,
+    resolutions: list[dict[str, Any]] | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Daily cycle: load reports -> classify -> enrich -> render brief."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -109,6 +111,8 @@ def synthesize_daily(
         progress=progress_items,
         cross_team_requests=cross_team_requests or [],
         operational_health=operational_health,
+        founder_requests=founder_requests or [],
+        resolutions=resolutions or [],
         cost_summary=costs or {},
         kpi_snapshot=kpi_snapshot,
     )
@@ -286,6 +290,25 @@ def _render_daily_brief(brief: FounderBrief, alerts: list[str]) -> str:
     else:
         lines.append("No decisions needed today.")
     lines.append("")
+
+    # Founder requests (active briefs from Notion)
+    if brief.founder_requests:
+        lines.append("## Founder Requests")
+        for fr in brief.founder_requests:
+            priority = fr.get("priority", "P3")
+            title = fr.get("title", "Untitled")
+            lines.append(f"- **[{priority}]** {title}")
+        lines.append("")
+
+    # Conflict resolutions
+    if brief.resolutions:
+        lines.append("## Conflict Resolutions")
+        for res in brief.resolutions:
+            escalated_tag = " **[ESCALATED]**" if res.get("escalated") else ""
+            strategy = res.get("strategy_used", "unknown")
+            outcome = res.get("outcome", "")
+            lines.append(f"- [{strategy}]{escalated_tag} {outcome}")
+        lines.append("")
 
     # Key updates
     lines.append("## Key Updates")
