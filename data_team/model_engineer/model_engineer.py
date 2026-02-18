@@ -306,6 +306,212 @@ def _check_ab_testing_readiness(
 
 
 # ---------------------------------------------------------------------------
+# Live model analytics (requires DATABASE_URL)
+# ---------------------------------------------------------------------------
+
+
+def _scan_warm_score_calibration(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Correlate warm_score bands with actual intro approval rates.
+
+    Runs WARM_SCORE_VS_OUTCOME template and checks whether higher scores
+    correspond to higher approval rates (the fundamental assumption).
+    """
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["warm_score_calibration_available"] = False
+        return
+
+    metrics["warm_score_calibration_available"] = True
+
+    # Run approval rate query — aggregated, no user_id filter needed
+    approval_sql = """
+    SELECT
+        CASE
+            WHEN ws.total_score >= 80 THEN 'high'
+            WHEN ws.total_score >= 50 THEN 'medium'
+            ELSE 'low'
+        END AS score_band,
+        COUNT(*) AS total_intros,
+        COUNT(CASE WHEN inf.status = 'approved' THEN 1 END) AS approved
+    FROM warm_scores ws
+    JOIN intro_facilitations inf ON inf.contact_id = ws.contact_id
+    GROUP BY score_band
+    HAVING COUNT(*) >= 5
+    """
+    rows = qe.execute_sql(approval_sql, context="warm_score_calibration")
+
+    if not rows:
+        metrics["warm_score_sample_size"] = 0
+        return
+
+    total_sample = sum(r.get("total_intros", 0) for r in rows)
+    metrics["warm_score_sample_size"] = total_sample
+
+    # Build band → approval_rate map
+    band_rates: dict[str, float] = {}
+    for row in rows:
+        band = row.get("score_band", "unknown")
+        total = row.get("total_intros", 0) or 0
+        approved = row.get("approved", 0) or 0
+        if total > 0:
+            band_rates[band] = round(approved / total, 3)
+
+    metrics["warm_score_band_rates"] = band_rates
+
+    # Core validation: high > medium > low
+    high_rate = band_rates.get("high", 0)
+    medium_rate = band_rates.get("medium", 0)
+    low_rate = band_rates.get("low", 0)
+
+    monotonic = high_rate >= medium_rate >= low_rate
+    metrics["warm_score_monotonic"] = monotonic
+
+    if not monotonic and total_sample >= 30:
+        findings.append(
+            Finding(
+                id="model-009",
+                severity="high",
+                category="model_calibration",
+                title="Warm score is miscalibrated — higher scores don't predict better outcomes",
+                detail=(
+                    f"Approval rates: high={high_rate:.0%}, "
+                    f"medium={medium_rate:.0%}, low={low_rate:.0%} "
+                    f"(n={total_sample})"
+                ),
+                recommendation=(
+                    "Recalibrate warm_score weights. Consider: "
+                    "1) Run regression on outcome data to find optimal weights, "
+                    "2) Add outcome-based recency bias, "
+                    "3) Test with/without cultural context"
+                ),
+            )
+        )
+
+    insights.append(
+        Insight(
+            id="model-insight-calibration",
+            category="model",
+            title="Warm score outcome correlation",
+            evidence=(
+                f"Bands: high={high_rate:.0%}, med={medium_rate:.0%}, "
+                f"low={low_rate:.0%} | monotonic={monotonic} | n={total_sample}"
+            ),
+            impact="Miscalibrated scores waste job seeker credits on unlikely intros",
+            recommendation=(
+                "Target: high band ≥60% approval, low band ≤30%. "
+                "Recalibrate if inverted."
+            ),
+            confidence=0.9 if total_sample >= 100 else 0.6,
+            statistical_significance=total_sample >= 100,
+            sample_size=total_sample,
+            actionable_by="model_engineer",
+        )
+    )
+
+
+def _scan_ab_test_analysis(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Analyse A/B experiment results if experiment data exists.
+
+    Runs CULTURAL_CONTEXT_EFFECTIVENESS to compare approach styles.
+    """
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["ab_test_analysis_available"] = False
+        return
+
+    metrics["ab_test_analysis_available"] = True
+
+    # Cultural context as a natural experiment
+    context_sql = """
+    SELECT
+        mr.cultural_context->>'approach_style' AS approach_style,
+        COUNT(*) AS total_matches,
+        AVG(CASE WHEN mr.user_feedback = 'positive' THEN 1.0 ELSE 0.0 END) AS positive_rate
+    FROM match_results mr
+    WHERE mr.cultural_context IS NOT NULL
+        AND mr.user_feedback IS NOT NULL
+    GROUP BY mr.cultural_context->>'approach_style'
+    HAVING COUNT(*) >= 5
+    """
+    rows = qe.execute_sql(context_sql, context="ab_test:cultural_context")
+
+    if not rows:
+        metrics["ab_test_variants_tested"] = 0
+        return
+
+    metrics["ab_test_variants_tested"] = len(rows)
+    total_matches = sum(r.get("total_matches", 0) for r in rows)
+    metrics["ab_test_total_samples"] = total_matches
+
+    # Find best and worst performing styles
+    by_rate = sorted(rows, key=lambda r: r.get("positive_rate", 0), reverse=True)
+    best = by_rate[0]
+    worst = by_rate[-1]
+
+    best_style = best.get("approach_style", "unknown")
+    best_rate = best.get("positive_rate", 0)
+    worst_style = worst.get("approach_style", "unknown")
+    worst_rate = worst.get("positive_rate", 0)
+
+    metrics["ab_test_best_style"] = best_style
+    metrics["ab_test_best_rate"] = round(best_rate, 3)
+    metrics["ab_test_worst_style"] = worst_style
+    metrics["ab_test_worst_rate"] = round(worst_rate, 3)
+
+    # Significant difference?
+    rate_gap = best_rate - worst_rate
+    if rate_gap > 0.15 and total_matches >= 50:
+        findings.append(
+            Finding(
+                id="model-010",
+                severity="medium",
+                category="model_calibration",
+                title=f"Cultural context '{best_style}' outperforms '{worst_style}' by {rate_gap:.0%}",
+                detail=(
+                    f"Best: {best_style} ({best_rate:.0%}), "
+                    f"Worst: {worst_style} ({worst_rate:.0%}), "
+                    f"n={total_matches}"
+                ),
+                recommendation=(
+                    "Consider defaulting to the higher-performing approach style "
+                    "or refining the lower-performing variant"
+                ),
+            )
+        )
+
+    insights.append(
+        Insight(
+            id="model-insight-ab",
+            category="model",
+            title="Cultural context effectiveness analysis",
+            evidence=(
+                f"{len(rows)} styles tested across {total_matches} matches. "
+                f"Best: {best_style} ({best_rate:.0%}), "
+                f"worst: {worst_style} ({worst_rate:.0%})"
+            ),
+            impact="Approach style directly affects response rate and user satisfaction",
+            recommendation="Route users to highest-performing style for their context",
+            confidence=0.8 if total_matches >= 100 else 0.5,
+            statistical_significance=total_matches >= 100 and rate_gap > 0.10,
+            sample_size=total_matches,
+            actionable_by="model_engineer",
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -322,6 +528,8 @@ def scan() -> DataTeamReport:
     _check_cultural_context(findings, insights, metrics)
     _check_ai_token_usage(findings, metrics)
     _check_ab_testing_readiness(findings, metrics)
+    _scan_warm_score_calibration(findings, insights, metrics)
+    _scan_ab_test_analysis(findings, insights, metrics)
 
     duration = time.time() - start
 

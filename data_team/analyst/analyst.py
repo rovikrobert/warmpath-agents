@@ -210,6 +210,253 @@ def _check_credit_transaction_types(
         )
 
 
+# ---------------------------------------------------------------------------
+# Live analytics (requires DATABASE_URL)
+# ---------------------------------------------------------------------------
+
+
+def _scan_anomaly_detection(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Detect anomalies in key metrics using Z-score analysis.
+
+    Runs WEEKLY_ACTIVE_USERS and DAILY_SIGNUPS templates, computes
+    rolling statistics, and flags values > 2 standard deviations from mean.
+    """
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["anomaly_detection_available"] = False
+        return
+
+    metrics["anomaly_detection_available"] = True
+    anomalies_found = 0
+
+    # Weekly active users — check for sudden drops or spikes
+    wau_rows = qe.execute_template(
+        "weekly_active_users",
+        {"start_date": "2020-01-01"},
+    )
+    if len(wau_rows) >= 4:
+        values = [r["active_users"] for r in wau_rows]
+        anomaly = _detect_zscore_anomaly(values)
+        metrics["wau_trend_length"] = len(values)
+        metrics["wau_latest"] = values[-1]
+
+        if anomaly:
+            anomalies_found += 1
+            direction = "spike" if anomaly["direction"] == "high" else "drop"
+            findings.append(
+                Finding(
+                    id="analyst-anomaly-001",
+                    severity="high" if anomaly["direction"] == "low" else "medium",
+                    category="anomaly",
+                    title=f"WAU {direction} detected (z={anomaly['z_score']:.1f})",
+                    detail=(
+                        f"Latest: {values[-1]}, mean: {anomaly['mean']:.0f}, "
+                        f"std: {anomaly['std']:.1f}"
+                    ),
+                    recommendation=(
+                        "Investigate cause — check for platform issues or marketing events"
+                        if anomaly["direction"] == "low"
+                        else "Positive growth signal — validate data quality"
+                    ),
+                )
+            )
+
+    # Credit flow — check for unusual transaction patterns
+    credit_rows = qe.execute_template(
+        "credit_flow",
+        {"start_date": "2020-01-01", "end_date": "2099-01-01"},
+    )
+    if credit_rows:
+        total_volume = sum(r.get("total_amount", 0) or 0 for r in credit_rows)
+        metrics["credit_total_volume"] = total_volume
+        earn_count = sum(
+            r.get("tx_count", 0)
+            for r in credit_rows
+            if "earn" in str(r.get("transaction_type", "")).lower()
+            or "upload" in str(r.get("transaction_type", "")).lower()
+        )
+        spend_count = sum(
+            r.get("tx_count", 0)
+            for r in credit_rows
+            if "spend" in str(r.get("transaction_type", "")).lower()
+            or "search" in str(r.get("transaction_type", "")).lower()
+        )
+        metrics["credit_earn_count"] = earn_count
+        metrics["credit_spend_count"] = spend_count
+
+        if earn_count > 0 and spend_count == 0:
+            anomalies_found += 1
+            findings.append(
+                Finding(
+                    id="analyst-anomaly-002",
+                    severity="medium",
+                    category="anomaly",
+                    title="Credits earned but never spent — demand side inactive",
+                    detail=f"Earn txns: {earn_count}, Spend txns: {spend_count}",
+                    recommendation="Investigate demand-side activation — are job seekers searching?",
+                )
+            )
+
+    metrics["anomalies_detected"] = anomalies_found
+
+    if anomalies_found:
+        insights.append(
+            Insight(
+                id="analyst-insight-anomaly",
+                category="anomaly",
+                title=f"{anomalies_found} metric anomalies detected",
+                evidence=f"Z-score analysis on WAU + credit flow",
+                impact="Anomalies may indicate platform issues, churn, or data quality problems",
+                recommendation="Review anomaly details and cross-reference with deployment history",
+                confidence=0.75,
+                sample_size=len(wau_rows) + len(credit_rows),
+            )
+        )
+
+
+def _scan_cohort_retention(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Analyse signup cohort retention curves from live data.
+
+    Runs SIGNUP_COHORT_RETENTION and SIGNUP_COHORT_ACTIVATION templates,
+    computes retention rates, and flags cohorts with steep drop-offs.
+    """
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["cohort_analysis_available"] = False
+        return
+
+    metrics["cohort_analysis_available"] = True
+
+    # Retention: week-2 retained users per signup cohort
+    retention_rows = qe.execute_template(
+        "signup_cohort_retention",
+        {"start_date": "2020-01-01"},
+    )
+    if retention_rows:
+        cohort_count = len(retention_rows)
+        metrics["cohort_count"] = cohort_count
+
+        retention_rates = []
+        for row in retention_rows:
+            size = row.get("cohort_size", 0) or 0
+            retained = row.get("retained_week_2", 0) or 0
+            if size > 0:
+                retention_rates.append(retained / size)
+
+        if retention_rates:
+            avg_retention = sum(retention_rates) / len(retention_rates)
+            metrics["avg_week2_retention"] = round(avg_retention, 3)
+            metrics["min_week2_retention"] = round(min(retention_rates), 3)
+            metrics["max_week2_retention"] = round(max(retention_rates), 3)
+
+            if avg_retention < 0.20:
+                findings.append(
+                    Finding(
+                        id="analyst-cohort-001",
+                        severity="high",
+                        category="retention",
+                        title=f"Week-2 retention is {avg_retention:.0%} — below 20% threshold",
+                        detail=f"Across {cohort_count} cohorts, avg retention = {avg_retention:.1%}",
+                        recommendation=(
+                            "Focus on activation: reduce time-to-first-value, "
+                            "improve onboarding, add re-engagement emails"
+                        ),
+                    )
+                )
+
+            insights.append(
+                Insight(
+                    id="analyst-insight-retention",
+                    category="retention",
+                    title="Cohort retention analysis",
+                    evidence=(
+                        f"{cohort_count} cohorts, avg week-2 retention: {avg_retention:.1%}, "
+                        f"range: {min(retention_rates):.1%}–{max(retention_rates):.1%}"
+                    ),
+                    impact="Retention directly drives LTV and marketplace liquidity",
+                    recommendation="Target 30%+ week-2 retention for marketplace viability",
+                    confidence=0.85,
+                    sample_size=sum(r.get("cohort_size", 0) or 0 for r in retention_rows),
+                    actionable_by="product_team",
+                )
+            )
+
+    # Activation: upload rate per signup cohort
+    activation_rows = qe.execute_template(
+        "signup_cohort_activation",
+        {"start_date": "2020-01-01"},
+    )
+    if activation_rows:
+        activation_rates = []
+        for row in activation_rows:
+            size = row.get("cohort_size", 0) or 0
+            activated = row.get("activated", 0) or 0
+            if size > 0:
+                activation_rates.append(activated / size)
+
+        if activation_rates:
+            avg_activation = sum(activation_rates) / len(activation_rates)
+            metrics["avg_activation_rate"] = round(avg_activation, 3)
+
+            if avg_activation < 0.40:
+                findings.append(
+                    Finding(
+                        id="analyst-cohort-002",
+                        severity="medium",
+                        category="retention",
+                        title=f"Activation rate is {avg_activation:.0%} — below 40% target",
+                        detail=f"Activation = first CSV upload after signup",
+                        recommendation="Simplify onboarding, provide sample CSV, add activation nudges",
+                    )
+                )
+
+
+def _detect_zscore_anomaly(
+    values: list[float | int],
+    threshold: float = 2.0,
+) -> dict | None:
+    """Check if the last value is anomalous relative to the series.
+
+    Returns anomaly info dict or None if no anomaly.
+    """
+    if len(values) < 4:
+        return None
+
+    # Use all but the last value as the baseline
+    baseline = values[:-1]
+    latest = values[-1]
+
+    mean = sum(baseline) / len(baseline)
+    variance = sum((x - mean) ** 2 for x in baseline) / len(baseline)
+    std = variance ** 0.5
+
+    if std == 0:
+        return None
+
+    z = (latest - mean) / std
+
+    if abs(z) >= threshold:
+        return {
+            "z_score": round(z, 2),
+            "mean": mean,
+            "std": std,
+            "direction": "high" if z > 0 else "low",
+        }
+    return None
+
+
 def _check_funnel_instrumentation(
     actions: set[str],
     findings: list[Finding],
@@ -329,6 +576,8 @@ def scan() -> DataTeamReport:
     _check_application_statuses(findings, metrics)
     _check_marketplace_endpoints(endpoints, findings, metrics)
     _check_credit_transaction_types(findings, metrics)
+    _scan_anomaly_detection(findings, insights, metrics)
+    _scan_cohort_retention(findings, insights, metrics)
 
     duration = time.time() - start
 

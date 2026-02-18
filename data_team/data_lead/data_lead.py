@@ -368,6 +368,121 @@ def generate_monthly_review(reports: list[DataTeamReport] | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Intelligence freshness + live KPIs
+# ---------------------------------------------------------------------------
+
+
+def _check_intel_freshness(
+    findings: list[Finding],
+    metrics: dict,
+) -> None:
+    """Flag stale intelligence categories as findings."""
+    try:
+        di = DataIntelligence()
+        freshness = di.check_freshness()
+        stale = [cat for cat, is_fresh in freshness.items() if not is_fresh]
+        metrics["intel_categories_total"] = len(freshness)
+        metrics["intel_categories_stale"] = len(stale)
+
+        if stale:
+            findings.append(
+                Finding(
+                    id="lead-intel-001",
+                    severity="low",
+                    category="intelligence",
+                    title=f"{len(stale)} intelligence categories are stale",
+                    detail=f"Stale: {', '.join(stale[:5])}",
+                    recommendation=(
+                        "Run --intel to refresh, or add web scraping for auto-refresh"
+                    ),
+                )
+            )
+    except Exception:
+        pass
+
+
+def _populate_live_kpis(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Populate KPI dashboard with live database values."""
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["live_kpis_available"] = False
+        return
+
+    metrics["live_kpis_available"] = True
+    kpi_values: dict[str, float | None] = {}
+
+    # Activation rate: users who uploaded / total users
+    funnel_rows = qe.execute_template(
+        "activation_funnel",
+        {"start_date": "2020-01-01", "end_date": "2099-01-01"},
+    )
+    if funnel_rows:
+        total = funnel_rows[0].get("total_users", 0) or 0
+        uploaded = funnel_rows[0].get("uploaded", 0) or 0
+        searched = funnel_rows[0].get("searched", 0) or 0
+        requested = funnel_rows[0].get("requested_intro", 0) or 0
+
+        kpi_values["activation_rate"] = round(uploaded / total, 3) if total else None
+        kpi_values["upload_to_search_rate"] = (
+            round(searched / uploaded, 3) if uploaded else None
+        )
+        kpi_values["search_to_intro_rate"] = (
+            round(requested / searched, 3) if searched else None
+        )
+
+    # Intro approval rate
+    approval_rows = qe.execute_template(
+        "intro_approval_rate",
+        {"start_date": "2020-01-01", "end_date": "2099-01-01"},
+    )
+    if approval_rows:
+        total = approval_rows[0].get("total_requests", 0) or 0
+        approved = approval_rows[0].get("approved", 0) or 0
+        kpi_values["intro_approval_rate"] = (
+            round(approved / total, 3) if total else None
+        )
+
+    # Marketplace supply coverage (distinct companies)
+    marketplace_rows = qe.execute_template(
+        "marketplace_health",
+        {"start_date": "2020-01-01"},
+    )
+    if marketplace_rows:
+        kpi_values["marketplace_supply_coverage"] = (
+            marketplace_rows[0].get("companies_represented", 0)
+        )
+
+    metrics["live_kpi_values"] = kpi_values
+
+    # Flag KPIs that are below red threshold
+    for kpi_name, value in kpi_values.items():
+        if value is None:
+            continue
+        target_info = KPI_TARGETS.get(kpi_name)
+        if not target_info:
+            continue
+        yellow = target_info.get("yellow", 0)
+        if isinstance(value, (int, float)) and isinstance(yellow, (int, float)):
+            if value < yellow:
+                findings.append(
+                    Finding(
+                        id=f"lead-kpi-{kpi_name}",
+                        severity="high",
+                        category="kpi",
+                        title=f"KPI '{kpi_name}' at {value} — below yellow threshold ({yellow})",
+                        detail=f"Target: {target_info['target']}, Current: {value}",
+                        recommendation=f"Investigate drivers of low {kpi_name}",
+                    )
+                )
+
+
+# ---------------------------------------------------------------------------
 # Public API (scan pattern)
 # ---------------------------------------------------------------------------
 
@@ -392,6 +507,12 @@ def scan() -> DataTeamReport:
     metrics["sub_agents_reporting"] = len(reports)
     metrics["total_findings"] = len(findings)
     metrics["total_insights"] = len(insights)
+
+    # Intelligence freshness — flag stale categories as findings
+    _check_intel_freshness(findings, metrics)
+
+    # Live KPIs — populate dashboard with actual values if DB available
+    _populate_live_kpis(findings, insights, metrics)
 
     # Check for critical findings that need cross-team attention
     critical_findings = [f for f in findings if f.severity == "critical"]

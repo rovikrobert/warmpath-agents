@@ -386,6 +386,112 @@ def _validate_sql_templates(
 
 
 # ---------------------------------------------------------------------------
+# Live data quality (requires DATABASE_URL)
+# ---------------------------------------------------------------------------
+
+# Tables critical for platform operation — empty = problem
+_CRITICAL_TABLES = [
+    "users",
+    "contacts",
+    "csv_uploads",
+    "search_requests",
+    "marketplace_listings",
+    "intro_facilitations",
+    "credit_transactions",
+]
+
+
+def _scan_live_data_quality(
+    findings: list[Finding],
+    insights: list[Insight],
+    metrics: dict,
+) -> None:
+    """Query live database for row counts, staleness, and data quality signals.
+
+    Gracefully skips when DATABASE_URL is not set.
+    """
+    from data_team.shared.query_executor import get_executor
+
+    qe = get_executor()
+    if not qe.is_available():
+        metrics["live_db_available"] = False
+        return
+
+    metrics["live_db_available"] = True
+    row_counts: dict[str, int] = {}
+    empty_tables: list[str] = []
+
+    for table in _CRITICAL_TABLES:
+        rows = qe.execute_sql(
+            f"SELECT COUNT(*) AS cnt FROM {table}",
+            context=f"data_quality:{table}",
+        )
+        count = rows[0]["cnt"] if rows else 0
+        row_counts[table] = count
+        if count == 0:
+            empty_tables.append(table)
+
+    metrics["live_row_counts"] = row_counts
+    metrics["live_empty_tables"] = len(empty_tables)
+    metrics["live_total_rows"] = sum(row_counts.values())
+
+    if empty_tables:
+        findings.append(
+            Finding(
+                id="pipe-010",
+                severity="high" if "users" in empty_tables else "medium",
+                category="data_quality",
+                title=f"{len(empty_tables)} critical tables are empty",
+                detail=f"Empty: {', '.join(empty_tables)}",
+                recommendation="Seed data or verify platform is receiving traffic",
+            )
+        )
+
+    # Staleness check — most recent activity across key tables
+    staleness_sql = (
+        "SELECT MAX(created_at) AS latest FROM usage_logs"
+    )
+    rows = qe.execute_sql(staleness_sql, context="data_quality:staleness")
+    if rows and rows[0].get("latest"):
+        from datetime import datetime, timezone
+
+        latest = rows[0]["latest"]
+        if hasattr(latest, "tzinfo") and latest.tzinfo is None:
+            latest = latest.replace(tzinfo=timezone.utc)
+        age_hours = (datetime.now(timezone.utc) - latest).total_seconds() / 3600
+        metrics["live_latest_activity_hours_ago"] = round(age_hours, 1)
+
+        if age_hours > 72:
+            findings.append(
+                Finding(
+                    id="pipe-011",
+                    severity="medium",
+                    category="data_quality",
+                    title=f"No platform activity in {age_hours:.0f} hours",
+                    detail="Most recent usage_log entry is stale",
+                    recommendation="Verify platform is live and users are active",
+                )
+            )
+
+    insights.append(
+        Insight(
+            id="pipe-insight-002",
+            category="data_quality",
+            title="Live data quality assessment",
+            evidence=(
+                f"{len(row_counts)} tables checked, "
+                f"{metrics['live_total_rows']} total rows, "
+                f"{len(empty_tables)} empty"
+            ),
+            impact="Empty tables block analytics and marketplace functionality",
+            recommendation="Prioritize seeding supply side (network holders) per post-build roadmap",
+            confidence=0.95,
+            sample_size=metrics["live_total_rows"],
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -409,6 +515,7 @@ def scan() -> DataTeamReport:
     _check_instrumentation(findings, insights, metrics)
     _check_data_retention(findings)
     _validate_sql_templates(findings, metrics)
+    _scan_live_data_quality(findings, insights, metrics)
 
     duration = time.time() - start
 
