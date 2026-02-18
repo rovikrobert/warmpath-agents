@@ -18,7 +18,6 @@ from ops_team.shared.config import (
     COACH_JOURNEY_STEPS,
     COACH_KEYWORD_COVERAGE_TARGET,
     FRONTEND_SRC,
-    OPS_TEAM_DIR,
     PAGES_DIR,
 )
 from ops_team.shared.learning import OpsLearningState

@@ -255,7 +255,7 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
 
     # Learning Updates (never breaks the brief)
     try:
-        from agents.shared.learning import get_learning_state, AgentLearningState
+        from agents.shared.learning import get_learning_state
 
         lead_ls = get_learning_state(AGENT_NAME)
         meta = lead_ls.generate_meta_learning_report()
@@ -437,7 +437,6 @@ def generate_weekly_report(reports: list[AgentReport] | None = None) -> str:
     # Learning Deep Dive (never breaks the weekly report)
     try:
         from agents.shared.learning import get_learning_state
-        from agents.shared.config import AGENT_NAMES
 
         lines.append("### Learning Deep Dive")
 

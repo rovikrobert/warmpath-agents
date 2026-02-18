@@ -23,7 +23,6 @@ from app.models.search_request import SearchRequest
 from app.models.user import ConnectorProfile, User
 from app.services.credits import get_balance
 from app.services.dashboard_insights import (
-    _get_job_market_trends,
     _get_network_analysis,
     _read_cache,
     _write_cache,

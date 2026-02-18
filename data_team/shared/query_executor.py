@@ -59,7 +59,7 @@ class QueryExecutor:
 
             # Normalise URL: Railway may use postgres:// (old style)
             if db_url.startswith("postgres://"):
-                db_url = "postgresql://" + db_url[len("postgres://"):]
+                db_url = "postgresql://" + db_url[len("postgres://") :]
             # Strip async driver prefix if present
             db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
 

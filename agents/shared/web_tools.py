@@ -17,7 +17,6 @@ import logging
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from urllib.parse import quote_plus, unquote
 
 import httpx
@@ -168,9 +167,7 @@ def _html_to_text(html: str) -> str:
         r"<(script|style)[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE
     )
     # Replace block elements with newlines
-    text = re.sub(
-        r"<(?:br|p|div|li|h[1-6])[^>]*/?>", "\n", text, flags=re.IGNORECASE
-    )
+    text = re.sub(r"<(?:br|p|div|li|h[1-6])[^>]*/?>", "\n", text, flags=re.IGNORECASE)
     # Remove remaining tags
     text = re.sub(r"<[^>]+>", "", text)
     # Decode common HTML entities

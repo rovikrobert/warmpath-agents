@@ -36,7 +36,11 @@ from .budget_enforcer import (
     update_throttle_status,
 )
 from .cos_config import COS_CONFIG
-from .cos_learning import record_cost_snapshot, record_founder_decision, update_team_reliability
+from .cos_learning import (
+    record_cost_snapshot,
+    record_founder_decision,
+    update_team_reliability,
+)
 from .notion_sync import NotionSync
 from .org_evaluator import evaluate_triggers, generate_restructuring_proposal
 from .pod_manager import detect_permanent_pods, get_pod_report
@@ -165,7 +169,9 @@ def _detect_conflicts(cross_team_requests: list[dict]) -> list[Conflict]:
     }
     domain_buckets: dict[str, list[dict]] = {d: [] for d in domain_keywords}
     for req in cross_team_requests:
-        req_text = (req.get("request", "") + " " + (req.get("blocking", "") or "")).lower()
+        req_text = (
+            req.get("request", "") + " " + (req.get("blocking", "") or "")
+        ).lower()
         for domain, kws in domain_keywords.items():
             if any(kw in req_text for kw in kws):
                 domain_buckets[domain].append(req)
@@ -181,27 +187,32 @@ def _detect_conflicts(cross_team_requests: list[dict]) -> list[Conflict]:
         urgencies = [urgency_map.get(r.get("urgency", "medium"), 2) for r in reqs]
         if max(urgencies) - min(urgencies) >= 2:
             conflict_id += 1
-            conflicts.append(Conflict(
-                id=f"conflict-{conflict_id:03d}-{domain}",
-                teams=teams[:2],
-                description=f"Conflicting urgency on {domain}: {teams[0]} vs {teams[1]}",
-                positions={
-                    r.get("source_agent", r.get("team", "unknown")): r.get("request", "")
-                    for r in reqs[:2]
-                },
-                evidence={
-                    r.get("source_agent", r.get("team", "unknown")): r.get("blocking", "") or ""
-                    for r in reqs[:2]
-                },
-                cos_recommendation=f"Prioritize {domain} concern by decision principles",
-                resolution_level=1,
-            ))
+            conflicts.append(
+                Conflict(
+                    id=f"conflict-{conflict_id:03d}-{domain}",
+                    teams=teams[:2],
+                    description=f"Conflicting urgency on {domain}: {teams[0]} vs {teams[1]}",
+                    positions={
+                        r.get("source_agent", r.get("team", "unknown")): r.get(
+                            "request", ""
+                        )
+                        for r in reqs[:2]
+                    },
+                    evidence={
+                        r.get("source_agent", r.get("team", "unknown")): r.get(
+                            "blocking", ""
+                        )
+                        or ""
+                        for r in reqs[:2]
+                    },
+                    cos_recommendation=f"Prioritize {domain} concern by decision principles",
+                    resolution_level=1,
+                )
+            )
     return conflicts
 
 
-def _log_resolutions_to_notion(
-    resolutions: list, conflicts: list
-) -> None:
+def _log_resolutions_to_notion(resolutions: list, conflicts: list) -> None:
     """Log each conflict resolution to the Notion Decision Log (best-effort)."""
     if not resolutions:
         return
@@ -213,7 +224,9 @@ def _log_resolutions_to_notion(
         for res in resolutions:
             conflict = conflict_map.get(res.conflict_id)
             decider = "Founder" if res.escalated else "CoS"
-            context = conflict.description if conflict else f"conflict_id={res.conflict_id}"
+            context = (
+                conflict.description if conflict else f"conflict_id={res.conflict_id}"
+            )
             business_outcomes = None
             if conflict and any(
                 "privacy" in p.lower() or "security" in p.lower()
@@ -277,17 +290,21 @@ def run_daily() -> str:
     if conflicts:
         logger.info(
             "Resolved %d conflicts (%d escalated, %d auto-resolved)",
-            len(conflicts), len(escalated), len(auto_resolved),
+            len(conflicts),
+            len(escalated),
+            len(auto_resolved),
         )
     # Inject escalated resolutions as critical cross-team requests
     for res in escalated:
-        cross_team_requests.append({
-            "source_agent": "cos",
-            "team": "cos",
-            "request": f"[CONFLICT ESCALATED] {res.outcome}",
-            "urgency": "critical",
-            "blocking": f"conflict_id={res.conflict_id}",
-        })
+        cross_team_requests.append(
+            {
+                "source_agent": "cos",
+                "team": "cos",
+                "request": f"[CONFLICT ESCALATED] {res.outcome}",
+                "urgency": "critical",
+                "blocking": f"conflict_id={res.conflict_id}",
+            }
+        )
 
     # Budget enforcement (Gap 7) — throttle teams exceeding caps
     budget_actions = enforce_budget(costs)
@@ -301,7 +318,11 @@ def run_daily() -> str:
     request_report = get_request_tracking_report()
 
     brief, brief_data = synthesize_daily(
-        reports, kpi_snapshot, costs, alerts, cross_team_requests,
+        reports,
+        kpi_snapshot,
+        costs,
+        alerts,
+        cross_team_requests,
         founder_requests=founder_requests,
         resolutions=[r.model_dump() for r in resolutions],
     )
@@ -424,9 +445,7 @@ def _push_daily_outputs(
     try:
         wa = WhatsAppBridge()
         wa_data = brief_data or {"decisions_needed": [], "progress": []}
-        wa.generate_morning_brief(
-            wa_data, costs, alerts, notion_page_id=notion_page_id
-        )
+        wa.generate_morning_brief(wa_data, costs, alerts, notion_page_id=notion_page_id)
     except Exception:
         logger.debug("WhatsApp message generation skipped")
 

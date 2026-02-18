@@ -435,29 +435,42 @@ def _check_live_nh_funnel(
         from app.models.contact import CsvUpload
         from app.models.marketplace import NetworkSharingPreferences
 
-        nh_signup = session.execute(
-            select(func.count()).select_from(User).where(
-                User.user_type == "network_holder",
-                User.deleted_at.is_(None),
-            )
-        ).scalar() or 0
+        nh_signup = (
+            session.execute(
+                select(func.count())
+                .select_from(User)
+                .where(
+                    User.user_type == "network_holder",
+                    User.deleted_at.is_(None),
+                )
+            ).scalar()
+            or 0
+        )
 
-        nh_uploaded = session.execute(
-            select(func.count(distinct(CsvUpload.user_id))).where(
-                CsvUpload.user_id.in_(
-                    select(User.id).where(
-                        User.user_type == "network_holder",
-                        User.deleted_at.is_(None),
+        nh_uploaded = (
+            session.execute(
+                select(func.count(distinct(CsvUpload.user_id))).where(
+                    CsvUpload.user_id.in_(
+                        select(User.id).where(
+                            User.user_type == "network_holder",
+                            User.deleted_at.is_(None),
+                        )
                     )
                 )
-            )
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
-        nh_optin = session.execute(
-            select(func.count()).select_from(NetworkSharingPreferences).where(
-                NetworkSharingPreferences.opt_in_marketplace.is_(True),
-            )
-        ).scalar() or 0
+        nh_optin = (
+            session.execute(
+                select(func.count())
+                .select_from(NetworkSharingPreferences)
+                .where(
+                    NetworkSharingPreferences.opt_in_marketplace.is_(True),
+                )
+            ).scalar()
+            or 0
+        )
 
         metrics["live_nh_signup_count"] = nh_signup
         metrics["live_nh_upload_count"] = nh_uploaded
@@ -563,25 +576,36 @@ def _check_live_referral_workflow(
         statuses = ["requested", "approved", "declined", "completed"]
         status_counts: dict[str, int] = {}
         for status in statuses:
-            count = session.execute(
-                select(func.count()).select_from(IntroFacilitation).where(
-                    IntroFacilitation.status == status
-                )
-            ).scalar() or 0
+            count = (
+                session.execute(
+                    select(func.count())
+                    .select_from(IntroFacilitation)
+                    .where(IntroFacilitation.status == status)
+                ).scalar()
+                or 0
+            )
             status_counts[status] = count
 
-        credit_earns = session.execute(
-            select(func.count()).select_from(CreditTransaction).where(
-                CreditTransaction.reason == "intro_facilitation",
-                CreditTransaction.type == "earn",
-            )
-        ).scalar() or 0
+        credit_earns = (
+            session.execute(
+                select(func.count())
+                .select_from(CreditTransaction)
+                .where(
+                    CreditTransaction.reason == "intro_facilitation",
+                    CreditTransaction.type == "earn",
+                )
+            ).scalar()
+            or 0
+        )
 
-        reputation_count = session.execute(
-            select(func.count()).select_from(ConnectorReputation).where(
-                ConnectorReputation.intros_facilitated > 0
-            )
-        ).scalar() or 0
+        reputation_count = (
+            session.execute(
+                select(func.count())
+                .select_from(ConnectorReputation)
+                .where(ConnectorReputation.intros_facilitated > 0)
+            ).scalar()
+            or 0
+        )
 
         metrics["live_referral_intros_by_status"] = status_counts
         metrics["live_referral_completed_count"] = status_counts.get("completed", 0)

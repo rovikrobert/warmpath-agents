@@ -10,7 +10,6 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 from agents.shared.report import Finding
 from ops_team.shared.config import OPS_AGENT_NAMES, REPORTS_DIR

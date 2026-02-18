@@ -345,7 +345,9 @@ def summarize_team(team: str, reports: list[AgentReport]) -> dict[str, Any]:
         health = "green"
 
     if health == "red":
-        top = next((f for f in all_findings if f.severity in ("critical", "high")), None)
+        top = next(
+            (f for f in all_findings if f.severity in ("critical", "high")), None
+        )
         summary = f"{team.title()}: {crit + high} critical/high issues."
         if top:
             summary += f" Top: {top.title}."

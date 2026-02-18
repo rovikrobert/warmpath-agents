@@ -494,21 +494,28 @@ def _aggregate_all_feedback(
 
     try:
         from sqlalchemy import create_engine, text
+
         db_url = os.environ.get("DATABASE_URL", "")
         if db_url:
-            sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://").replace("sqlite+aiosqlite://", "sqlite://")
+            sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://").replace(
+                "sqlite+aiosqlite://", "sqlite://"
+            )
             engine = create_engine(sync_url)
             with engine.connect() as conn:
                 rows = conn.execute(
-                    text("SELECT feature, rating, comment, created_at FROM user_feedback ORDER BY created_at DESC LIMIT 100")
+                    text(
+                        "SELECT feature, rating, comment, created_at FROM user_feedback ORDER BY created_at DESC LIMIT 100"
+                    )
                 ).fetchall()
                 for row in rows:
-                    db_items.append({
-                        "feature": row[0],
-                        "rating": row[1],
-                        "comment": row[2],
-                        "created_at": str(row[3]) if row[3] else "",
-                    })
+                    db_items.append(
+                        {
+                            "feature": row[0],
+                            "rating": row[1],
+                            "comment": row[2],
+                            "created_at": str(row[3]) if row[3] else "",
+                        }
+                    )
     except Exception as exc:
         logger.debug("Could not read feedback from DB: %s", exc)
 
@@ -519,7 +526,9 @@ def _aggregate_all_feedback(
     for item in db_items:
         feature = item.get("feature", "unknown")
         if ":" in feature:
-            feature = feature.split(":", 1)[1].strip("/").split("/")[0].lower() or "other"
+            feature = (
+                feature.split(":", 1)[1].strip("/").split("/")[0].lower() or "other"
+            )
         feature_counts[feature] = feature_counts.get(feature, 0) + 1
         feature_ratings.setdefault(feature, []).append(item.get("rating", 0))
 
@@ -546,7 +555,9 @@ def _aggregate_all_feedback(
                 title=f"Feedback: {len(db_items)} items ({positive} positive, {negative} negative, {neutral} neutral)",
                 evidence=f"Top features: {top_str}. Themes (3+): {len(themes)}",
                 impact="User feedback drives product iteration priorities",
-                recommendation="Focus on negative-sentiment features" if negative > positive else "Positive sentiment — maintain quality",
+                recommendation="Focus on negative-sentiment features"
+                if negative > positive
+                else "Positive sentiment — maintain quality",
                 confidence=0.9,
                 persona="both",
             )

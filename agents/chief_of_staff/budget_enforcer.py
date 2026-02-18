@@ -45,44 +45,52 @@ def enforce_budget(
 
         ratio = current / cap
         if ratio >= alert_pct:
-            actions.append(BudgetAction(
-                team=team,
-                action="throttle",
-                reason=f"Cost ${current:.2f} is {ratio:.0%} of ${cap:.2f} cap",
-                current_cost=round(current, 4),
-                budget_cap=cap,
-                recommendation=f"Downgrade {team} agents to Haiku for remaining scans today",
-            ))
+            actions.append(
+                BudgetAction(
+                    team=team,
+                    action="throttle",
+                    reason=f"Cost ${current:.2f} is {ratio:.0%} of ${cap:.2f} cap",
+                    current_cost=round(current, 4),
+                    budget_cap=cap,
+                    recommendation=f"Downgrade {team} agents to Haiku for remaining scans today",
+                )
+            )
         elif ratio >= 1.0:
-            actions.append(BudgetAction(
-                team=team,
-                action="warn",
-                reason=f"Cost ${current:.2f} is {ratio:.0%} of ${cap:.2f} cap",
-                current_cost=round(current, 4),
-                budget_cap=cap,
-                recommendation=f"Monitor {team} — approaching throttle threshold",
-            ))
+            actions.append(
+                BudgetAction(
+                    team=team,
+                    action="warn",
+                    reason=f"Cost ${current:.2f} is {ratio:.0%} of ${cap:.2f} cap",
+                    current_cost=round(current, 4),
+                    budget_cap=cap,
+                    recommendation=f"Monitor {team} — approaching throttle threshold",
+                )
+            )
         else:
-            actions.append(BudgetAction(
-                team=team,
-                action="ok",
-                reason=f"Within budget ({ratio:.0%})",
-                current_cost=round(current, 4),
-                budget_cap=cap,
-            ))
+            actions.append(
+                BudgetAction(
+                    team=team,
+                    action="ok",
+                    reason=f"Within budget ({ratio:.0%})",
+                    current_cost=round(current, 4),
+                    budget_cap=cap,
+                )
+            )
 
     # Check total daily cap
     total = costs.get("total_estimated_cost_usd", 0.0)
     daily_cap = budget_cfg.get("daily_cost_cap_usd", 3.0)
     if daily_cap > 0 and total / daily_cap >= alert_pct:
-        actions.append(BudgetAction(
-            team="all",
-            action="throttle",
-            reason=f"Total cost ${total:.2f} exceeds {alert_pct:.0%} of ${daily_cap:.2f}",
-            current_cost=round(total, 4),
-            budget_cap=daily_cap,
-            recommendation="Skip non-critical scans for the rest of today",
-        ))
+        actions.append(
+            BudgetAction(
+                team="all",
+                action="throttle",
+                reason=f"Total cost ${total:.2f} exceeds {alert_pct:.0%} of ${daily_cap:.2f}",
+                current_cost=round(total, 4),
+                budget_cap=daily_cap,
+                recommendation="Skip non-critical scans for the rest of today",
+            )
+        )
 
     return actions
 

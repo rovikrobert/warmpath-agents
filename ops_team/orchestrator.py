@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from ops_team.shared.config import OPS_AGENT_NAMES, REPORTS_DIR
+from ops_team.shared.config import OPS_AGENT_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,6 @@ def cmd_intel_report() -> None:
 
 def cmd_learning_report() -> None:
     """Meta-learning reports for all ops team agents."""
-    from ops_team.shared.config import OPS_AGENT_NAMES
     from ops_team.shared.learning import OpsLearningState
 
     print("=" * 60)

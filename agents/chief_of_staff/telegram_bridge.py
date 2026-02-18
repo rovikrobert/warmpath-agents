@@ -66,7 +66,9 @@ class TelegramBridge:
             for i, d in enumerate(decisions[:3], 1):
                 lines.append(f"{i}. {d}")
             lines.append("")
-            replies = ", ".join(f"{i}=yes" for i in range(1, min(len(decisions), 4) + 1))
+            replies = ", ".join(
+                f"{i}=yes" for i in range(1, min(len(decisions), 4) + 1)
+            )
             detail_link = notion_url or "Notion"
             lines.append(f"Reply {replies}, or details: {detail_link}")
         if notion_url and not decisions:
@@ -84,16 +86,18 @@ class TelegramBridge:
         notion_url: str = "",
     ) -> str:
         report_link = notion_url or "Notion"
-        return "\n".join([
-            f"Week {week_num} Summary",
-            "",
-            f"Cost: {cost} ({daily_avg} avg)",
-            "",
-            f"Top win: {top_win}",
-            f"Top risk: {top_risk}",
-            "",
-            f"Full report: {report_link}",
-        ])
+        return "\n".join(
+            [
+                f"Week {week_num} Summary",
+                "",
+                f"Cost: {cost} ({daily_avg} avg)",
+                "",
+                f"Top win: {top_win}",
+                f"Top risk: {top_risk}",
+                "",
+                f"Full report: {report_link}",
+            ]
+        )
 
     def format_escalation(
         self,
@@ -102,17 +106,19 @@ class TelegramBridge:
         option_a: str,
         option_b: str,
     ) -> str:
-        return "\n".join([
-            f"ALERT: {title} [R]",
-            "",
-            detail,
-            "",
-            "Action needed:",
-            f"A) {option_a}",
-            f"B) {option_b}",
-            "",
-            "Reply A or B",
-        ])
+        return "\n".join(
+            [
+                f"ALERT: {title} [R]",
+                "",
+                detail,
+                "",
+                "Action needed:",
+                f"A) {option_a}",
+                f"B) {option_b}",
+                "",
+                "Reply A or B",
+            ]
+        )
 
     def format_cost_alert(
         self,
@@ -122,14 +128,16 @@ class TelegramBridge:
         auto_action: str,
         question: str,
     ) -> str:
-        return "\n".join([
-            f"Cost spike: {actual} yesterday (budget: {budget})",
-            "",
-            f"Cause: {cause}",
-            "",
-            f"Auto-action: {auto_action}",
-            f"{question} Y/N",
-        ])
+        return "\n".join(
+            [
+                f"Cost spike: {actual} yesterday (budget: {budget})",
+                "",
+                f"Cause: {cause}",
+                "",
+                f"Auto-action: {auto_action}",
+                f"{question} Y/N",
+            ]
+        )
 
     # -- Reply parsing (shared grammar) --------------------------------------
 
@@ -149,15 +157,21 @@ class TelegramBridge:
         today = datetime.now(timezone.utc)
         date_str = today.strftime("%b %d")
         team_summaries = brief_data.get("team_summaries", [])
-        decisions = [d.get("summary", "Unknown") for d in brief_data.get("decisions_needed", [])[:3]]
+        decisions = [
+            d.get("summary", "Unknown")
+            for d in brief_data.get("decisions_needed", [])[:3]
+        ]
         total_cost = costs.get("total_estimated_cost_usd", 0)
         cost_str = f"${total_cost:.2f}/day"
         notion_url = ""
         if notion_page_id:
             notion_url = f"https://notion.so/{notion_page_id.replace('-', '')}"
         message = self.format_daily_brief(
-            date=date_str, team_summaries=team_summaries,
-            decisions=decisions, cost=cost_str, notion_url=notion_url,
+            date=date_str,
+            team_summaries=team_summaries,
+            decisions=decisions,
+            cost=cost_str,
+            notion_url=notion_url,
         )
         if alerts:
             message += "\n\n" + "\n".join(f"[!] {a}" for a in alerts)
@@ -198,6 +212,7 @@ class TelegramBridge:
             return {"status": "file_only", "telegram": False}
         try:
             import httpx
+
             url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
             payload: dict[str, Any] = {"chat_id": self._chat_id, "text": message}
             with httpx.Client(timeout=15.0) as client:

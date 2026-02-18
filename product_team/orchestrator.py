@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from product_team.shared.config import PRODUCT_AGENT_NAMES, REPORTS_DIR
+from product_team.shared.config import PRODUCT_AGENT_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ def cmd_all() -> None:
             findings_count = len(report.findings)
             print(f"  {findings_count} findings, {report.scan_duration_seconds:.1f}s")
         else:
-            print(f"  [SKIPPED]")
+            print("  [SKIPPED]")
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")
@@ -191,7 +191,6 @@ def cmd_intel_report() -> None:
 
 def cmd_learning_report() -> None:
     """Meta-learning reports for all product team agents."""
-    from product_team.shared.config import PRODUCT_AGENT_NAMES
     from product_team.shared.learning import ProductLearningState
 
     print("=" * 60)

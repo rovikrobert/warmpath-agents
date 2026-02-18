@@ -404,7 +404,9 @@ def _scan_competitor_updates(
     total_results = 0
 
     for competitor in TRACKED_COMPETITORS[:5]:  # Top 5 to stay within rate limits
-        results = web_search(f"{competitor} referral platform news 2025 2026", max_results=3)
+        results = web_search(
+            f"{competitor} referral platform news 2025 2026", max_results=3
+        )
         results_by_competitor[competitor] = results
         total_results += len(results)
 

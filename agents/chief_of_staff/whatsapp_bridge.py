@@ -18,7 +18,7 @@ from typing import Any
 
 from agents.shared.whatsapp_formatter import WhatsAppFormatter
 
-from .cos_config import COS_CONFIG, TEAM_REGISTRY
+from .cos_config import COS_CONFIG
 
 logger = logging.getLogger(__name__)
 

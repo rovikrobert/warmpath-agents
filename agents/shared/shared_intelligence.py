@@ -64,16 +64,18 @@ def broadcast_insight(
     insights = _load()
     # Deduplicate by insight_id
     insights = [i for i in insights if i.get("insight_id") != insight_id]
-    insights.append({
-        "team": team,
-        "agent": agent,
-        "insight_id": insight_id,
-        "category": category,
-        "title": title,
-        "evidence": evidence,
-        "severity": severity,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    insights.append(
+        {
+            "team": team,
+            "agent": agent,
+            "insight_id": insight_id,
+            "category": category,
+            "title": title,
+            "evidence": evidence,
+            "severity": severity,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     insights = _prune(insights)
     _save(insights)
 
@@ -113,5 +115,7 @@ def get_insight_summary() -> dict:
     return {
         "total_shared_insights": len(insights),
         "teams_contributing": sorted(teams_contributing),
-        "categories": sorted({i.get("category", "") for i in insights if i.get("category")}),
+        "categories": sorted(
+            {i.get("category", "") for i in insights if i.get("category")}
+        ),
     }

@@ -14,7 +14,7 @@ from pathlib import Path
 from agents.shared.report import Finding
 from data_team.shared.config import APP_DIR, MODELS_DIR, SERVICES_DIR
 from data_team.shared.learning import DataLearningState
-from data_team.shared.report import DataTeamReport, Insight, KPISnapshot
+from data_team.shared.report import DataTeamReport, Insight
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +311,7 @@ def _scan_anomaly_detection(
                 id="analyst-insight-anomaly",
                 category="anomaly",
                 title=f"{anomalies_found} metric anomalies detected",
-                evidence=f"Z-score analysis on WAU + credit flow",
+                evidence="Z-score analysis on WAU + credit flow",
                 impact="Anomalies may indicate platform issues, churn, or data quality problems",
                 recommendation="Review anomaly details and cross-reference with deployment history",
                 confidence=0.75,
@@ -388,7 +388,9 @@ def _scan_cohort_retention(
                     impact="Retention directly drives LTV and marketplace liquidity",
                     recommendation="Target 30%+ week-2 retention for marketplace viability",
                     confidence=0.85,
-                    sample_size=sum(r.get("cohort_size", 0) or 0 for r in retention_rows),
+                    sample_size=sum(
+                        r.get("cohort_size", 0) or 0 for r in retention_rows
+                    ),
                     actionable_by="product_team",
                 )
             )
@@ -417,7 +419,7 @@ def _scan_cohort_retention(
                         severity="medium",
                         category="retention",
                         title=f"Activation rate is {avg_activation:.0%} — below 40% target",
-                        detail=f"Activation = first CSV upload after signup",
+                        detail="Activation = first CSV upload after signup",
                         recommendation="Simplify onboarding, provide sample CSV, add activation nudges",
                     )
                 )
@@ -440,7 +442,7 @@ def _detect_zscore_anomaly(
 
     mean = sum(baseline) / len(baseline)
     variance = sum((x - mean) ** 2 for x in baseline) / len(baseline)
-    std = variance ** 0.5
+    std = variance**0.5
 
     if std == 0:
         return None

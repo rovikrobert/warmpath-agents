@@ -15,8 +15,6 @@ from pathlib import Path
 from agents.shared.report import Finding
 from agents.shared.web_tools import web_search
 from product_team.shared.config import (
-    API_DIR,
-    FRONTEND_SRC,
     PAGES_DIR,
     PERSONAS,
     PROJECT_ROOT,
@@ -254,6 +252,7 @@ def _scan_page_content(
 def _posthog_query(query_type: str, params: dict | None = None) -> dict:
     """Query PostHog Trends API. Returns raw JSON response."""
     import httpx
+
     api_key = os.environ.get("POSTHOG_API_KEY", "")
     project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
     host = os.environ.get("POSTHOG_HOST", "https://app.posthog.com")
@@ -292,7 +291,9 @@ def _analyze_posthog_data(
 
     metrics["posthog_configured"] = True
     try:
-        data = _posthog_query("trend", {"events": '[{"id": "$pageview"}]', "date_from": "-7d"})
+        data = _posthog_query(
+            "trend", {"events": '[{"id": "$pageview"}]', "date_from": "-7d"}
+        )
         results = data.get("results", [])
         if results:
             total_views = sum(results[0].get("data", []))
@@ -396,6 +397,7 @@ def _monitor_competitors(
 
     try:
         from datetime import datetime, timezone
+
         registry["last_full_scan"] = datetime.now(timezone.utc).isoformat()
         COMPETITOR_REGISTRY_PATH.write_text(json.dumps(registry, indent=2))
     except OSError:

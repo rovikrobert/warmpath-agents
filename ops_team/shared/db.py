@@ -3,6 +3,7 @@
 Wraps app.database sync session for read-only agent queries.
 Returns None if DATABASE_URL is unset (graceful degradation).
 """
+
 from __future__ import annotations
 
 import logging

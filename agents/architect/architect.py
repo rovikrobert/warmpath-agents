@@ -643,11 +643,7 @@ def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
                 continue
             name = node.name
             # Skip private, dunder, framework, and short names
-            if (
-                name.startswith("_")
-                or name in _FRAMEWORK_NAMES
-                or len(name) <= 2
-            ):
+            if name.startswith("_") or name in _FRAMEWORK_NAMES or len(name) <= 2:
                 continue
             # Only track if not already seen (first definition wins)
             if name not in definitions:
@@ -801,8 +797,7 @@ def _scan_mypy(findings: list[Finding]) -> dict[str, object]:
                 category="type_safety",
                 title=f"mypy reports {total_errors} type errors",
                 detail=(
-                    f"mypy found {total_errors} errors. "
-                    f"Error codes: {errors_by_code}."
+                    f"mypy found {total_errors} errors. Error codes: {errors_by_code}."
                 ),
                 recommendation="Gradually address type errors to improve safety.",
                 effort_hours=2.0,
@@ -997,8 +992,16 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
                 target.write_text(mutated, encoding="utf-8")
                 result = _run_tool(
                     [
-                        "python3", "-m", "pytest", "tests/", "-x", "-q",
-                        "--timeout=10", "--no-header", "-p", "no:warnings",
+                        "python3",
+                        "-m",
+                        "pytest",
+                        "tests/",
+                        "-x",
+                        "-q",
+                        "--timeout=10",
+                        "--no-header",
+                        "-p",
+                        "no:warnings",
                     ],
                     timeout=30,
                 )
@@ -1039,7 +1042,8 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
         if kill_rate < 0.60:
             # Identify weak files
             weak = [
-                f for f, r in file_results.items()
+                f
+                for f, r in file_results.items()
                 if r["tested"] > 0 and r["killed"] / r["tested"] < 0.5
             ]
             weak_str = ", ".join(f"`{f}`" for f in weak) if weak else "see details"

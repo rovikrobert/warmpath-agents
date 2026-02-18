@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agents.shared.config import (
-    AGENT_NAMES,
     INTEL_CACHE,
     INTEL_CACHE_TTL_HOURS,
     PROJECT_ROOT,

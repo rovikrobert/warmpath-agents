@@ -714,6 +714,7 @@ def _check_live_error_telemetry(
         from sqlalchemy import func, select
         from app.models.enrichment import UsageLog
         from app.models.audit import AuditLog
+
         logger.info("naiv: live error telemetry — querying usage_logs + audit_logs")
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)

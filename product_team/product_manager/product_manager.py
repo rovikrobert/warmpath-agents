@@ -324,7 +324,9 @@ def _validate_api_contracts(
 
         page_dir = FRONTEND_SRC / "pages"
         if page_dir.is_dir():
-            field_access_pattern = re.compile(r"(?:data|resp|response|result)\s*[\[.](\w+)")
+            field_access_pattern = re.compile(
+                r"(?:data|resp|response|result)\s*[\[.](\w+)"
+            )
             frontend_fields: set[str] = set()
             for page in page_dir.glob("*.jsx"):
                 page_source = _read_safe(page)
@@ -407,17 +409,26 @@ def _track_experiments(
             )
         )
 
-    concluded = [e for e in experiments if e.get("status") == "concluded" and e.get("result")]
-    recent_learnings = [f"{e.get('hypothesis', '?')[:60]} -> {e.get('result', '?')[:60]}" for e in concluded[-3:]]
+    concluded = [
+        e for e in experiments if e.get("status") == "concluded" and e.get("result")
+    ]
+    recent_learnings = [
+        f"{e.get('hypothesis', '?')[:60]} -> {e.get('result', '?')[:60]}"
+        for e in concluded[-3:]
+    ]
 
     insights.append(
         ProductInsight(
             id="pm-insight-experiments",
             category="experiment_tracking",
             title=f"Experiment tracker: {len(experiments)} total, {by_status.get('active', 0)} active, {by_status.get('concluded', 0)} concluded",
-            evidence=f"Recent learnings: {'; '.join(recent_learnings)}" if recent_learnings else "No concluded experiments yet",
+            evidence=f"Recent learnings: {'; '.join(recent_learnings)}"
+            if recent_learnings
+            else "No concluded experiments yet",
             impact="Structured experimentation accelerates product-market fit discovery",
-            recommendation="Add new hypotheses to experiment_registry.json" if not experiments else "Review active experiments",
+            recommendation="Add new hypotheses to experiment_registry.json"
+            if not experiments
+            else "Review active experiments",
             confidence=0.9,
         )
     )

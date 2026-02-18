@@ -113,7 +113,7 @@ def cmd_all(skip_tests: bool = False) -> None:
     # Record health snapshot
     try:
         from agents.shared.learning import get_learning_state
-        from agents.shared.config import SEVERITY_WEIGHTS, HEALTH_WEIGHTS
+        from agents.shared.config import SEVERITY_WEIGHTS
 
         sev_counts: dict[str, int] = {}
         for f in all_findings:
@@ -346,7 +346,7 @@ def cmd_resolved() -> None:
 
     print("## Resolved Findings\n")
     print(f"| {'ID':<25} | {'Type':<15} | {'Resolved':<12} | Reason |")
-    print(f"|{'-'*27}|{'-'*17}|{'-'*14}|--------|")
+    print(f"|{'-' * 27}|{'-' * 17}|{'-' * 14}|--------|")
     for fid, entry in sorted(registry.items()):
         res_type = entry.get("resolution_type", "?")
         resolved_at = entry.get("resolved_at", "")[:10]

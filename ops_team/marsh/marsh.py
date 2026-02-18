@@ -741,7 +741,9 @@ def _check_live_health(
                 title=f"Production API healthy ({status.response_ms:.0f}ms)",
                 evidence=f"HTTP {status.status_code} in {status.response_ms:.0f}ms",
                 impact="Marketplace is operational and responsive",
-                recommendation="No action needed" if status.response_ms < 2000 else "Response time is elevated — investigate",
+                recommendation="No action needed"
+                if status.response_ms < 2000
+                else "Response time is elevated — investigate",
                 confidence=0.95,
                 persona="both",
                 actionable_by="engineering",
@@ -985,42 +987,61 @@ def _check_live_marketplace_volume(
             IntroFacilitation,
         )
 
-        active_listings = session.execute(
-            select(func.count()).select_from(MarketplaceListing).where(
-                MarketplaceListing.is_available.is_(True),
-                MarketplaceListing.deleted_at.is_(None),
-            )
-        ).scalar() or 0
+        active_listings = (
+            session.execute(
+                select(func.count())
+                .select_from(MarketplaceListing)
+                .where(
+                    MarketplaceListing.is_available.is_(True),
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            ).scalar()
+            or 0
+        )
 
-        unique_companies = session.execute(
-            select(func.count(distinct(MarketplaceListing.company_id))).where(
-                MarketplaceListing.is_available.is_(True),
-                MarketplaceListing.deleted_at.is_(None),
-            )
-        ).scalar() or 0
+        unique_companies = (
+            session.execute(
+                select(func.count(distinct(MarketplaceListing.company_id))).where(
+                    MarketplaceListing.is_available.is_(True),
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            ).scalar()
+            or 0
+        )
 
-        unique_nhs = session.execute(
-            select(func.count(distinct(MarketplaceListing.network_holder_id))).where(
-                MarketplaceListing.is_available.is_(True),
-                MarketplaceListing.deleted_at.is_(None),
-            )
-        ).scalar() or 0
+        unique_nhs = (
+            session.execute(
+                select(
+                    func.count(distinct(MarketplaceListing.network_holder_id))
+                ).where(
+                    MarketplaceListing.is_available.is_(True),
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            ).scalar()
+            or 0
+        )
 
         statuses = ["requested", "approved", "declined", "completed", "expired"]
         intros_by_status: dict[str, int] = {}
         for status in statuses:
-            count = session.execute(
-                select(func.count()).select_from(IntroFacilitation).where(
-                    IntroFacilitation.status == status
-                )
-            ).scalar() or 0
+            count = (
+                session.execute(
+                    select(func.count())
+                    .select_from(IntroFacilitation)
+                    .where(IntroFacilitation.status == status)
+                ).scalar()
+                or 0
+            )
             intros_by_status[status] = count
 
         total_intros = sum(intros_by_status.values())
 
-        unique_seekers = session.execute(
-            select(func.count(distinct(IntroFacilitation.job_seeker_id)))
-        ).scalar() or 0
+        unique_seekers = (
+            session.execute(
+                select(func.count(distinct(IntroFacilitation.job_seeker_id)))
+            ).scalar()
+            or 0
+        )
 
         metrics["live_active_listings"] = active_listings
         metrics["live_unique_companies"] = unique_companies
@@ -1030,7 +1051,8 @@ def _check_live_marketplace_volume(
         metrics["live_unique_seekers"] = unique_seekers
         metrics["live_supply_demand_ratio"] = (
             round(active_listings / max(1, total_intros), 2)
-            if total_intros > 0 else None
+            if total_intros > 0
+            else None
         )
 
         insights.append(

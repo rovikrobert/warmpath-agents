@@ -13,9 +13,7 @@ from pathlib import Path
 
 from agents.shared.report import Finding
 from product_team.shared.config import (
-    COMPONENTS_DIR,
     FRONTEND_SRC,
-    PAGES_DIR,
     UX_HEURISTIC_WEIGHTS,
 )
 from product_team.shared.learning import ProductLearningState
@@ -357,7 +355,9 @@ def _run_accessibility_audit(
     try:
         result = subprocess.run(
             ["npx", "pa11y", "--version"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
             cwd=str(FRONTEND_SRC.parent),
         )
         if result.returncode != 0:
@@ -381,11 +381,14 @@ def _run_accessibility_audit(
     try:
         result = subprocess.run(
             ["npx", "pa11y", target, "--reporter", "json", "--standard", "WCAG2AA"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(FRONTEND_SRC.parent),
         )
         if result.stdout.strip():
             import json as _json
+
             try:
                 issues = _json.loads(result.stdout)
             except _json.JSONDecodeError:
@@ -485,7 +488,9 @@ def _analyze_user_flows(
                 total_steps += 1
                 source_page = journey[i]
                 target_page = journey[i + 1]
-                if source_page in graph and target_page in graph.get(source_page, set()):
+                if source_page in graph and target_page in graph.get(
+                    source_page, set()
+                ):
                     reachable_count += 1
         coverage = reachable_count / max(1, total_steps)
         metrics[f"journey_coverage_{persona_id}"] = round(coverage, 2)

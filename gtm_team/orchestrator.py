@@ -93,7 +93,7 @@ def cmd_all() -> None:
             findings_count = len(report.findings)
             print(f"  {findings_count} findings, {report.scan_duration_seconds:.1f}s")
         else:
-            print(f"  [SKIPPED]")
+            print("  [SKIPPED]")
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")

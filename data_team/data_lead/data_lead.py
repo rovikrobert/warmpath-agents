@@ -16,7 +16,7 @@ from agents.shared.report import Finding
 from data_team.shared.config import DATA_AGENT_NAMES, KPI_TARGETS, REPORTS_DIR
 from data_team.shared.intelligence import DataIntelligence
 from data_team.shared.learning import DataLearningState
-from data_team.shared.report import DataTeamReport, Insight, KPISnapshot
+from data_team.shared.report import DataTeamReport, Insight
 
 logger = logging.getLogger(__name__)
 
@@ -454,8 +454,8 @@ def _populate_live_kpis(
         {"start_date": "2020-01-01"},
     )
     if marketplace_rows:
-        kpi_values["marketplace_supply_coverage"] = (
-            marketplace_rows[0].get("companies_represented", 0)
+        kpi_values["marketplace_supply_coverage"] = marketplace_rows[0].get(
+            "companies_represented", 0
         )
 
     metrics["live_kpi_values"] = kpi_values

@@ -16,8 +16,6 @@ from pathlib import Path
 from agents.shared.report import Finding
 from gtm_team.shared.config import (
     API_DIR,
-    APP_DIR,
-    FRONTEND_SRC,
     PAGES_DIR,
     PROJECT_ROOT,
     REPORTS_DIR,
@@ -33,7 +31,6 @@ from gtm_team.shared.strategy_context import (
     extract_personas,
     extract_pricing_info,
     get_strategy_doc,
-    load_strategy_docs,
 )
 
 logger = logging.getLogger(__name__)

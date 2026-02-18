@@ -48,13 +48,15 @@ def _check_performance_triggers(reports: list[AgentReport]) -> list[OrgTrigger]:
         noise = stats.get("noise_ratio", 0.0)
         # High noise ratio suggests low-value output
         if noise > 0.5:
-            triggers.append(OrgTrigger(
-                category="performance",
-                trigger=f"{team} has high noise ratio ({noise:.0%})",
-                evidence=f"{team} reports contain >50% info-severity findings",
-                severity="medium",
-                affected_teams=[team],
-            ))
+            triggers.append(
+                OrgTrigger(
+                    category="performance",
+                    trigger=f"{team} has high noise ratio ({noise:.0%})",
+                    evidence=f"{team} reports contain >50% info-severity findings",
+                    severity="medium",
+                    affected_teams=[team],
+                )
+            )
 
     # Check for agents with zero findings across multiple reports
     agent_findings: dict[str, int] = {}
@@ -64,13 +66,15 @@ def _check_performance_triggers(reports: list[AgentReport]) -> list[OrgTrigger]:
     for agent, count in agent_findings.items():
         if count == 0:
             # Agent reporting but producing nothing — could be idle
-            triggers.append(OrgTrigger(
-                category="performance",
-                trigger=f"{agent} produced zero findings",
-                evidence="Clean scan — may indicate agent is idle or scope is too narrow",
-                severity="low",
-                affected_teams=[_agent_to_team(agent)],
-            ))
+            triggers.append(
+                OrgTrigger(
+                    category="performance",
+                    trigger=f"{agent} produced zero findings",
+                    evidence="Clean scan — may indicate agent is idle or scope is too narrow",
+                    severity="low",
+                    affected_teams=[_agent_to_team(agent)],
+                )
+            )
 
     return triggers
 
@@ -87,21 +91,25 @@ def _check_structural_triggers(reports: list[AgentReport]) -> list[OrgTrigger]:
 
     for team, agents in team_agents.items():
         if len(agents) > 6:
-            triggers.append(OrgTrigger(
-                category="structural",
-                trigger=f"{team} has {len(agents)} agents (>6)",
-                evidence="Diminishing returns on coordination overhead",
-                severity="medium",
-                affected_teams=[team],
-            ))
+            triggers.append(
+                OrgTrigger(
+                    category="structural",
+                    trigger=f"{team} has {len(agents)} agents (>6)",
+                    evidence="Diminishing returns on coordination overhead",
+                    severity="medium",
+                    affected_teams=[team],
+                )
+            )
         elif len(agents) < 2 and team != "cos":
-            triggers.append(OrgTrigger(
-                category="structural",
-                trigger=f"{team} has only {len(agents)} agent(s)",
-                evidence="May not justify team overhead — consider merging",
-                severity="low",
-                affected_teams=[team],
-            ))
+            triggers.append(
+                OrgTrigger(
+                    category="structural",
+                    trigger=f"{team} has only {len(agents)} agent(s)",
+                    evidence="May not justify team overhead — consider merging",
+                    severity="low",
+                    affected_teams=[team],
+                )
+            )
 
     return triggers
 
@@ -113,13 +121,15 @@ def _check_cost_triggers(costs: dict[str, Any]) -> list[OrgTrigger]:
     daily_cap = COS_CONFIG["cost_budget"].get("daily_cost_cap_usd", 3.0)
 
     if total > daily_cap:
-        triggers.append(OrgTrigger(
-            category="cost",
-            trigger=f"Daily cost ${total:.2f} exceeds ${daily_cap:.2f} cap",
-            evidence="Total daily cost exceeding budget",
-            severity="high",
-            affected_teams=["all"],
-        ))
+        triggers.append(
+            OrgTrigger(
+                category="cost",
+                trigger=f"Daily cost ${total:.2f} exceeds ${daily_cap:.2f} cap",
+                evidence="Total daily cost exceeding budget",
+                severity="high",
+                affected_teams=["all"],
+            )
+        )
 
     # Check per-team cost from breakdown
     breakdown = costs.get("agent_breakdown", {})
@@ -134,13 +144,15 @@ def _check_cost_triggers(costs: dict[str, Any]) -> list[OrgTrigger]:
     for team, cost in team_costs.items():
         cap = per_team_caps.get(team, 0.30)
         if cost > cap * 1.5:
-            triggers.append(OrgTrigger(
-                category="cost",
-                trigger=f"{team} cost ${cost:.2f} exceeds 150% of ${cap:.2f} cap",
-                evidence=f"Team spending {cost / cap * 100:.0f}% of budget",
-                severity="medium",
-                affected_teams=[team],
-            ))
+            triggers.append(
+                OrgTrigger(
+                    category="cost",
+                    trigger=f"{team} cost ${cost:.2f} exceeds 150% of ${cap:.2f} cap",
+                    evidence=f"Team spending {cost / cap * 100:.0f}% of budget",
+                    severity="medium",
+                    affected_teams=[team],
+                )
+            )
 
     return triggers
 
@@ -150,9 +162,7 @@ def _check_cost_triggers(costs: dict[str, Any]) -> list[OrgTrigger]:
 # ---------------------------------------------------------------------------
 
 
-def run_agent_value_audit(
-    team: str, reports: list[AgentReport]
-) -> list[AgentAudit]:
+def run_agent_value_audit(team: str, reports: list[AgentReport]) -> list[AgentAudit]:
     """Run value audit for all agents in a team based on report data."""
     state = get_learning_summary()
     team_rel = state.get("team_reliability", {}).get(team, {})
@@ -176,15 +186,17 @@ def run_agent_value_audit(
         else:
             verdict = "valuable"
 
-        audits.append(AgentAudit(
-            agent=r.agent,
-            team=team,
-            reports_total=team_rel.get("reports_total", 0),
-            findings_produced=finding_count,
-            info_ratio=round(info_ratio, 3),
-            cost_per_day=round(cost, 4),
-            verdict=verdict,
-        ))
+        audits.append(
+            AgentAudit(
+                agent=r.agent,
+                team=team,
+                reports_total=team_rel.get("reports_total", 0),
+                findings_produced=finding_count,
+                info_ratio=round(info_ratio, 3),
+                cost_per_day=round(cost, 4),
+                verdict=verdict,
+            )
+        )
 
     return audits
 
@@ -209,7 +221,12 @@ def generate_restructuring_proposal(triggers: list[OrgTrigger]) -> str:
     for category, trigs in by_category.items():
         lines.append(f"### {category.title()} Triggers\n")
         for t in trigs:
-            severity_icon = {"critical": "[!!]", "high": "[!]", "medium": "[~]", "low": "[.]"}.get(t.severity, "[?]")
+            severity_icon = {
+                "critical": "[!!]",
+                "high": "[!]",
+                "medium": "[~]",
+                "low": "[.]",
+            }.get(t.severity, "[?]")
             lines.append(f"- {severity_icon} **{t.trigger}**")
             if t.evidence:
                 lines.append(f"  - Evidence: {t.evidence}")
@@ -221,7 +238,9 @@ def generate_restructuring_proposal(triggers: list[OrgTrigger]) -> str:
     severities = [t.severity for t in triggers]
     if "critical" in severities or "high" in severities:
         lines.append("### CoS Recommendation\n")
-        lines.append("Schedule founder review this week to discuss restructuring options.")
+        lines.append(
+            "Schedule founder review this week to discuss restructuring options."
+        )
     else:
         lines.append("### CoS Recommendation\n")
         lines.append("Monitor — no immediate action required. Re-evaluate next week.")

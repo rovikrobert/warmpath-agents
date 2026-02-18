@@ -15,13 +15,11 @@ from agents.shared.report import Finding
 from data_team.shared.config import (
     ALL_TABLES,
     APP_DIR,
-    DATABASE_TABLES,
-    DATA_TEAM_DIR,
     MODELS_DIR,
     SERVICES_DIR,
 )
 from data_team.shared.learning import DataLearningState
-from data_team.shared.privacy_guard import PII_COLUMNS, VAULT_TABLES, guard
+from data_team.shared.privacy_guard import PII_COLUMNS
 from data_team.shared.report import DataTeamReport, Insight
 
 logger = logging.getLogger(__name__)
@@ -448,9 +446,7 @@ def _scan_live_data_quality(
         )
 
     # Staleness check — most recent activity across key tables
-    staleness_sql = (
-        "SELECT MAX(created_at) AS latest FROM usage_logs"
-    )
+    staleness_sql = "SELECT MAX(created_at) AS latest FROM usage_logs"
     rows = qe.execute_sql(staleness_sql, context="data_quality:staleness")
     if rows and rows[0].get("latest"):
         from datetime import datetime, timezone

@@ -7,7 +7,6 @@ Falls back to a helpful message when AI_MOCK_MODE=true or no API key is set.
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -114,7 +113,9 @@ def _load_recent_reports(team: str) -> str:
         return ""
 
     # Find most recent .json report
-    reports = sorted(report_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    reports = sorted(
+        report_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not reports:
         return ""
 
@@ -132,6 +133,7 @@ def _load_recent_reports(team: str) -> str:
 @dataclass
 class ConsultResponse:
     """Structured response from a consultation."""
+
     team: str
     query: str
     answer: str
@@ -217,7 +219,11 @@ def consult(
         import os
 
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        mock_mode = os.environ.get("AI_MOCK_MODE", "true").lower() in ("true", "1", "yes")
+        mock_mode = os.environ.get("AI_MOCK_MODE", "true").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
 
         if mock_mode or not api_key:
             logger.info("Consultant running in mock mode for team '%s'", team)
@@ -263,7 +269,7 @@ def _mock_consult(query: str, team: str, start: float) -> ConsultResponse:
         query=query,
         answer=(
             f"**{team_label} Team Analysis** (mock mode)\n\n"
-            f"Query received: \"{query}\"\n\n"
+            f'Query received: "{query}"\n\n'
             f"To get a real AI-powered consultation, set `AI_MOCK_MODE=false` and "
             f"provide a valid `ANTHROPIC_API_KEY` in your environment.\n\n"
             f"In the meantime, you can:\n"

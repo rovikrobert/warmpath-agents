@@ -13,7 +13,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -187,15 +186,17 @@ class WhatsAppFormatter:
         user_context: str = "unauthenticated",
     ) -> str:
         """Generate a bug/error alert message for the founder."""
-        return "\n".join([
-            f"BUG ALERT [{time_str}]",
-            "",
-            f"{method} {path}",
-            f"{error_type}: {error_msg}",
-            f"User: {user_context}",
-            "",
-            "Fix needed. Check logs for full trace.",
-        ])
+        return "\n".join(
+            [
+                f"BUG ALERT [{time_str}]",
+                "",
+                f"{method} {path}",
+                f"{error_type}: {error_msg}",
+                f"User: {user_context}",
+                "",
+                "Fix needed. Check logs for full trace.",
+            ]
+        )
 
     def pod_status(
         self,

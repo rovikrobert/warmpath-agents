@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from data_team.shared.config import DATA_AGENT_NAMES, REPORTS_DIR
+from data_team.shared.config import DATA_AGENT_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def cmd_all() -> None:
             findings_count = len(report.findings)
             print(f"  {findings_count} findings, {report.scan_duration_seconds:.1f}s")
         else:
-            print(f"  [SKIPPED]")
+            print("  [SKIPPED]")
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")
@@ -154,7 +154,6 @@ def cmd_intel() -> None:
 
 def cmd_intel_report() -> None:
     """Full intelligence summary report."""
-    import json as _json
     from data_team.shared.intelligence import DataIntelligence
 
     di = DataIntelligence()
@@ -185,7 +184,6 @@ def cmd_intel_report() -> None:
 
 def cmd_learning_report() -> None:
     """Meta-learning reports for all data team agents."""
-    from data_team.shared.config import DATA_AGENT_NAMES
     from data_team.shared.learning import DataLearningState
 
     print("=" * 60)

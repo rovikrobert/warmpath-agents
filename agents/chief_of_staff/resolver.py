@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from agents.shared.business_outcomes import OUTCOME_PRIORITY, OUTCOME_LABELS
 
 from .cos_config import DECISION_PRINCIPLES
 from .schemas import Conflict, Resolution

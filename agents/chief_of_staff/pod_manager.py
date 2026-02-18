@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
 from .cos_learning import _load_state, _save_state
 from .schemas import Pod, PodStatus

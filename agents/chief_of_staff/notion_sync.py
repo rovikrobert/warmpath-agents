@@ -51,6 +51,9 @@ class NotionSync:
             "daily_briefs_db": os.environ.get("NOTION_DAILY_BRIEFS_DB", ""),
             "decision_log_db": os.environ.get("NOTION_DECISION_LOG_DB", ""),
             "founder_briefs_db": os.environ.get("NOTION_FOUNDER_BRIEFS_DB", ""),
+            "team_reports_db": os.environ.get("NOTION_TEAM_REPORTS_DB", ""),
+            "weekly_synthesis_db": os.environ.get("NOTION_WEEKLY_SYNTHESIS_DB", ""),
+            "command_center_page": os.environ.get("NOTION_COMMAND_CENTER_PAGE", ""),
             "last_daily_sync": None,
             "last_weekly_sync": None,
         }
@@ -187,6 +190,55 @@ class NotionSync:
             db_ids["founder_briefs"] = result["id"]
             self._state["founder_briefs_db"] = result["id"]
 
+        # 4. Team Reports database
+        result = self._client.create_database(
+            parent_page_id=parent_page_id,
+            title="Team Reports",
+            properties={
+                "Team": {"title": {}},
+                "Date": {"date": {}},
+                "Health": {
+                    "select": {
+                        "options": [
+                            {"name": "Green", "color": "green"},
+                            {"name": "Yellow", "color": "yellow"},
+                            {"name": "Red", "color": "red"},
+                        ]
+                    }
+                },
+                "Summary": {"rich_text": {}},
+                "Agents": {"number": {}},
+                "Findings": {"number": {}},
+            },
+        )
+        if result.get("id"):
+            db_ids["team_reports"] = result["id"]
+            self._state["team_reports_db"] = result["id"]
+
+        # 5. Weekly Synthesis database
+        result = self._client.create_database(
+            parent_page_id=parent_page_id,
+            title="Weekly Synthesis",
+            properties={
+                "Title": {"title": {}},
+                "Date": {"date": {}},
+                "Status": {
+                    "select": {
+                        "options": [
+                            {"name": "Published", "color": "green"},
+                            {"name": "Draft", "color": "yellow"},
+                        ]
+                    }
+                },
+            },
+        )
+        if result.get("id"):
+            db_ids["weekly_synthesis"] = result["id"]
+            self._state["weekly_synthesis_db"] = result["id"]
+
+        # Store parent as command center page
+        self._state["command_center_page"] = parent_page_id
+
         self._save_state()
         logger.info("Notion databases created: %s", db_ids)
         return db_ids
@@ -243,6 +295,149 @@ class NotionSync:
 
         logger.error("Failed to sync daily brief: %s", result)
         return {"synced": False, "error": result.get("message", "Unknown")}
+
+    # -----------------------------------------------------------------
+    # Team report sync
+    # -----------------------------------------------------------------
+
+    def push_team_report(
+        self,
+        date: str,
+        team: str,
+        health: str,
+        summary: str,
+        agent_count: int = 0,
+        finding_count: int = 0,
+        detail_markdown: str = "",
+    ) -> dict[str, Any]:
+        """Push a per-team daily report to the Notion Team Reports database."""
+        db_id = self._state.get("team_reports_db", "")
+        if not db_id or not self.enabled:
+            logger.info("Team report not synced to Notion (not configured)")
+            return {"synced": False}
+
+        health_label = {"green": "Green", "yellow": "Yellow", "red": "Red"}.get(
+            health, "Green"
+        )
+        children = self._markdown_to_blocks(detail_markdown) if detail_markdown else []
+
+        result = self._client.create_page(
+            database_id=db_id,
+            properties={
+                "Team": NotionClient.title_property(team.title()),
+                "Date": NotionClient.date_property(date),
+                "Health": NotionClient.select_property(health_label),
+                "Summary": NotionClient.rich_text_property(summary),
+                "Agents": NotionClient.number_property(agent_count),
+                "Findings": NotionClient.number_property(finding_count),
+            },
+            children=children or None,
+        )
+
+        if result.get("id"):
+            logger.info("Team report synced to Notion: %s (%s)", team, result["id"])
+            return {"synced": True, "page_id": result["id"]}
+        return {"synced": False, "error": result.get("message", "Unknown")}
+
+    # -----------------------------------------------------------------
+    # Weekly synthesis sync
+    # -----------------------------------------------------------------
+
+    def push_weekly_synthesis(
+        self,
+        date: str,
+        brief_markdown: str,
+    ) -> dict[str, Any]:
+        """Push a weekly synthesis to the Notion Weekly Synthesis database."""
+        db_id = self._state.get("weekly_synthesis_db", "")
+        if not db_id or not self.enabled:
+            logger.info("Weekly synthesis not synced to Notion (not configured)")
+            return {"synced": False}
+
+        children = self._markdown_to_blocks(brief_markdown)
+
+        result = self._client.create_page(
+            database_id=db_id,
+            properties={
+                "Title": NotionClient.title_property(f"Weekly Synthesis — {date}"),
+                "Date": NotionClient.date_property(date),
+                "Status": NotionClient.select_property("Published"),
+            },
+            children=children or None,
+        )
+
+        if result.get("id"):
+            self._state["last_weekly_sync"] = date
+            self._save_state()
+            logger.info("Weekly synthesis synced to Notion: %s", result["id"])
+            return {"synced": True, "page_id": result["id"]}
+        return {"synced": False, "error": result.get("message", "Unknown")}
+
+    # -----------------------------------------------------------------
+    # Communication guide
+    # -----------------------------------------------------------------
+
+    def push_communication_guide(self) -> dict[str, Any]:
+        """Create the static Communication Guide page in Notion."""
+        parent_id = self._state.get("command_center_page", "")
+        if not parent_id or not self.enabled:
+            logger.info("Communication guide not synced to Notion (not configured)")
+            return {"synced": False}
+
+        blocks = self._build_communication_guide_blocks()
+        result = self._client.create_page(
+            database_id=parent_id,
+            properties={"Title": NotionClient.title_property("Communication Guide")},
+            children=blocks,
+        )
+
+        if result.get("id"):
+            logger.info("Communication guide created: %s", result["id"])
+            return {"synced": True, "page_id": result["id"]}
+        return {"synced": False, "error": result.get("message", "Unknown")}
+
+    def _build_communication_guide_blocks(self) -> list[dict[str, Any]]:
+        """Build Notion blocks for the Communication Guide page."""
+        blocks: list[dict[str, Any]] = []
+
+        blocks.append(NotionClient.heading_block("CLI Commands", level=2))
+        for cmd in [
+            "python3 -m agents.orchestrator --cos-daily — Run daily cycle",
+            "python3 -m agents.orchestrator --all — Full scan all teams",
+            'python3 -m agents.orchestrator --consult "Q" — Ask CoS a question',
+            "python3 -m agents.orchestrator --weekly — Weekly synthesis",
+            "python3 -m agents.orchestrator --monthly — Monthly review",
+            "python3 -m TEAM.orchestrator --agent NAME — Run single agent",
+            'python3 -m TEAM.orchestrator --consult "Q" — Consult specific team',
+        ]:
+            blocks.append(NotionClient.bulleted_list_block(cmd))
+
+        blocks.append(NotionClient.heading_block("Notion Patterns", level=2))
+        for tip in [
+            "Create a Founder Brief with priority P0-P3 and status Active — CoS reads it next daily cycle",
+            "Check Daily Brief page each morning for decisions needed",
+            "Drill into Team Reports for per-team details",
+            "Review Decision Log for audit trail of all decisions",
+        ]:
+            blocks.append(NotionClient.bulleted_list_block(tip))
+
+        blocks.append(NotionClient.heading_block("Telegram Commands", level=2))
+        for cmd in [
+            "status — Get current status snapshot",
+            "cost — Get cost report",
+            "blockers — Get current blockers",
+            "1, 2, 3 or 1=yes — Approve numbered decisions from daily brief",
+            "A / B — Choose between escalation options",
+            "Y / N — Yes/no to pending questions",
+            "ship X — Trigger feature ship pipeline",
+            "approve X — Approve a pending decision by name",
+            "brief me on X — Request a brief on topic X",
+            "pause TEAM — Pause a team's scans",
+            "reprioritize: A > B — Reorder priorities",
+        ]:
+            blocks.append(NotionClient.bulleted_list_block(cmd))
+
+        return blocks[:100]
 
     # -----------------------------------------------------------------
     # Decision log

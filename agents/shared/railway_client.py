@@ -192,33 +192,39 @@ def get_production_config() -> ConfigStatus:
 
     for name, desc in CRITICAL_VARS.items():
         val = raw.get(name, "")
-        variables.append(VarStatus(
-            name=name,
-            is_set=bool(val),
-            category="critical",
-            description=desc,
-            value_hint=_safe_hint(name, val),
-        ))
+        variables.append(
+            VarStatus(
+                name=name,
+                is_set=bool(val),
+                category="critical",
+                description=desc,
+                value_hint=_safe_hint(name, val),
+            )
+        )
 
     for name, desc in FEATURE_VARS.items():
         val = raw.get(name, "")
-        variables.append(VarStatus(
-            name=name,
-            is_set=bool(val),
-            category="feature",
-            description=desc,
-            value_hint=_safe_hint(name, val),
-        ))
+        variables.append(
+            VarStatus(
+                name=name,
+                is_set=bool(val),
+                category="feature",
+                description=desc,
+                value_hint=_safe_hint(name, val),
+            )
+        )
 
     for name, desc in INFRA_VARS.items():
         val = raw.get(name, "")
-        variables.append(VarStatus(
-            name=name,
-            is_set=bool(val),
-            category="infra",
-            description=desc,
-            value_hint=_safe_hint(name, val),
-        ))
+        variables.append(
+            VarStatus(
+                name=name,
+                is_set=bool(val),
+                category="infra",
+                description=desc,
+                value_hint=_safe_hint(name, val),
+            )
+        )
 
     return ConfigStatus(reachable=True, variables=variables)
 
