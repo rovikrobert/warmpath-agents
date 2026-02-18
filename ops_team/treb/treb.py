@@ -404,6 +404,267 @@ def _check_engagement_touchpoints(
 
 
 # ---------------------------------------------------------------------------
+# Check 6 — Live NH Activation Funnel
+# ---------------------------------------------------------------------------
+
+
+def _check_live_nh_funnel(
+    findings: list[Finding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Query DB for NH signup -> upload -> opt-in conversion rates."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="treb-live-funnel-skip",
+                severity="info",
+                category="nh_funnel",
+                title="Live NH funnel unavailable",
+                detail="DATABASE_URL not set — cannot query activation funnel",
+            )
+        )
+        return
+
+    try:
+        from sqlalchemy import func, select, distinct
+        from app.models.user import User
+        from app.models.contact import CsvUpload
+        from app.models.marketplace import NetworkSharingPreferences
+
+        nh_signup = session.execute(
+            select(func.count()).select_from(User).where(
+                User.user_type == "network_holder",
+                User.deleted_at.is_(None),
+            )
+        ).scalar() or 0
+
+        nh_uploaded = session.execute(
+            select(func.count(distinct(CsvUpload.user_id))).where(
+                CsvUpload.user_id.in_(
+                    select(User.id).where(
+                        User.user_type == "network_holder",
+                        User.deleted_at.is_(None),
+                    )
+                )
+            )
+        ).scalar() or 0
+
+        nh_optin = session.execute(
+            select(func.count()).select_from(NetworkSharingPreferences).where(
+                NetworkSharingPreferences.opt_in_marketplace.is_(True),
+            )
+        ).scalar() or 0
+
+        metrics["live_nh_signup_count"] = nh_signup
+        metrics["live_nh_upload_count"] = nh_uploaded
+        metrics["live_nh_optin_count"] = nh_optin
+        metrics["live_nh_signup_to_upload_rate"] = (
+            round(nh_uploaded / nh_signup, 2) if nh_signup > 0 else 0.0
+        )
+        metrics["live_nh_upload_to_optin_rate"] = (
+            round(nh_optin / nh_uploaded, 2) if nh_uploaded > 0 else 0.0
+        )
+
+        if nh_signup > 0:
+            overall_rate = round(nh_optin / nh_signup, 2) if nh_signup > 0 else 0.0
+            insights.append(
+                OpsInsight(
+                    id="treb-live-ins-funnel",
+                    category="supply_activation",
+                    title=f"NH activation funnel: {nh_signup} -> {nh_uploaded} -> {nh_optin}",
+                    evidence=(
+                        f"signup->upload: {metrics['live_nh_signup_to_upload_rate']:.0%}, "
+                        f"upload->opt-in: {metrics['live_nh_upload_to_optin_rate']:.0%}, "
+                        f"overall: {overall_rate:.0%}"
+                    ),
+                    impact="Funnel conversion directly affects marketplace supply",
+                    recommendation=(
+                        "Target >=70% signup->upload. Below 50% suggests onboarding friction."
+                        if metrics["live_nh_signup_to_upload_rate"] < 0.7
+                        else "Funnel rates are healthy."
+                    ),
+                    confidence=0.9,
+                    persona="network_holder",
+                    actionable_by="product",
+                )
+            )
+
+            if metrics["live_nh_signup_to_upload_rate"] < 0.5:
+                findings.append(
+                    Finding(
+                        id="treb-live-funnel-001",
+                        severity="high",
+                        category="nh_funnel",
+                        title=f"NH signup->upload rate critically low ({metrics['live_nh_signup_to_upload_rate']:.0%})",
+                        detail=f"{nh_signup} NHs signed up but only {nh_uploaded} uploaded CSV",
+                        recommendation="Investigate onboarding friction — add CSV upload nudges",
+                    )
+                )
+        else:
+            findings.append(
+                Finding(
+                    id="treb-live-funnel-000",
+                    severity="info",
+                    category="nh_funnel",
+                    title="No network holders in database yet",
+                    detail="Activation funnel is empty — pre-launch state",
+                )
+            )
+    except Exception as exc:
+        logger.warning("treb: live funnel check failed: %s", exc)
+        findings.append(
+            Finding(
+                id="treb-live-funnel-err",
+                severity="info",
+                category="nh_funnel",
+                title="Live NH funnel check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Check 7 — Live Referral Bonus Capture Validation
+# ---------------------------------------------------------------------------
+
+
+def _check_live_referral_workflow(
+    findings: list[Finding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Verify referral bonus workflow: intro completed -> credit earned -> reputation updated."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="treb-live-ref-skip",
+                severity="info",
+                category="referral_workflow",
+                title="Live referral workflow unavailable",
+                detail="DATABASE_URL not set — cannot validate referral bonus capture",
+            )
+        )
+        return
+
+    try:
+        from sqlalchemy import func, select
+        from app.models.marketplace import IntroFacilitation, ConnectorReputation
+        from app.models.credits import CreditTransaction
+
+        statuses = ["requested", "approved", "declined", "completed"]
+        status_counts: dict[str, int] = {}
+        for status in statuses:
+            count = session.execute(
+                select(func.count()).select_from(IntroFacilitation).where(
+                    IntroFacilitation.status == status
+                )
+            ).scalar() or 0
+            status_counts[status] = count
+
+        credit_earns = session.execute(
+            select(func.count()).select_from(CreditTransaction).where(
+                CreditTransaction.reason == "intro_facilitation",
+                CreditTransaction.type == "earn",
+            )
+        ).scalar() or 0
+
+        reputation_count = session.execute(
+            select(func.count()).select_from(ConnectorReputation).where(
+                ConnectorReputation.intros_facilitated > 0
+            )
+        ).scalar() or 0
+
+        metrics["live_referral_intros_by_status"] = status_counts
+        metrics["live_referral_completed_count"] = status_counts.get("completed", 0)
+        metrics["live_referral_credit_earned_count"] = credit_earns
+        metrics["live_referral_reputation_updated_count"] = reputation_count
+
+        completed = status_counts.get("completed", 0)
+        total_intros = sum(status_counts.values())
+
+        if total_intros > 0:
+            if completed > 0 and credit_earns == 0:
+                findings.append(
+                    Finding(
+                        id="treb-live-ref-001",
+                        severity="high",
+                        category="referral_workflow",
+                        title="Completed intros exist but no credits earned",
+                        detail=(
+                            f"{completed} completed intros but 0 intro_facilitation "
+                            "credit earn events — credits not being awarded"
+                        ),
+                        recommendation="Verify credit earning is wired to intro completion",
+                    )
+                )
+
+            if completed > 0 and reputation_count == 0:
+                findings.append(
+                    Finding(
+                        id="treb-live-ref-002",
+                        severity="medium",
+                        category="referral_workflow",
+                        title="Completed intros exist but no reputation updates",
+                        detail=(
+                            f"{completed} completed intros but no connector_reputation "
+                            "records with intros_facilitated > 0"
+                        ),
+                        recommendation="Verify reputation update is wired to intro completion",
+                    )
+                )
+
+            insights.append(
+                OpsInsight(
+                    id="treb-live-ins-ref",
+                    category="supply_activation",
+                    title=f"Referral workflow: {total_intros} intros, {completed} completed",
+                    evidence=(
+                        f"Status breakdown: {status_counts}, "
+                        f"credits earned: {credit_earns}, "
+                        f"reputation records: {reputation_count}"
+                    ),
+                    impact="End-to-end referral workflow drives NH retention",
+                    recommendation="Monitor completed->credit->reputation chain for consistency",
+                    confidence=0.85,
+                    persona="network_holder",
+                    actionable_by="engineering",
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    id="treb-live-ref-000",
+                    severity="info",
+                    category="referral_workflow",
+                    title="No intro facilitations in database yet",
+                    detail="Referral bonus workflow has no data — pre-launch state",
+                )
+            )
+    except Exception as exc:
+        logger.warning("treb: live referral check failed: %s", exc)
+        findings.append(
+            Finding(
+                id="treb-live-ref-err",
+                severity="info",
+                category="referral_workflow",
+                title="Live referral workflow check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -477,6 +738,12 @@ def scan() -> OpsTeamReport:
 
     _check_frontend_supply_pages(jsx_files, findings, insights, metrics)
     _check_engagement_touchpoints(api_sources, jsx_files, findings, metrics)
+
+    # ---- Live NH activation funnel -------------------------------------------
+    _check_live_nh_funnel(findings, insights, metrics)
+
+    # ---- Live referral bonus capture validation ------------------------------
+    _check_live_referral_workflow(findings, insights, metrics)
 
     # ---- Compute supply-side health score ---------------------------------
 
