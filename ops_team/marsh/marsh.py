@@ -952,6 +952,137 @@ def _check_coverage_signals(
 
 
 # ---------------------------------------------------------------------------
+# Check: Live marketplace volume
+# ---------------------------------------------------------------------------
+
+
+def _check_live_marketplace_volume(
+    findings: list[Finding],
+    mkt_findings: list[MarketplaceFinding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Query DB for live marketplace supply/demand volume metrics."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="marsh-live-vol-skip",
+                severity="info",
+                category="marketplace_volume",
+                title="Live marketplace volume unavailable",
+                detail="DATABASE_URL not set — cannot query marketplace tables",
+            )
+        )
+        return
+
+    try:
+        from sqlalchemy import func, select, distinct
+        from app.models.marketplace import (
+            MarketplaceListing,
+            IntroFacilitation,
+        )
+
+        active_listings = session.execute(
+            select(func.count()).select_from(MarketplaceListing).where(
+                MarketplaceListing.is_available.is_(True),
+                MarketplaceListing.deleted_at.is_(None),
+            )
+        ).scalar() or 0
+
+        unique_companies = session.execute(
+            select(func.count(distinct(MarketplaceListing.company_id))).where(
+                MarketplaceListing.is_available.is_(True),
+                MarketplaceListing.deleted_at.is_(None),
+            )
+        ).scalar() or 0
+
+        unique_nhs = session.execute(
+            select(func.count(distinct(MarketplaceListing.network_holder_id))).where(
+                MarketplaceListing.is_available.is_(True),
+                MarketplaceListing.deleted_at.is_(None),
+            )
+        ).scalar() or 0
+
+        statuses = ["requested", "approved", "declined", "completed", "expired"]
+        intros_by_status: dict[str, int] = {}
+        for status in statuses:
+            count = session.execute(
+                select(func.count()).select_from(IntroFacilitation).where(
+                    IntroFacilitation.status == status
+                )
+            ).scalar() or 0
+            intros_by_status[status] = count
+
+        total_intros = sum(intros_by_status.values())
+
+        unique_seekers = session.execute(
+            select(func.count(distinct(IntroFacilitation.job_seeker_id)))
+        ).scalar() or 0
+
+        metrics["live_active_listings"] = active_listings
+        metrics["live_unique_companies"] = unique_companies
+        metrics["live_unique_nhs"] = unique_nhs
+        metrics["live_intros_by_status"] = intros_by_status
+        metrics["live_total_intros"] = total_intros
+        metrics["live_unique_seekers"] = unique_seekers
+        metrics["live_supply_demand_ratio"] = (
+            round(active_listings / max(1, total_intros), 2)
+            if total_intros > 0 else None
+        )
+
+        insights.append(
+            OpsInsight(
+                id="marsh-live-ins-vol",
+                category="marketplace_health",
+                title=f"Marketplace: {active_listings} listings, {total_intros} intros",
+                evidence=(
+                    f"Supply: {active_listings} active listings across {unique_companies} companies "
+                    f"from {unique_nhs} NHs. "
+                    f"Demand: {total_intros} intros ({intros_by_status}), {unique_seekers} seekers"
+                ),
+                impact="Supply/demand balance determines marketplace value",
+                recommendation=(
+                    "Grow supply side first — target 100+ listings across 20+ companies"
+                    if active_listings < 100
+                    else "Supply base is building — focus on demand acquisition"
+                ),
+                confidence=0.95,
+                persona="both",
+                actionable_by="product",
+            )
+        )
+
+        if active_listings == 0:
+            mkt_findings.append(
+                MarketplaceFinding(
+                    id="marsh-live-vol-001",
+                    category="marketplace_volume",
+                    severity="high",
+                    title="Zero active marketplace listings",
+                    detail="Marketplace has no supply — job seekers cannot find connections",
+                    recommendation="Seed supply side: recruit NHs and guide them through opt-in flow",
+                )
+            )
+
+    except Exception as exc:
+        logger.warning("marsh: live volume check failed: %s", exc)
+        findings.append(
+            Finding(
+                id="marsh-live-vol-err",
+                severity="info",
+                category="marketplace_volume",
+                title="Live marketplace volume check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -1029,6 +1160,9 @@ def scan() -> OpsTeamReport:
 
     # Production environment config check
     _check_production_config(findings, insights, metrics)
+
+    # Live marketplace volume metrics
+    _check_live_marketplace_volume(findings, mkt_findings, insights, metrics)
 
     duration = time.time() - start
 
