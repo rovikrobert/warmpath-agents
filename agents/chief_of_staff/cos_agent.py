@@ -52,35 +52,36 @@ from .telegram_bridge import TelegramBridge, TELEGRAM_DIR
 
 logger = logging.getLogger(__name__)
 
-# Data team reports directory — resolved lazily, patchable by tests
-try:
-    from data_team.shared.config import REPORTS_DIR as DATA_TEAM_REPORTS_DIR
-except ImportError:
-    DATA_TEAM_REPORTS_DIR = None
+# Team report directories — import failures are BUGS, not optional features.
+# If a team package is missing, we want to know immediately.
+_TEAM_REPORT_DIRS: dict[str, Path | None] = {}
+for _team_name, _module_path in [
+    ("data", "data_team.shared.config"),
+    ("product", "product_team.shared.config"),
+    ("ops", "ops_team.shared.config"),
+    ("finance", "finance_team.shared.config"),
+    ("gtm", "gtm_team.shared.config"),
+]:
+    try:
+        import importlib
 
-# Product team reports directory — resolved lazily, patchable by tests
-try:
-    from product_team.shared.config import REPORTS_DIR as PRODUCT_TEAM_REPORTS_DIR
-except ImportError:
-    PRODUCT_TEAM_REPORTS_DIR = None
+        _mod = importlib.import_module(_module_path)
+        _TEAM_REPORT_DIRS[_team_name] = _mod.REPORTS_DIR
+    except ImportError:
+        logger.error(
+            "BUG: Cannot import %s — %s team reports will be MISSING from briefs. "
+            "Fix the import or check that the package is installed.",
+            _module_path,
+            _team_name,
+        )
+        _TEAM_REPORT_DIRS[_team_name] = None
 
-# Ops team reports directory — resolved lazily, patchable by tests
-try:
-    from ops_team.shared.config import REPORTS_DIR as OPS_TEAM_REPORTS_DIR
-except ImportError:
-    OPS_TEAM_REPORTS_DIR = None
-
-# Finance team reports directory — resolved lazily, patchable by tests
-try:
-    from finance_team.shared.config import REPORTS_DIR as FINANCE_TEAM_REPORTS_DIR
-except ImportError:
-    FINANCE_TEAM_REPORTS_DIR = None
-
-# GTM team reports directory — resolved lazily, patchable by tests
-try:
-    from gtm_team.shared.config import REPORTS_DIR as GTM_TEAM_REPORTS_DIR
-except ImportError:
-    GTM_TEAM_REPORTS_DIR = None
+# Expose as module-level names for backward compat and test patching
+DATA_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("data")
+PRODUCT_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("product")
+OPS_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("ops")
+FINANCE_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("finance")
+GTM_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("gtm")
 
 
 # ---------------------------------------------------------------------------
@@ -107,10 +108,35 @@ def _load_reports() -> tuple[list[AgentReport], list[dict]]:
         "learning_updates",
     }
 
-    def _load_dir(reports_dir: Path | None, is_engineering: bool = False) -> None:
-        if reports_dir is None or not reports_dir.is_dir():
+    def _load_dir(
+        reports_dir: Path | None, team_label: str, is_engineering: bool = False
+    ) -> None:
+        if reports_dir is None:
+            logger.error(
+                "BUG: %s reports dir is None — team import failed. "
+                "This team will be MISSING from the daily brief.",
+                team_label,
+            )
             return
-        for path in sorted(reports_dir.glob("*_latest.json")):
+        if not reports_dir.is_dir():
+            logger.warning(
+                "%s reports dir does not exist: %s — no reports to load. "
+                "Run the %s team scan first.",
+                team_label,
+                reports_dir,
+                team_label,
+            )
+            return
+        json_files = sorted(reports_dir.glob("*_latest.json"))
+        if not json_files:
+            logger.warning(
+                "%s reports dir is empty: %s — no *_latest.json files found.",
+                team_label,
+                reports_dir,
+            )
+            return
+        loaded = 0
+        for path in json_files:
             try:
                 data = json.loads(path.read_text())
                 # Extract cross-team requests before stripping fields
@@ -122,15 +148,20 @@ def _load_reports() -> tuple[list[AgentReport], list[dict]]:
                 else:
                     clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
                     reports.append(AgentReport.from_dict(clean))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                loaded += 1
+            except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
+                logger.warning(
+                    "Failed to load %s report %s: %s", team_label, path.name, exc
+                )
                 continue
+        logger.info("Loaded %d/%d reports from %s", loaded, len(json_files), team_label)
 
-    _load_dir(REPORTS_DIR, is_engineering=True)
-    _load_dir(DATA_TEAM_REPORTS_DIR)
-    _load_dir(PRODUCT_TEAM_REPORTS_DIR)
-    _load_dir(OPS_TEAM_REPORTS_DIR)
-    _load_dir(FINANCE_TEAM_REPORTS_DIR)
-    _load_dir(GTM_TEAM_REPORTS_DIR)
+    _load_dir(REPORTS_DIR, "engineering", is_engineering=True)
+    _load_dir(DATA_TEAM_REPORTS_DIR, "data")
+    _load_dir(PRODUCT_TEAM_REPORTS_DIR, "product")
+    _load_dir(OPS_TEAM_REPORTS_DIR, "ops")
+    _load_dir(FINANCE_TEAM_REPORTS_DIR, "finance")
+    _load_dir(GTM_TEAM_REPORTS_DIR, "gtm")
 
     return reports, cross_team_requests
 
@@ -446,20 +477,28 @@ def _push_daily_outputs(
         except Exception:
             logger.debug("Telegram daily brief generation skipped")
 
-    # Push per-team reports to Notion
+    # Push per-team reports to Notion (skip if already pushed today)
     try:
         if brief_data:
             notion = NotionSync()
             if notion.enabled:
-                for ts in brief_data.get("team_summaries", []):
-                    notion.push_team_report(
-                        date=today,
-                        team=ts.get("team", "unknown"),
-                        health=ts.get("health", "green"),
-                        summary=ts.get("summary", ""),
-                        agent_count=ts.get("agent_count", 0),
-                        finding_count=ts.get("finding_count", 0),
+                if notion._state.get("last_team_reports_sync") == today:
+                    logger.info(
+                        "Team reports already synced to Notion for %s — skipping",
+                        today,
                     )
+                else:
+                    for ts in brief_data.get("team_summaries", []):
+                        notion.push_team_report(
+                            date=today,
+                            team=ts.get("team", "unknown"),
+                            health=ts.get("health", "green"),
+                            summary=ts.get("summary", ""),
+                            agent_count=ts.get("agent_count", 0),
+                            finding_count=ts.get("finding_count", 0),
+                        )
+                    notion._state["last_team_reports_sync"] = today
+                    notion._save_state()
     except Exception:
         logger.debug("Team report push to Notion skipped")
 
