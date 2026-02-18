@@ -520,8 +520,20 @@ def main() -> None:
 
 def cmd_consult(query: str, team: str | None = None) -> None:
     """Interactive consultation with an agent team."""
+    import os
+    from pathlib import Path
+
     from agents.shared.consultant import consult
     from agents.chief_of_staff.router import route_query
+
+    # Consult is useless in mock mode — force AI mode and load .env for API key
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    except ImportError:
+        pass
+    os.environ["AI_MOCK_MODE"] = "false"
 
     if team:
         # Direct team consultation
