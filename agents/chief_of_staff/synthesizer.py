@@ -12,12 +12,10 @@ from agents.shared.business_outcomes import (
     get_business_impact,
     score_alignment,
 )
-from agents.shared.config import SEVERITY_WEIGHTS
-from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary
 from agents.shared.report import AgentReport, Finding, merge_reports
 
-from .cos_config import COS_CONFIG, SEVERITY_WEIGHT
-from .cos_learning import get_learning_summary, weekly_reflect
+from .cos_config import COS_CONFIG, SEVERITY_WEIGHT, TEAM_REGISTRY
+from .cos_learning import weekly_reflect
 from .schemas import CosFinding, FounderBrief
 
 
@@ -86,6 +84,22 @@ def synthesize_daily(
     # Operational health checks
     operational_health = _check_operational_health(reports, cross_team_requests or [])
 
+    # Compute per-team summaries
+    _team_agents_sets = {team: set(agents) for team, agents in TEAM_REGISTRY.items()}
+    team_report_groups: dict[str, list[AgentReport]] = {}
+    for r in reports:
+        for team_name, agent_set in _team_agents_sets.items():
+            if r.agent in agent_set:
+                team_report_groups.setdefault(team_name, []).append(r)
+                break
+        else:
+            team_report_groups.setdefault("engineering", []).append(r)
+
+    team_summaries_list = [
+        summarize_team(team, team_reports)
+        for team, team_reports in sorted(team_report_groups.items())
+    ]
+
     # Build the brief model
     brief = FounderBrief(
         date=today,
@@ -109,6 +123,7 @@ def synthesize_daily(
             for cf in key_updates[:5]
         ],
         progress=progress_items,
+        team_summaries=team_summaries_list,
         cross_team_requests=cross_team_requests or [],
         operational_health=operational_health,
         founder_requests=founder_requests or [],
@@ -130,27 +145,51 @@ def _check_operational_health(
     items: list[dict[str, Any]] = []
 
     # 1. Cross-team request backlog
-    pending = [r for r in cross_team_requests if r.get("urgency") in ("critical", "high")]
+    pending = [
+        r for r in cross_team_requests if r.get("urgency") in ("critical", "high")
+    ]
     if pending:
-        items.append({
-            "indicator": "Cross-Team Request Backlog",
-            "status": "warning" if len(pending) > 3 else "ok",
-            "detail": f"{len(pending)} high/critical cross-team requests pending",
-        })
+        items.append(
+            {
+                "indicator": "Cross-Team Request Backlog",
+                "status": "warning" if len(pending) > 3 else "ok",
+                "detail": f"{len(pending)} high/critical cross-team requests pending",
+            }
+        )
     else:
-        items.append({
-            "indicator": "Cross-Team Request Backlog",
-            "status": "ok",
-            "detail": "No high-urgency cross-team requests",
-        })
+        items.append(
+            {
+                "indicator": "Cross-Team Request Backlog",
+                "status": "ok",
+                "detail": "No high-urgency cross-team requests",
+            }
+        )
 
     # 2. Scan freshness (check timestamps)
     _TEAM_AGENTS = {
-        "engineering": {"architect", "test_engineer", "perf_monitor", "deps_manager", "doc_keeper"},
+        "engineering": {
+            "architect",
+            "test_engineer",
+            "perf_monitor",
+            "deps_manager",
+            "doc_keeper",
+        },
         "data": {"pipeline", "analyst", "model_engineer", "data_lead"},
-        "product": {"user_researcher", "product_manager", "ux_lead", "design_lead", "product_lead"},
+        "product": {
+            "user_researcher",
+            "product_manager",
+            "ux_lead",
+            "design_lead",
+            "product_lead",
+        },
         "ops": {"keevs", "treb", "naiv", "marsh", "ops_lead"},
-        "finance": {"finance_manager", "credits_manager", "investor_relations", "legal_compliance", "finance_lead"},
+        "finance": {
+            "finance_manager",
+            "credits_manager",
+            "investor_relations",
+            "legal_compliance",
+            "finance_lead",
+        },
         "gtm": {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"},
     }
     all_agents_set = set()
@@ -166,36 +205,44 @@ def _check_operational_health(
             teams_silent.add(team_name)
 
     if teams_silent:
-        items.append({
-            "indicator": "Scan Coverage",
-            "status": "warning",
-            "detail": f"{len(teams_reporting)}/6 teams reporting. Silent: {', '.join(sorted(teams_silent))}",
-        })
+        items.append(
+            {
+                "indicator": "Scan Coverage",
+                "status": "warning",
+                "detail": f"{len(teams_reporting)}/6 teams reporting. Silent: {', '.join(sorted(teams_silent))}",
+            }
+        )
     else:
-        items.append({
-            "indicator": "Scan Coverage",
-            "status": "ok",
-            "detail": f"All 6 teams reporting ({len(reports)} agents total)",
-        })
+        items.append(
+            {
+                "indicator": "Scan Coverage",
+                "status": "ok",
+                "detail": f"All 6 teams reporting ({len(reports)} agents total)",
+            }
+        )
 
     # 3. Report format compatibility
     agents_with_metrics = sum(1 for r in reports if r.metrics)
     agents_without = len(reports) - agents_with_metrics
     if agents_without > 0:
-        items.append({
-            "indicator": "Report Completeness",
-            "status": "info",
-            "detail": f"{agents_without}/{len(reports)} agents reported without metrics",
-        })
+        items.append(
+            {
+                "indicator": "Report Completeness",
+                "status": "info",
+                "detail": f"{agents_without}/{len(reports)} agents reported without metrics",
+            }
+        )
 
     # 4. Finding volume — signal overload check
     total_findings = sum(len(r.findings) for r in reports)
     if total_findings > 100:
-        items.append({
-            "indicator": "Signal Volume",
-            "status": "warning",
-            "detail": f"{total_findings} total findings — consider reviewing resolved registry for noise reduction",
-        })
+        items.append(
+            {
+                "indicator": "Signal Volume",
+                "status": "warning",
+                "detail": f"{total_findings} total findings — consider reviewing resolved registry for noise reduction",
+            }
+        )
 
     # 5. Shared intelligence activity
     try:
@@ -205,17 +252,21 @@ def _check_operational_health(
         teams_sharing = len(intel_summary.get("teams_contributing", []))
         total_shared = intel_summary.get("total_shared_insights", 0)
         if teams_sharing < 3 and total_shared == 0:
-            items.append({
-                "indicator": "Cross-Team Intelligence",
-                "status": "info",
-                "detail": "No shared intelligence yet — teams are operating in silos",
-            })
+            items.append(
+                {
+                    "indicator": "Cross-Team Intelligence",
+                    "status": "info",
+                    "detail": "No shared intelligence yet — teams are operating in silos",
+                }
+            )
         else:
-            items.append({
-                "indicator": "Cross-Team Intelligence",
-                "status": "ok",
-                "detail": f"{total_shared} shared insights from {teams_sharing} teams",
-            })
+            items.append(
+                {
+                    "indicator": "Cross-Team Intelligence",
+                    "status": "ok",
+                    "detail": f"{total_shared} shared insights from {teams_sharing} teams",
+                }
+            )
     except Exception:
         pass
 
@@ -265,6 +316,51 @@ def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
                 }
             )
     return progress
+
+
+def summarize_team(team: str, reports: list[AgentReport]) -> dict[str, Any]:
+    """Produce a structured per-team summary for the FounderBrief.
+
+    Returns dict with keys: team, health, summary, agent_count, finding_count.
+    """
+    if not reports:
+        return {
+            "team": team,
+            "health": "green",
+            "summary": f"{team.title()} team silent — no reports this cycle.",
+            "agent_count": 0,
+            "finding_count": 0,
+        }
+
+    all_findings = [f for r in reports for f in r.findings]
+    crit = sum(1 for f in all_findings if f.severity == "critical")
+    high = sum(1 for f in all_findings if f.severity == "high")
+    medium = sum(1 for f in all_findings if f.severity == "medium")
+
+    if crit > 0 or high > 0:
+        health = "red"
+    elif medium > 0:
+        health = "yellow"
+    else:
+        health = "green"
+
+    if health == "red":
+        top = next((f for f in all_findings if f.severity in ("critical", "high")), None)
+        summary = f"{team.title()}: {crit + high} critical/high issues."
+        if top:
+            summary += f" Top: {top.title}."
+    elif health == "yellow":
+        summary = f"{team.title()}: {medium} medium issues under review."
+    else:
+        summary = f"{team.title()}: clean scan across {len(reports)} agents."
+
+    return {
+        "team": team,
+        "health": health,
+        "summary": summary,
+        "agent_count": len(reports),
+        "finding_count": len(all_findings),
+    }
 
 
 def _render_daily_brief(brief: FounderBrief, alerts: list[str]) -> str:

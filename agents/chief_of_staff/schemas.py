@@ -53,6 +53,7 @@ class FounderBrief(BaseModel):
     founder_requests: list[dict[str, Any]] = Field(default_factory=list)
     resolutions: list[dict[str, Any]] = Field(default_factory=list)
     cost_summary: dict[str, Any] = Field(default_factory=dict)
+    team_summaries: list[dict[str, Any]] = Field(default_factory=list)
     kpi_snapshot: str = ""
 
 
