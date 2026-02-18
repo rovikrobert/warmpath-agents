@@ -1,0 +1,19 @@
+{
+  "experiments": [],
+  "schema_version": 1,
+  "experiment_schema": {
+    "id": "string (uuid)",
+    "hypothesis": "string - what we believe will happen",
+    "metric": "string - what we measure",
+    "variant_a": "string - control description",
+    "variant_b": "string - treatment description",
+    "status": "draft | active | concluded | abandoned",
+    "start_date": "ISO 8601 date or null",
+    "end_date": "ISO 8601 date or null",
+    "result": "string - outcome summary or null",
+    "confidence": "float 0-1 or null",
+    "posthog_experiment_id": "string or null",
+    "created_at": "ISO 8601 date",
+    "created_by": "string"
+  }
+}

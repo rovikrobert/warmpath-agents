@@ -282,6 +282,147 @@ def _check_integration_gaps(
     metrics["endpoint_test_coverage"] = round(endpoint_test_coverage, 2)
 
 
+def _validate_api_contracts(
+    findings: list[Finding],
+    insights: list[ProductInsight],
+    metrics: dict,
+) -> None:
+    """Parse Pydantic schemas and frontend API calls, flag mismatches."""
+    from product_team.shared.config import SCHEMAS_DIR, FRONTEND_SRC
+
+    schema_files = sorted(SCHEMAS_DIR.glob("*.py")) if SCHEMAS_DIR.is_dir() else []
+    schema_files = [f for f in schema_files if f.name != "__init__.py"]
+    metrics["schema_files_found"] = len(schema_files)
+
+    response_models: dict[str, set[str]] = {}
+    model_pattern = re.compile(r"class\s+(\w*Response\w*)\s*\(")
+    field_pattern = re.compile(r"^\s+(\w+)\s*:", re.MULTILINE)
+
+    for path in schema_files:
+        source = _read_safe(path)
+        for model_match in model_pattern.finditer(source):
+            model_name = model_match.group(1)
+            start = model_match.end()
+            next_class = re.search(r"\nclass\s", source[start:])
+            end = start + next_class.start() if next_class else len(source)
+            block = source[start:end]
+            fields = set(field_pattern.findall(block))
+            fields -= {"model_config", "Config"}
+            if fields:
+                response_models[model_name] = fields
+
+    metrics["schema_response_models"] = len(response_models)
+
+    api_client_path = FRONTEND_SRC / "api" / "client.js"
+    frontend_api_calls = 0
+
+    if api_client_path.exists():
+        source = _read_safe(api_client_path)
+        api_call_pattern = re.compile(r"(?:api|fetch)\s*\(\s*['\"`]([^'\"` ]+)['\"`]")
+        calls = api_call_pattern.findall(source)
+        frontend_api_calls = len(calls)
+
+        page_dir = FRONTEND_SRC / "pages"
+        if page_dir.is_dir():
+            field_access_pattern = re.compile(r"(?:data|resp|response|result)\s*[\[.](\w+)")
+            frontend_fields: set[str] = set()
+            for page in page_dir.glob("*.jsx"):
+                page_source = _read_safe(page)
+                frontend_fields.update(field_access_pattern.findall(page_source))
+            metrics["frontend_response_fields"] = len(frontend_fields)
+
+    metrics["frontend_api_calls"] = frontend_api_calls
+
+    insights.append(
+        ProductInsight(
+            id="pm-insight-contracts",
+            category="feature_coverage",
+            title=f"API contract audit: {len(response_models)} response models, {frontend_api_calls} frontend API calls",
+            evidence=f"Schema files: {len(schema_files)}, Response models: {', '.join(sorted(response_models.keys())[:5])}{'...' if len(response_models) > 5 else ''}",
+            impact="Schema-frontend alignment prevents runtime errors and broken UX",
+            recommendation="Review any flagged mismatches between backend schemas and frontend expectations",
+            confidence=0.8,
+        )
+    )
+
+
+def _track_experiments(
+    findings: list[Finding],
+    insights: list[ProductInsight],
+    metrics: dict,
+) -> None:
+    """Track hypothesis/experiment lifecycle from registry."""
+    import json
+    from datetime import datetime, timezone
+    from product_team.shared.config import EXPERIMENT_REGISTRY_PATH
+
+    if not EXPERIMENT_REGISTRY_PATH.exists():
+        metrics["experiments_total"] = 0
+        metrics["experiments_active"] = 0
+        metrics["experiments_concluded"] = 0
+        return
+
+    try:
+        registry = json.loads(EXPERIMENT_REGISTRY_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        metrics["experiments_total"] = 0
+        metrics["experiments_active"] = 0
+        metrics["experiments_concluded"] = 0
+        return
+
+    experiments = registry.get("experiments", [])
+    metrics["experiments_total"] = len(experiments)
+
+    by_status: dict[str, int] = {}
+    stale_experiments: list[str] = []
+
+    for exp in experiments:
+        status = exp.get("status", "draft")
+        by_status[status] = by_status.get(status, 0) + 1
+        if status == "active" and exp.get("start_date"):
+            try:
+                start = datetime.fromisoformat(exp["start_date"])
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                days_active = (datetime.now(timezone.utc) - start).days
+                if days_active > 30 and not exp.get("result"):
+                    stale_experiments.append(exp.get("id", "unknown"))
+            except (ValueError, TypeError):
+                pass
+
+    metrics["experiments_active"] = by_status.get("active", 0)
+    metrics["experiments_concluded"] = by_status.get("concluded", 0)
+    metrics["experiments_draft"] = by_status.get("draft", 0)
+    metrics["experiments_stale"] = len(stale_experiments)
+
+    if stale_experiments:
+        findings.append(
+            Finding(
+                id="pm-exp-stale",
+                severity="medium",
+                category="experiment_tracking",
+                title=f"{len(stale_experiments)} experiments active >30 days without results",
+                detail=f"IDs: {', '.join(stale_experiments)}",
+                recommendation="Conclude or extend experiments — stale tests waste resources",
+            )
+        )
+
+    concluded = [e for e in experiments if e.get("status") == "concluded" and e.get("result")]
+    recent_learnings = [f"{e.get('hypothesis', '?')[:60]} -> {e.get('result', '?')[:60]}" for e in concluded[-3:]]
+
+    insights.append(
+        ProductInsight(
+            id="pm-insight-experiments",
+            category="experiment_tracking",
+            title=f"Experiment tracker: {len(experiments)} total, {by_status.get('active', 0)} active, {by_status.get('concluded', 0)} concluded",
+            evidence=f"Recent learnings: {'; '.join(recent_learnings)}" if recent_learnings else "No concluded experiments yet",
+            impact="Structured experimentation accelerates product-market fit discovery",
+            recommendation="Add new hypotheses to experiment_registry.json" if not experiments else "Review active experiments",
+            confidence=0.9,
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -317,6 +458,8 @@ def scan() -> ProductTeamReport:
         _map_feature_coverage(api_files, page_files, findings, insights, metrics)
         _audit_test_coverage(test_files, api_files, findings, insights, metrics)
         _check_integration_gaps(api_files, page_files, test_files, findings, metrics)
+        _validate_api_contracts(findings, insights, metrics)
+        _track_experiments(findings, insights, metrics)
 
     duration = time.time() - start
 

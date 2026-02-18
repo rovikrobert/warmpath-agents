@@ -480,6 +480,105 @@ def generate_monthly_review(reports: list[ProductTeamReport] | None = None) -> s
     return "\n".join(lines)
 
 
+def _aggregate_all_feedback(
+    findings: list[Finding],
+    insights: list[ProductInsight],
+    metrics: dict,
+) -> None:
+    """Aggregate feedback from DB (UserFeedback table) + Notion.
+
+    Clusters by feature area, identifies themes, tracks sentiment.
+    Reads DB synchronously via a separate sync engine for agent use.
+    """
+    db_items: list[dict] = []
+
+    try:
+        from sqlalchemy import create_engine, text
+        db_url = os.environ.get("DATABASE_URL", "")
+        if db_url:
+            sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://").replace("sqlite+aiosqlite://", "sqlite://")
+            engine = create_engine(sync_url)
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT feature, rating, comment, created_at FROM user_feedback ORDER BY created_at DESC LIMIT 100")
+                ).fetchall()
+                for row in rows:
+                    db_items.append({
+                        "feature": row[0],
+                        "rating": row[1],
+                        "comment": row[2],
+                        "created_at": str(row[3]) if row[3] else "",
+                    })
+    except Exception as exc:
+        logger.debug("Could not read feedback from DB: %s", exc)
+
+    metrics["feedback_db_items"] = len(db_items)
+
+    feature_counts: dict[str, int] = {}
+    feature_ratings: dict[str, list[int]] = {}
+    for item in db_items:
+        feature = item.get("feature", "unknown")
+        if ":" in feature:
+            feature = feature.split(":", 1)[1].strip("/").split("/")[0].lower() or "other"
+        feature_counts[feature] = feature_counts.get(feature, 0) + 1
+        feature_ratings.setdefault(feature, []).append(item.get("rating", 0))
+
+    themes = {f: c for f, c in feature_counts.items() if c >= 3}
+    metrics["feedback_themes"] = len(themes)
+
+    feature_sentiment: dict[str, float] = {}
+    for feature, ratings in feature_ratings.items():
+        if ratings:
+            feature_sentiment[feature] = round(sum(ratings) / len(ratings), 2)
+
+    if db_items:
+        positive = sum(1 for item in db_items if item.get("rating", 0) > 0)
+        negative = sum(1 for item in db_items if item.get("rating", 0) < 0)
+        neutral = len(db_items) - positive - negative
+
+        top_features = sorted(feature_counts.items(), key=lambda x: -x[1])[:5]
+        top_str = ", ".join(f"{f}: {c}" for f, c in top_features)
+
+        insights.append(
+            ProductInsight(
+                id="pl-insight-feedback-aggregate",
+                category="beta_feedback",
+                title=f"Feedback: {len(db_items)} items ({positive} positive, {negative} negative, {neutral} neutral)",
+                evidence=f"Top features: {top_str}. Themes (3+): {len(themes)}",
+                impact="User feedback drives product iteration priorities",
+                recommendation="Focus on negative-sentiment features" if negative > positive else "Positive sentiment — maintain quality",
+                confidence=0.9,
+                persona="both",
+            )
+        )
+
+        for feature, sentiment in feature_sentiment.items():
+            if sentiment < -0.3 and feature_counts.get(feature, 0) >= 3:
+                findings.append(
+                    Finding(
+                        id=f"pl-feedback-neg-{feature[:20]}",
+                        severity="high",
+                        category="beta_feedback",
+                        title=f"Negative feedback theme: {feature} ({feature_counts[feature]} items, sentiment {sentiment})",
+                        detail=f"Feature '{feature}' has {feature_counts[feature]} feedback items with net negative sentiment",
+                        recommendation=f"Investigate user complaints about {feature}",
+                    )
+                )
+    else:
+        insights.append(
+            ProductInsight(
+                id="pl-insight-feedback-aggregate",
+                category="beta_feedback",
+                title="No in-app feedback collected yet",
+                evidence="UserFeedback table is empty or DB not accessible",
+                impact="No direct user feedback to inform priorities",
+                recommendation="Promote the feedback button to beta testers",
+                confidence=1.0,
+                persona="both",
+            )
+        )
+
+
 # ---------------------------------------------------------------------------
 # Public API (scan pattern)
 # ---------------------------------------------------------------------------
@@ -507,6 +606,9 @@ def scan() -> ProductTeamReport:
     findings.extend(fb_findings)
     insights.extend(fb_insights)
     cross_team_requests.extend(fb_xtr)
+
+    # In-app feedback aggregation
+    _aggregate_all_feedback(findings, insights, metrics)
 
     metrics["sub_agents_reporting"] = len(reports)
     metrics["total_findings"] = len(findings)

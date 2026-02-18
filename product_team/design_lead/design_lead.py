@@ -316,6 +316,78 @@ def _compute_design_system_score(
     return score
 
 
+def _validate_against_design_tokens(
+    jsx_files: list[Path],
+    design_findings: list[DesignFinding],
+    metrics: dict,
+) -> None:
+    """Validate code against design-tokens.json spec. Flag drift."""
+    import json
+    from product_team.shared.config import DESIGN_TOKENS_PATH
+
+    if not DESIGN_TOKENS_PATH.exists():
+        metrics["design_tokens_loaded"] = False
+        design_findings.append(
+            DesignFinding(
+                id="ds-tokens-missing",
+                category="design_system",
+                severity="medium",
+                title="No design-tokens.json found",
+                detail=f"Expected at {DESIGN_TOKENS_PATH}",
+                recommendation="Create frontend/design-tokens.json with canonical design values",
+            )
+        )
+        return
+
+    try:
+        tokens = json.loads(DESIGN_TOKENS_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        metrics["design_tokens_loaded"] = False
+        return
+
+    metrics["design_tokens_loaded"] = True
+
+    allowed_colors: set[str] = set()
+    for group_colors in tokens.get("colors", {}).values():
+        allowed_colors.update(group_colors)
+
+    tw_color_pattern = re.compile(
+        r"\b(?:text|bg|border|ring|shadow|from|via|to)-"
+        r"((?:slate|gray|zinc|red|orange|amber|yellow|green|emerald|blue|indigo|violet|purple|pink|rose|white|black|transparent)-?\d*)"
+    )
+
+    off_token_colors: set[str] = set()
+    on_token_colors: set[str] = set()
+
+    for path in jsx_files:
+        source = _read_safe(path)
+        for match in tw_color_pattern.finditer(source):
+            color = match.group(1)
+            if color in allowed_colors:
+                on_token_colors.add(color)
+            else:
+                off_token_colors.add(color)
+
+    total_colors = len(on_token_colors) + len(off_token_colors)
+    compliance = len(on_token_colors) / max(1, total_colors)
+
+    metrics["token_color_drift"] = len(off_token_colors)
+    metrics["token_colors_compliant"] = len(on_token_colors)
+    metrics["token_compliance_pct"] = round(compliance * 100, 1)
+
+    if off_token_colors:
+        design_findings.append(
+            DesignFinding(
+                id="ds-tokens-color-drift",
+                category="color",
+                severity="low" if len(off_token_colors) <= 5 else "medium",
+                title=f"{len(off_token_colors)} color values not in design tokens",
+                detail=f"Off-spec: {', '.join(sorted(off_token_colors)[:8])}{'...' if len(off_token_colors) > 8 else ''}",
+                recommendation="Add to design-tokens.json or replace with approved colors",
+            )
+        )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -357,6 +429,7 @@ def scan() -> ProductTeamReport:
         _check_dark_mode(jsx_files, design_findings, metrics)
         _check_animations(jsx_files, design_findings, metrics)
         ds_score = _compute_design_system_score(jsx_files, metrics)
+        _validate_against_design_tokens(jsx_files, design_findings, metrics)
 
     duration = time.time() - start
 

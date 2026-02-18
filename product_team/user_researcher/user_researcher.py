@@ -5,7 +5,9 @@ Scans frontend pages and CLAUDE.md to map user journeys and identify gaps.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -249,6 +251,157 @@ def _scan_page_content(
     metrics["total_page_components"] = total_components
 
 
+def _posthog_query(query_type: str, params: dict | None = None) -> dict:
+    """Query PostHog Trends API. Returns raw JSON response."""
+    import httpx
+    api_key = os.environ.get("POSTHOG_API_KEY", "")
+    project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
+    host = os.environ.get("POSTHOG_HOST", "https://app.posthog.com")
+    url = f"{host}/api/projects/{project_id}/insights/trend/"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        resp = httpx.get(url, headers=headers, params=params or {}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        return {}
+
+
+def _analyze_posthog_data(
+    insights: list,
+    metrics: dict,
+) -> None:
+    """Query PostHog for real user analytics. Graceful fallback if not configured."""
+    api_key = os.environ.get("POSTHOG_API_KEY", "")
+    project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
+
+    if not api_key or not project_id:
+        metrics["posthog_configured"] = False
+        insights.append(
+            ProductInsight(
+                id="ur-insight-posthog-unconfigured",
+                category="analytics",
+                title="PostHog not configured — no real user analytics available",
+                evidence="POSTHOG_API_KEY or POSTHOG_PROJECT_ID not set",
+                impact="Cannot measure actual user journeys, drop-offs, or feature adoption",
+                recommendation="Set POSTHOG_API_KEY and POSTHOG_PROJECT_ID env vars",
+                confidence=1.0,
+            )
+        )
+        return
+
+    metrics["posthog_configured"] = True
+    try:
+        data = _posthog_query("trend", {"events": '[{"id": "$pageview"}]', "date_from": "-7d"})
+        results = data.get("results", [])
+        if results:
+            total_views = sum(results[0].get("data", []))
+            metrics["posthog_pageviews_7d"] = total_views
+            insights.append(
+                ProductInsight(
+                    id="ur-insight-posthog-traffic",
+                    category="analytics",
+                    title=f"PostHog: {total_views} pageviews in last 7 days",
+                    evidence=f"Daily trend: {results[0].get('data', [])}",
+                    impact="Real user traffic data informs product priorities",
+                    recommendation="Monitor trends for growth or drop-off signals",
+                    confidence=0.95,
+                )
+            )
+        else:
+            insights.append(
+                ProductInsight(
+                    id="ur-insight-posthog-nodata",
+                    category="analytics",
+                    title="PostHog configured but no pageview data yet",
+                    evidence="Trends API returned empty results",
+                    impact="No user traffic to analyze",
+                    recommendation="Verify PostHog JS snippet is deployed in production",
+                    confidence=0.9,
+                )
+            )
+    except Exception as exc:
+        logger.warning("PostHog query failed: %s", exc)
+        insights.append(
+            ProductInsight(
+                id="ur-insight-posthog-error",
+                category="analytics",
+                title="PostHog query failed — analytics unavailable this scan",
+                evidence=str(exc)[:200],
+                impact="Temporary loss of real user analytics",
+                recommendation="Check PostHog API key validity and network connectivity",
+                confidence=0.5,
+            )
+        )
+
+
+def _monitor_competitors(
+    insights: list,
+    findings: list,
+    metrics: dict,
+) -> None:
+    """Structured competitive monitoring from competitor registry."""
+    from product_team.shared.config import COMPETITOR_REGISTRY_PATH
+
+    if not COMPETITOR_REGISTRY_PATH.exists():
+        metrics["competitors_tracked"] = 0
+        return
+
+    try:
+        registry = json.loads(COMPETITOR_REGISTRY_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        metrics["competitors_tracked"] = 0
+        return
+
+    competitors = registry.get("competitors", [])
+    metrics["competitors_tracked"] = len(competitors)
+    total_results = 0
+    updates_found: list[str] = []
+
+    for comp in competitors:
+        name = comp.get("name", "Unknown")
+        queries = comp.get("search_queries", [])
+        for query in queries[:1]:
+            results = web_search(query, max_results=2)
+            total_results += len(results)
+            for r in results:
+                updates_found.append(f"{name}: {r.title[:80]}")
+
+    metrics["competitor_search_results"] = total_results
+
+    if updates_found:
+        insights.append(
+            ProductInsight(
+                id="ur-insight-competitive",
+                category="competitive",
+                title=f"Competitive scan: {total_results} results across {len(competitors)} competitors",
+                evidence="; ".join(updates_found[:5]),
+                impact="Competitive intelligence informs feature prioritization and positioning",
+                recommendation="Review competitor updates for feature parity risks",
+                confidence=0.6,
+            )
+        )
+    else:
+        insights.append(
+            ProductInsight(
+                id="ur-insight-competitive",
+                category="competitive",
+                title=f"Competitive scan: no updates found for {len(competitors)} competitors",
+                evidence="Web search returned no results — may be offline or rate-limited",
+                impact="No new competitive intelligence this scan",
+                recommendation="Retry when network is available",
+                confidence=0.3,
+            )
+        )
+
+    try:
+        from datetime import datetime, timezone
+        registry["last_full_scan"] = datetime.now(timezone.utc).isoformat()
+        COMPETITOR_REGISTRY_PATH.write_text(json.dumps(registry, indent=2))
+    except OSError:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -281,7 +434,9 @@ def scan() -> ProductTeamReport:
         _scan_page_content(page_files, insights, metrics)
 
     _catalog_research_sources(insights, metrics)
+    _monitor_competitors(insights, findings, metrics)
     _scan_user_sentiment(insights, findings, metrics)
+    _analyze_posthog_data(insights, metrics)
 
     duration = time.time() - start
 

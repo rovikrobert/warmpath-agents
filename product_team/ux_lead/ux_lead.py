@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
+import subprocess
 import time
 from pathlib import Path
 
@@ -347,6 +348,160 @@ def _check_flow_efficiency(
         metrics["avg_nav_per_page"] = round(total_nav_links / len(page_files), 1)
 
 
+def _run_accessibility_audit(
+    ux_findings: list[UXFinding],
+    findings: list[Finding],
+    metrics: dict,
+) -> None:
+    """Run pa11y for WCAG 2.1 AA accessibility testing. Falls back if unavailable."""
+    try:
+        result = subprocess.run(
+            ["npx", "pa11y", "--version"],
+            capture_output=True, text=True, timeout=15,
+            cwd=str(FRONTEND_SRC.parent),
+        )
+        if result.returncode != 0:
+            raise FileNotFoundError("pa11y not available")
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        metrics["pa11y_available"] = False
+        findings.append(
+            Finding(
+                id="ux-pa11y-unavailable",
+                severity="info",
+                category="accessibility",
+                title="pa11y not available — using static analysis only",
+                detail="Install pa11y: npm install -D pa11y (in frontend/)",
+                recommendation="Install pa11y for WCAG 2.1 AA compliance testing",
+            )
+        )
+        return
+
+    metrics["pa11y_available"] = True
+    target = "http://localhost:3000"
+    try:
+        result = subprocess.run(
+            ["npx", "pa11y", target, "--reporter", "json", "--standard", "WCAG2AA"],
+            capture_output=True, text=True, timeout=30,
+            cwd=str(FRONTEND_SRC.parent),
+        )
+        if result.stdout.strip():
+            import json as _json
+            try:
+                issues = _json.loads(result.stdout)
+            except _json.JSONDecodeError:
+                issues = []
+            metrics["pa11y_issues"] = len(issues)
+            errors = [i for i in issues if i.get("type") == "error"]
+            warnings = [i for i in issues if i.get("type") == "warning"]
+            metrics["pa11y_errors"] = len(errors)
+            metrics["pa11y_warnings"] = len(warnings)
+            for issue in errors[:10]:
+                ux_findings.append(
+                    UXFinding(
+                        id=f"ux-pa11y-{issue.get('code', 'unknown')[:30]}",
+                        category="accessibility",
+                        severity="high" if issue.get("type") == "error" else "medium",
+                        title=f"WCAG: {issue.get('message', 'Unknown issue')[:80]}",
+                        file=target,
+                        detail=f"Rule: {issue.get('code', '?')} | Element: {issue.get('selector', '?')}",
+                        heuristic="WCAG 2.1 AA",
+                        recommendation=f"Fix: {issue.get('context', '')[:100]}",
+                    )
+                )
+        else:
+            metrics["pa11y_issues"] = 0
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        metrics["pa11y_issues"] = -1
+        logger.warning("pa11y scan failed: %s", exc)
+
+
+def _analyze_user_flows(
+    jsx_files: list[Path],
+    ux_findings: list[UXFinding],
+    findings: list[Finding],
+    metrics: dict,
+) -> None:
+    """Build page transition graph and validate against persona journeys."""
+    from product_team.shared.config import PERSONA_JOURNEYS
+
+    graph: dict[str, set[str]] = {}
+    page_files = [p for p in jsx_files if "pages/" in str(p)]
+
+    # Parse App.jsx for route definitions
+    app_jsx = FRONTEND_SRC / "App.jsx"
+    route_to_page: dict[str, str] = {}
+    if app_jsx.exists():
+        app_source = _read_safe(app_jsx)
+        route_pattern = re.compile(
+            r'path\s*=\s*["\']([^"\']+)["\']\s*[^>]*element\s*=\s*\{?\s*<\s*(\w+)',
+        )
+        for match in route_pattern.finditer(app_source):
+            route_to_page[match.group(1)] = match.group(2)
+
+    nav_patterns = [
+        re.compile(r'navigate\s*\(\s*["\']([^"\']+)["\']'),
+        re.compile(r'<Link\s+to\s*=\s*["\']([^"\']+)["\']'),
+        re.compile(r'href\s*=\s*["\'](/[^"\']+)["\']'),
+    ]
+
+    for page_path in page_files:
+        page_name = page_path.stem
+        source = _read_safe(page_path)
+        targets: set[str] = set()
+        for pattern in nav_patterns:
+            for match in pattern.finditer(source):
+                target_path = match.group(1)
+                target_page = route_to_page.get(target_path)
+                if target_page:
+                    targets.add(target_page)
+        graph[page_name] = targets
+
+    metrics["flow_graph_nodes"] = len(graph)
+    metrics["flow_graph_edges"] = sum(len(v) for v in graph.values())
+
+    dead_ends = [page for page, targets in graph.items() if not targets]
+    metrics["dead_end_pages"] = len(dead_ends)
+
+    if dead_ends:
+        ux_findings.append(
+            UXFinding(
+                id="ux-flow-deadends",
+                category="flow_analysis",
+                severity="medium",
+                title=f"{len(dead_ends)} pages are dead ends (no outgoing navigation)",
+                file="",
+                detail=f"Pages: {', '.join(sorted(dead_ends)[:10])}",
+                heuristic="User control & freedom",
+                recommendation="Add navigation options (back, home, next step) to dead-end pages",
+            )
+        )
+
+    all_pages = set(graph.keys())
+    for persona_id, journeys in PERSONA_JOURNEYS.items():
+        reachable_count = 0
+        total_steps = 0
+        for journey in journeys:
+            for i in range(len(journey) - 1):
+                total_steps += 1
+                source_page = journey[i]
+                target_page = journey[i + 1]
+                if source_page in graph and target_page in graph.get(source_page, set()):
+                    reachable_count += 1
+        coverage = reachable_count / max(1, total_steps)
+        metrics[f"journey_coverage_{persona_id}"] = round(coverage, 2)
+        if coverage < 0.5:
+            findings.append(
+                Finding(
+                    id=f"ux-flow-{persona_id}",
+                    severity="high",
+                    category="flow_analysis",
+                    title=f"{persona_id} journey coverage: {coverage:.0%} — critical navigation gaps",
+                    detail=f"Only {reachable_count}/{total_steps} journey steps have direct navigation links",
+                    recommendation=f"Add navigation paths to complete the {persona_id} user flow",
+                )
+            )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -375,6 +530,7 @@ def scan() -> ProductTeamReport:
         )
     else:
         _check_accessibility(jsx_files, ux_findings, findings, metrics)
+        _run_accessibility_audit(ux_findings, findings, metrics)
         _check_loading_states(jsx_files, ux_findings, findings, metrics)
         _check_error_states(jsx_files, ux_findings, findings, metrics)
         _check_empty_states(jsx_files, ux_findings, metrics)
@@ -382,6 +538,7 @@ def scan() -> ProductTeamReport:
         _check_responsive(jsx_files, ux_findings, metrics)
         _check_privacy_indicators(jsx_files, ux_findings, metrics)
         _check_flow_efficiency(jsx_files, ux_findings, metrics)
+        _analyze_user_flows(jsx_files, ux_findings, findings, metrics)
 
     # Compute UX health score
     score_components = {

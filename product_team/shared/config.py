@@ -20,7 +20,11 @@ PAGES_DIR = FRONTEND_SRC / "pages"
 COMPONENTS_DIR = FRONTEND_SRC / "components"
 APP_DIR = PROJECT_ROOT / "app"
 API_DIR = APP_DIR / "api"
+SCHEMAS_DIR = APP_DIR / "schemas"
 TESTS_DIR = PROJECT_ROOT / "tests"
+DESIGN_TOKENS_PATH = FRONTEND_DIR / "design-tokens.json"
+COMPETITOR_REGISTRY_PATH = PRODUCT_TEAM_DIR / "shared" / "competitor_registry.json"
+EXPERIMENT_REGISTRY_PATH = PRODUCT_TEAM_DIR / "shared" / "experiment_registry.json"
 
 # ---------------------------------------------------------------------------
 # Agent names
@@ -66,6 +70,24 @@ PERSONAS: dict[str, dict] = {
         ],
         "tier": "supply",
     },
+}
+
+# ---------------------------------------------------------------------------
+# Persona journeys (expected page flows for cross-page flow analysis)
+# ---------------------------------------------------------------------------
+
+PERSONA_JOURNEYS: dict[str, list[list[str]]] = {
+    "job_seeker": [
+        ["AuthPage", "OnboardingPage", "Dashboard", "FindReferrals", "ReferralResults"],
+        ["AuthPage", "OnboardingPage", "Dashboard", "NewSearch", "SearchResults"],
+        ["Dashboard", "ApplicationsPage"],
+        ["Dashboard", "CreditsPage"],
+    ],
+    "network_holder": [
+        ["AuthPage", "OnboardingPage", "Dashboard", "ContactsPage", "SharingSettings"],
+        ["Dashboard", "MarketplaceDashboard"],
+        ["Dashboard", "CreditsPage"],
+    ],
 }
 
 # ---------------------------------------------------------------------------
