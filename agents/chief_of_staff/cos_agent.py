@@ -30,10 +30,18 @@ from agents.shared.config import REPORTS_DIR
 from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary
 from agents.shared.report import AgentReport
 
+from .budget_enforcer import (
+    enforce_budget,
+    get_budget_enforcement_report,
+    update_throttle_status,
+)
 from .cos_config import COS_CONFIG
-from .cos_learning import record_cost_snapshot, update_team_reliability
+from .cos_learning import record_cost_snapshot, record_founder_decision, update_team_reliability
 from .notion_sync import NotionSync
+from .org_evaluator import evaluate_triggers, generate_restructuring_proposal
+from .pod_manager import detect_permanent_pods, get_pod_report
 from .resolver import attempt_resolution
+from .router import get_request_tracking_report, route_and_track_request
 from .schemas import Conflict
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
 from .whatsapp_bridge import WhatsAppBridge
@@ -251,6 +259,16 @@ def run_daily() -> str:
     except Exception:
         logger.debug("get_active_briefs skipped (Notion not configured)")
 
+    # Process any pending WhatsApp commands (Gap 8)
+    _process_whatsapp_commands()
+
+    # Route and track cross-team requests (Gap 6)
+    for req in cross_team_requests:
+        try:
+            route_and_track_request(req)
+        except Exception:
+            logger.debug("Failed to route request: %s", req.get("request", "")[:60])
+
     # Detect and resolve cross-team conflicts
     conflicts = _detect_conflicts(cross_team_requests)
     resolutions = [attempt_resolution(c) for c in conflicts]
@@ -271,11 +289,27 @@ def run_daily() -> str:
             "blocking": f"conflict_id={res.conflict_id}",
         })
 
+    # Budget enforcement (Gap 7) — throttle teams exceeding caps
+    budget_actions = enforce_budget(costs)
+    update_throttle_status(budget_actions)
+    budget_report = get_budget_enforcement_report(budget_actions)
+
+    # Pod status (Gap 5)
+    pod_report = get_pod_report()
+
+    # Request tracking report (Gap 6)
+    request_report = get_request_tracking_report()
+
     brief, brief_data = synthesize_daily(
         reports, kpi_snapshot, costs, alerts, cross_team_requests,
         founder_requests=founder_requests,
         resolutions=[r.model_dump() for r in resolutions],
     )
+
+    # Append new sections to brief
+    for section in (budget_report, pod_report, request_report):
+        if section:
+            brief += "\n" + section
 
     # Update learning state
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
@@ -398,7 +432,7 @@ def _push_daily_outputs(
 
 
 def run_weekly() -> str:
-    """Weekly cycle: deeper analysis + self-learning."""
+    """Weekly cycle: deeper analysis + self-learning + org evaluation."""
     reports, _cross_team = _load_reports()
     if not reports:
         return "# Weekly Synthesis\n\nNo engineering reports available. Run agent scans first."
@@ -406,6 +440,29 @@ def run_weekly() -> str:
     kpi_snapshot = _get_kpi_snapshot(reports)
     costs = get_team_cost_summary(reports)
     brief = synthesize_weekly(reports, kpi_snapshot, costs)
+
+    # Org restructuring evaluation (Gap 4 — COS.md 7.7: weekly trigger scan)
+    try:
+        triggers = evaluate_triggers(reports, costs)
+        if triggers:
+            proposal = generate_restructuring_proposal(triggers)
+            brief += "\n" + proposal
+            logger.info("Org evaluation: %d triggers fired", len(triggers))
+    except Exception:
+        logger.debug("Org evaluation skipped")
+
+    # Pod health review (Gap 5 — COS.md 7.7: weekly pod check)
+    try:
+        pod_report = get_pod_report()
+        if pod_report:
+            brief += "\n" + pod_report
+        permanent_warnings = detect_permanent_pods()
+        if permanent_warnings:
+            brief += "\n### Pod Anti-Pattern Alerts\n\n"
+            brief += "\n".join(f"- [!] {w}" for w in permanent_warnings)
+            brief += "\n"
+    except Exception:
+        logger.debug("Pod review skipped")
 
     # Push weekly WhatsApp summary (best-effort, skip if already sent this week)
     from datetime import datetime, timezone
@@ -443,6 +500,61 @@ def _current_week_number() -> int:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc).isocalendar()[1]
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp command processing (Gap 8)
+# ---------------------------------------------------------------------------
+
+
+def _process_whatsapp_commands() -> list[dict]:
+    """Scan for WhatsApp reply files and process commands.
+
+    Looks for files matching whatsapp-reply-*.txt in the WhatsApp directory,
+    parses each via WhatsAppBridge.process_command(), and dispatches actions.
+    """
+    results: list[dict] = []
+    reply_pattern = "whatsapp-reply-*.txt"
+
+    if not WHATSAPP_DIR.is_dir():
+        return results
+
+    for reply_file in sorted(WHATSAPP_DIR.glob(reply_pattern)):
+        try:
+            text = reply_file.read_text(encoding="utf-8").strip()
+            if not text:
+                continue
+
+            wa = WhatsAppBridge()
+            parsed = wa.process_command(text)
+            command = parsed.get("command", "unknown")
+
+            # Dispatch based on command type
+            if command == "status":
+                logger.info("WhatsApp command: status request")
+            elif command == "approve":
+                item_id = parsed.get("item", "")
+                record_founder_decision(item_id, "cos_recommendation", "approved")
+                logger.info("WhatsApp command: approved %s", item_id)
+            elif command == "choose":
+                choice = parsed.get("choice", "")
+                logger.info("WhatsApp command: chose option %s", choice)
+            elif command == "ship":
+                feature = parsed.get("feature", "")
+                logger.info("WhatsApp command: ship %s", feature)
+            else:
+                logger.info("WhatsApp command: %s", command)
+
+            results.append(parsed)
+
+            # Archive processed reply
+            processed_path = reply_file.with_suffix(".processed")
+            reply_file.rename(processed_path)
+
+        except Exception:
+            logger.debug("Failed to process WhatsApp reply: %s", reply_file.name)
+
+    return results
 
 
 # ---------------------------------------------------------------------------

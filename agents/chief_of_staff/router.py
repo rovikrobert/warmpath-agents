@@ -2,12 +2,20 @@
 
 Keyword-based routing with confidence scoring. The CoS can handle cross-cutting
 queries itself or dispatch to specialized teams.
+
+Also provides cross-team request tracking (Gap 6): detected requests are routed,
+assigned IDs, and tracked in cos_state.json until resolved.
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
+
+from .cos_learning import _load_state, _save_state
+from .schemas import TrackedRequest
 
 logger = logging.getLogger(__name__)
 
@@ -138,3 +146,105 @@ def route_query(query: str) -> RouteResult:
         confidence=confidence,
         reasoning=f"Best match: {primary} team (score: {top_team_score:.1f}).",
     )
+
+
+# ---------------------------------------------------------------------------
+# Cross-team request routing & tracking (Gap 6)
+# ---------------------------------------------------------------------------
+
+
+def route_and_track_request(request: dict) -> TrackedRequest:
+    """Route a cross-team request and persist it for tracking.
+
+    Args:
+        request: dict with keys: source_agent, request, urgency, blocking
+    """
+    req_text = request.get("request", "")
+    source = request.get("source_agent", "unknown")
+    urgency = request.get("urgency", "medium")
+
+    # Route using the query router
+    result = route_query(req_text)
+
+    tracked = TrackedRequest(
+        id=f"req-{uuid.uuid4().hex[:8]}",
+        source_agent=source,
+        request=req_text,
+        urgency=urgency,
+        routed_to=result.primary_team,
+        status="routed",
+        created_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    )
+
+    # Persist to state
+    state = _load_state()
+    requests_list = state.setdefault("tracked_requests", [])
+    requests_list.append(tracked.model_dump())
+    # Keep last 100 requests
+    state["tracked_requests"] = requests_list[-100:]
+    _save_state(state)
+
+    logger.info(
+        "Routed request from %s to %s: %s",
+        source, result.primary_team, req_text[:60],
+    )
+    return tracked
+
+
+def get_open_requests() -> list[TrackedRequest]:
+    """Return all unresolved tracked requests."""
+    state = _load_state()
+    requests_list = state.get("tracked_requests", [])
+    return [
+        TrackedRequest(**r)
+        for r in requests_list
+        if r.get("status") != "resolved"
+    ]
+
+
+def resolve_request(request_id: str) -> None:
+    """Mark a tracked request as resolved."""
+    state = _load_state()
+    for r in state.get("tracked_requests", []):
+        if r.get("id") == request_id:
+            r["status"] = "resolved"
+            r["resolved_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            _save_state(state)
+            return
+    raise ValueError(f"Request {request_id} not found")
+
+
+def get_stale_requests(days: int = 3) -> list[TrackedRequest]:
+    """Return requests that have been open for more than `days` days."""
+    now = datetime.now(timezone.utc)
+    open_reqs = get_open_requests()
+    stale: list[TrackedRequest] = []
+    for r in open_reqs:
+        if r.created_date:
+            created = datetime.strptime(r.created_date, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
+            if (now - created).days >= days:
+                stale.append(r)
+    return stale
+
+
+def get_request_tracking_report() -> str:
+    """Render open/stale requests as markdown for the daily brief."""
+    open_reqs = get_open_requests()
+    stale = get_stale_requests()
+
+    if not open_reqs:
+        return ""
+
+    lines = ["### Cross-Team Requests\n"]
+    lines.append(f"**{len(open_reqs)} open** ({len(stale)} stale >3 days)\n")
+
+    for r in open_reqs:
+        stale_flag = " [STALE]" if r in stale else ""
+        lines.append(
+            f"- [{r.urgency.upper()}]{stale_flag} {r.source_agent} → {r.routed_to}: "
+            f"{r.request[:80]}"
+        )
+    lines.append("")
+    return "\n".join(lines)

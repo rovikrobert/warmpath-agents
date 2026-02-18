@@ -76,3 +76,99 @@ class Resolution(BaseModel):
     outcome: str
     escalated: bool = False
     founder_agreed: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Org restructuring models (COS.md Section 7)
+# ---------------------------------------------------------------------------
+
+
+class OrgTrigger(BaseModel):
+    """A trigger that fires when org structure evaluation is needed."""
+
+    category: str  # performance | business | structural | cost
+    trigger: str
+    evidence: str = ""
+    severity: str = "medium"  # critical | high | medium | low
+    affected_teams: list[str] = Field(default_factory=list)
+
+
+class AgentAudit(BaseModel):
+    """Result of an agent value audit (COS.md 7.3)."""
+
+    agent: str
+    team: str
+    reports_total: int = 0
+    findings_produced: int = 0
+    info_ratio: float = 0.0
+    idle_ratio: float = 0.0
+    cost_per_day: float = 0.0
+    verdict: str = "valuable"  # essential | valuable | marginal | redundant
+
+
+# ---------------------------------------------------------------------------
+# Pod lifecycle models (COS.md Section 7.9)
+# ---------------------------------------------------------------------------
+
+
+class Pod(BaseModel):
+    """A temporary cross-functional working group."""
+
+    id: str
+    name: str
+    mission: str
+    lead: str
+    members: list[dict[str, str]] = Field(default_factory=list)  # [{agent, team, role}]
+    duration_weeks: int = 2
+    start_date: str = ""
+    exit_criteria: list[str] = Field(default_factory=list)
+    exit_criteria_met: list[bool] = Field(default_factory=list)
+    cost_budget_per_day: float = 0.0
+    status: str = "active"  # active | dissolved
+
+
+class PodStatus(BaseModel):
+    """Health check result for an active pod."""
+
+    pod_id: str
+    name: str
+    days_elapsed: int = 0
+    days_total: int = 14
+    exit_met: int = 0
+    exit_total: int = 0
+    health: str = "green"  # green | yellow | red
+    note: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Cross-team request tracking (Gap 6)
+# ---------------------------------------------------------------------------
+
+
+class TrackedRequest(BaseModel):
+    """A cross-team request that has been routed and is being tracked."""
+
+    id: str
+    source_agent: str
+    request: str
+    urgency: str = "medium"
+    routed_to: str = ""
+    status: str = "pending"  # pending | routed | resolved
+    created_date: str = ""
+    resolved_date: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Budget enforcement (Gap 7)
+# ---------------------------------------------------------------------------
+
+
+class BudgetAction(BaseModel):
+    """Action to take when a team exceeds its budget."""
+
+    team: str
+    action: str  # throttle | warn | ok
+    reason: str = ""
+    current_cost: float = 0.0
+    budget_cap: float = 0.0
+    recommendation: str = ""
