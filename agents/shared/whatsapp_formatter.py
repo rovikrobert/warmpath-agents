@@ -177,6 +177,26 @@ class WhatsAppFormatter:
         lines.append("No action needed. Logged in Notion.")
         return "\n".join(lines)
 
+    def error_alert(
+        self,
+        time_str: str,
+        method: str,
+        path: str,
+        error_type: str,
+        error_msg: str,
+        user_context: str = "unauthenticated",
+    ) -> str:
+        """Generate a bug/error alert message for the founder."""
+        return "\n".join([
+            f"BUG ALERT [{time_str}]",
+            "",
+            f"{method} {path}",
+            f"{error_type}: {error_msg}",
+            f"User: {user_context}",
+            "",
+            "Fix needed. Check logs for full trace.",
+        ])
+
     def pod_status(
         self,
         pods: list[dict[str, Any]],
