@@ -20,7 +20,7 @@ from pathlib import Path
 from agents.shared.report import Finding
 from finance_team.shared.config import (
     API_DIR,
-    MODELS_DIR,
+    KPI_TARGETS,
     PROJECT_ROOT,
     REPORTS_DIR,
     SERVICES_DIR,
@@ -253,7 +253,7 @@ def _check_non_transferability(
                 id="cm-fin-transmitter-001",
                 category="credit_economy",
                 severity="high",
-                title=f"Regulatory risk: money transmitter signals in credit code",
+                title="Regulatory risk: money transmitter signals in credit code",
                 file=_relative(_CREDITS_SVC_PATH),
                 detail=f"Risk signals detected: {', '.join(risk_signals_found)}",
                 recommendation="Legal review required before launch if any signal persists.",
@@ -619,6 +619,169 @@ def _check_abuse_prevention(
 
 
 # ---------------------------------------------------------------------------
+# Live DB analytics (CoS audit gap fix)
+# ---------------------------------------------------------------------------
+
+
+def _compute_gini(values: list[float]) -> float:
+    """Compute Gini coefficient from a list of values."""
+    if not values:
+        return 0.0
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    total = sum(sorted_vals)
+    if total == 0:
+        return 0.0
+    cum = sum((2 * (i + 1) - n - 1) * v for i, v in enumerate(sorted_vals))
+    return cum / (n * total)
+
+
+def _check_credit_velocity_live(
+    findings: list,
+    financial_findings: list,
+    metrics: dict,
+) -> None:
+    """Query DB for credit earn->spend velocity."""
+    try:
+        from finance_team.shared.query_executor import get_finance_executor
+    except ImportError:
+        metrics["credit_velocity_available"] = False
+        return
+
+    qe = get_finance_executor()
+    if not qe.is_available():
+        metrics["credit_velocity_available"] = False
+        return
+
+    metrics["credit_velocity_available"] = True
+    from datetime import datetime, timedelta, timezone
+
+    start = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    rows = qe.query_template("credit_velocity", {"start_date": start})
+    if rows and rows[0].get("avg_days_to_spend") is not None:
+        velocity = float(rows[0]["avg_days_to_spend"])
+        metrics["credit_velocity_days"] = round(velocity, 1)
+
+        target = KPI_TARGETS.get("credit_velocity_days", {}).get("target", 30)
+        if velocity > target * 2:
+            financial_findings.append(
+                FinancialFinding(
+                    id="cm-vel-001",
+                    category="credit_economy",
+                    severity="medium",
+                    title=f"Credit velocity slow: {velocity:.0f} days (target: {target})",
+                    detail=f"Users take {velocity:.0f} days on avg to spend earned credits",
+                    recommendation="Consider onboarding nudges or credit expiry reminders.",
+                )
+            )
+
+
+def _check_credit_distribution_live(
+    findings: list,
+    financial_findings: list,
+    metrics: dict,
+) -> None:
+    """Query DB for credit balance distribution and Gini coefficient."""
+    try:
+        from finance_team.shared.query_executor import get_finance_executor
+    except ImportError:
+        metrics["credit_distribution_available"] = False
+        return
+
+    qe = get_finance_executor()
+    if not qe.is_available():
+        metrics["credit_distribution_available"] = False
+        return
+
+    metrics["credit_distribution_available"] = True
+    rows = qe.query_template("credit_distribution", {})
+    if rows:
+        bucket_counts = {r["balance_bucket"]: r["user_count"] for r in rows}
+        metrics["credit_distribution_buckets"] = bucket_counts
+
+        bucket_values = {
+            "zero_or_negative": 0,
+            "low_1_50": 25,
+            "medium_51_200": 125,
+            "high_200_plus": 300,
+        }
+        values = []
+        for bucket, count in bucket_counts.items():
+            values.extend([bucket_values.get(bucket, 0)] * count)
+
+        gini = _compute_gini(values)
+        metrics["credit_gini"] = round(gini, 3)
+
+
+def _check_expiry_rate_live(
+    findings: list,
+    financial_findings: list,
+    metrics: dict,
+) -> None:
+    """Query DB for credit expiry rate."""
+    try:
+        from finance_team.shared.query_executor import get_finance_executor
+    except ImportError:
+        metrics["expiry_rate_available"] = False
+        return
+
+    qe = get_finance_executor()
+    if not qe.is_available():
+        metrics["expiry_rate_available"] = False
+        return
+
+    metrics["expiry_rate_available"] = True
+    from datetime import datetime, timedelta, timezone
+
+    start = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    rows = qe.query_template("credit_expiry_rate", {"start_date": start})
+    if rows and rows[0].get("total_transactions"):
+        total = rows[0]["total_transactions"]
+        expired = rows[0].get("expired_count", 0)
+        rate = expired / max(1, total)
+        metrics["credit_expiry_rate"] = round(rate, 3)
+
+        target = KPI_TARGETS.get("expiry_rate", {}).get("target", 0.15)
+        if rate > target * 2:
+            financial_findings.append(
+                FinancialFinding(
+                    id="cm-expiry-live-001",
+                    category="credit_economy",
+                    severity="medium",
+                    title=f"High credit expiry rate: {rate:.0%} (target: {target:.0%})",
+                    detail=f"{expired}/{total} credits expired in last 90 days",
+                    recommendation="Users aren't spending credits -- review UX and send reminders.",
+                )
+            )
+
+
+def _check_zero_balance_rate_live(
+    findings: list,
+    financial_findings: list,
+    metrics: dict,
+) -> None:
+    """Query DB for zero-balance user rate."""
+    try:
+        from finance_team.shared.query_executor import get_finance_executor
+    except ImportError:
+        metrics["zero_balance_available"] = False
+        return
+
+    qe = get_finance_executor()
+    if not qe.is_available():
+        metrics["zero_balance_available"] = False
+        return
+
+    metrics["zero_balance_available"] = True
+    rows = qe.query_template("zero_balance_users", {})
+    if rows and rows[0].get("total_users"):
+        total = rows[0]["total_users"]
+        zero = rows[0].get("zero_balance_users", 0)
+        rate = zero / max(1, total)
+        metrics["zero_balance_rate"] = round(rate, 3)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -713,6 +876,11 @@ def scan() -> FinanceTeamReport:
     _check_duplicate_detection(combined, findings, fin_findings, metrics)
     _check_balance_integrity(credits_svc_source, findings, fin_findings, metrics)
     _check_abuse_prevention(combined, findings, fin_findings, metrics)
+
+    _check_credit_velocity_live(findings, fin_findings, metrics)
+    _check_credit_distribution_live(findings, fin_findings, metrics)
+    _check_expiry_rate_live(findings, fin_findings, metrics)
+    _check_zero_balance_rate_live(findings, fin_findings, metrics)
 
     # --- Compute overall credit economy integrity score ----------------------
 
