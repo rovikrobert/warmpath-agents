@@ -34,12 +34,20 @@ COS_CONFIG: dict = {
         "daily_briefs_db_env": "NOTION_DAILY_BRIEFS_DB",
         "decision_log_db_env": "NOTION_DECISION_LOG_DB",
         "founder_briefs_db_env": "NOTION_FOUNDER_BRIEFS_DB",
+        "team_reports_db_env": "NOTION_TEAM_REPORTS_DB",
+        "weekly_synthesis_db_env": "NOTION_WEEKLY_SYNTHESIS_DB",
     },
     "whatsapp": {
         "morning_brief_time": "08:00",
         "weekly_summary_day": "sunday",
         "weekly_summary_time": "20:00",
         "max_message_lines": 15,
+    },
+    "telegram": {
+        "morning_brief_time": "08:00",
+        "weekly_summary_day": "sunday",
+        "weekly_summary_time": "20:00",
+        "max_message_lines": 20,
     },
     "teams": {
         "engineering": {
@@ -111,11 +119,11 @@ SEVERITY_WEIGHT: dict[str, float] = {
 # Later teams benefit from seeing resolved engineering issues.
 SCAN_ORDER: list[str] = [
     "engineering",  # Code fixes, dependency updates, security patches
-    "data",         # Schema/instrumentation audits (see engineering fixes)
-    "product",      # UX/journey audits (see fixed pages)
-    "ops",          # Marketplace health, coaching (see updated services)
-    "finance",      # Credit economy, compliance (see credit service updates)
-    "gtm",          # Marketing, competitive (see positioning changes)
+    "data",  # Schema/instrumentation audits (see engineering fixes)
+    "product",  # UX/journey audits (see fixed pages)
+    "ops",  # Marketplace health, coaching (see updated services)
+    "finance",  # Credit economy, compliance (see credit service updates)
+    "gtm",  # Marketing, competitive (see positioning changes)
 ]
 
 # Decision principle hierarchy — first item wins in a tie
