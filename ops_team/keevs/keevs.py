@@ -499,6 +499,94 @@ def _check_frontend_integration(
         )
 
 
+def _check_live_coaching_quality(
+    findings: list[Finding],
+    insights: list[OpsInsight],
+    metrics: dict,
+) -> None:
+    """Test coach mock handler quality by running test scenarios."""
+    try:
+        from ops_team.keevs.coach_service import _mock_chat_response
+    except ImportError:
+        findings.append(
+            Finding(
+                id="keevs-live-001",
+                severity="info",
+                category="coaching_quality",
+                title="Could not import coach_service for live quality testing",
+                recommendation="Ensure ops_team/keevs/coach_service.py exists",
+            )
+        )
+        return
+
+    test_scenarios = [
+        ("How should I follow up with my contact at Google?", "follow-up"),
+        ("Which companies in my network are hiring?", "network"),
+        ("How do I use my credits?", "credits"),
+        ("Help me get started", "getting started"),
+        ("What's my pipeline looking like?", "pipeline"),
+    ]
+
+    test_context = {
+        "user": {"name": "Test User", "type": "job_seeker"},
+        "preferences": {"target_role": "Software Engineer"},
+        "network": {"total_contacts": 50, "top_companies": ["Google", "Meta"]},
+        "pipeline": {"active": 3, "follow_ups_due": 1},
+        "recent_searches": [],
+        "credits": {"balance": 100},
+        "market_trends": {},
+    }
+
+    passed = 0
+    total_length = 0
+    failures: list[str] = []
+
+    for message, scenario_name in test_scenarios:
+        try:
+            response = _mock_chat_response(message, test_context)
+            length = len(response)
+            total_length += length
+            if length >= 50:
+                passed += 1
+            else:
+                failures.append(f"{scenario_name}: response too short ({length} chars)")
+        except Exception as exc:
+            failures.append(f"{scenario_name}: error — {exc}")
+
+    tested = len(test_scenarios)
+    pass_rate = passed / max(1, tested)
+    avg_length = total_length / max(1, tested)
+
+    metrics["live_coaching_scenarios_tested"] = tested
+    metrics["live_coaching_test_pass_rate"] = round(pass_rate, 2)
+    metrics["live_coaching_avg_response_length"] = round(avg_length, 0)
+
+    if pass_rate < 0.8:
+        findings.append(
+            Finding(
+                id="keevs-live-002",
+                severity="high",
+                category="coaching_quality",
+                title=f"Coaching response quality below threshold ({pass_rate:.0%})",
+                detail=f"Failures: {'; '.join(failures)}",
+                recommendation="Review _mock_chat_response handlers for short/missing responses",
+            )
+        )
+    else:
+        insights.append(
+            OpsInsight(
+                id="keevs-live-ins-001",
+                category="coaching",
+                title=f"Live coaching quality test: {pass_rate:.0%} pass rate",
+                evidence=f"{passed}/{tested} scenarios passed, avg length {avg_length:.0f} chars",
+                impact="Mock coaching responses meet quality bar for test scenarios",
+                recommendation="Expand test scenarios as new coaching features are added",
+                confidence=0.85,
+                persona="job_seeker",
+            )
+        )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -570,6 +658,9 @@ def scan() -> OpsTeamReport:
 
     if api_source:
         _check_streaming_robustness(api_source, findings, metrics)
+
+    # --- Live coaching quality test -------------------------------------------
+    _check_live_coaching_quality(findings, insights, metrics)
 
     # --- Compute coaching quality score --------------------------------------
 
