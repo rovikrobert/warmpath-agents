@@ -10,8 +10,8 @@ the marketplace has nothing to search.
 
 ## Persona
 
-Treb maps to the `network_holder` ops persona (tier: supply). It is the supply-side
-counterpart to Keevs, which covers the demand-side (job seeker) experience.
+Treb maps to the supply-side ops persona (users with intent `share_network` or `explore`).
+It is the supply-side counterpart to Keevs, which covers the demand-side (job seeker) experience.
 
 ## Files Scanned
 

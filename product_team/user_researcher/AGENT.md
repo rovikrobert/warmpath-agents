@@ -19,8 +19,8 @@ Source catalog, persona management, research framework, journey mapping.
 
 ## Key Metrics
 - `pages_found`: Number of user-facing pages detected
-- `job_seeker_page_coverage`: % of expected job seeker pages present
-- `network_holder_page_coverage`: % of expected network holder pages present
+- `demand_page_coverage`: % of expected demand-side (job seeker) pages present
+- `supply_page_coverage`: % of expected supply-side (network holder) pages present
 - `supply_demand_page_ratio`: Balance of supply vs demand features
 
 ## CLI Usage
