@@ -405,7 +405,9 @@ def _check_consent_gates(
     privacy_model_path = MODELS_DIR / "privacy.py"
     privacy_api_path = API_DIR / "privacy.py"
 
-    model_source = _read_safe(marketplace_model_path) + "\n" + _read_safe(privacy_model_path)
+    model_source = (
+        _read_safe(marketplace_model_path) + "\n" + _read_safe(privacy_model_path)
+    )
     api_source = _read_safe(marketplace_api_path) + "\n" + _read_safe(privacy_api_path)
     combined = model_source + "\n" + api_source
 
@@ -937,6 +939,100 @@ def _check_breach_notification(
 
 
 # ---------------------------------------------------------------------------
+# Check 7: Deletion verification via DB (CoS audit gap fix)
+# ---------------------------------------------------------------------------
+
+
+def _check_deletion_verification(
+    findings: list[Finding],
+    compliance_findings: list[ComplianceFinding],
+    metrics: dict,
+) -> None:
+    """Verify past account deletions left no orphan data.
+
+    Uses the finance query executor to check that deleted users
+    (from audit_logs) have zero remaining rows across vault tables.
+    Read-only verification — does not execute any deletions.
+    """
+    try:
+        from finance_team.shared.query_executor import get_finance_executor
+    except ImportError:
+        metrics["deletion_verification_available"] = False
+        return
+
+    qe = get_finance_executor()
+    if not qe.is_available():
+        metrics["deletion_verification_available"] = False
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-delver-001",
+                category="gdpr",
+                severity="info",
+                title="Deletion verification skipped — database not available",
+                detail="Finance query executor is unavailable; deletion verification requires DB access",
+                regulation="GDPR",
+                recommendation="Set DATABASE_URL to enable live deletion verification.",
+            )
+        )
+        return
+
+    metrics["deletion_verification_available"] = True
+
+    # Check for deleted users via audit logs
+    deleted_users = qe.execute_raw(
+        "SELECT DISTINCT (metadata_->>'user_id')::text AS user_id "
+        "FROM audit_logs WHERE action = 'account_deletion' "
+        "AND created_at >= NOW() - INTERVAL '90 days' LIMIT 10",
+        context="finance:deletion_audit_lookup",
+    )
+
+    if not deleted_users:
+        metrics["deletion_verification_users_checked"] = 0
+        return
+
+    # For each deleted user, verify no orphan data
+    orphan_count = 0
+    for row in deleted_users:
+        user_id = row.get("user_id")
+        if not user_id:
+            continue
+
+        results = qe.query_template("deletion_verification", {"user_id": str(user_id)})
+        for r in results:
+            remaining = r.get("remaining_rows", 0)
+            if remaining > 0:
+                orphan_count += 1
+                table = r.get("table_name", "unknown")
+                compliance_findings.append(
+                    ComplianceFinding(
+                        id=f"lc-delver-orphan-{table[:10]}",
+                        category="gdpr",
+                        severity="high",
+                        title=f"Orphan data found in {table} after account deletion",
+                        detail=f"{remaining} rows remain for deleted user in {table}",
+                        regulation="GDPR",
+                        recommendation=f"Review delete_user_data() — {table} cleanup may be incomplete.",
+                    )
+                )
+
+    metrics["deletion_verification_users_checked"] = len(deleted_users)
+    metrics["deletion_verification_orphans"] = orphan_count
+
+    if orphan_count == 0 and deleted_users:
+        compliance_findings.append(
+            ComplianceFinding(
+                id="lc-delver-pass",
+                category="gdpr",
+                severity="info",
+                title="Deletion verification passed — no orphan data found",
+                detail=f"Checked {len(deleted_users)} deleted users, all data properly removed",
+                regulation="GDPR",
+                recommendation="Continue periodic verification.",
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -967,6 +1063,7 @@ def scan() -> FinanceTeamReport:
     _check_suppression_list(findings, compliance_findings, metrics)
     _check_security_compliance(findings, compliance_findings, metrics)
     _check_breach_notification(findings, compliance_findings, metrics)
+    _check_deletion_verification(findings, compliance_findings, metrics)
 
     # --- Overall compliance score ---
     severity_penalty = {"critical": 25, "high": 15, "medium": 5, "low": 1, "info": 0}
