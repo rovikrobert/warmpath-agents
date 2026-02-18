@@ -905,6 +905,87 @@ def _scan_table_growth(models_dir: Path) -> tuple[list[Finding], dict[str, Any]]
 
 
 # ---------------------------------------------------------------------------
+# Analysis: Production Health Check
+# ---------------------------------------------------------------------------
+
+
+def _scan_production_health() -> tuple[list[Finding], dict[str, Any]]:
+    """Hit the production /health endpoint and report status."""
+    findings: list[Finding] = []
+    metrics: dict[str, Any] = {}
+
+    try:
+        from agents.shared.api_client import check_health
+
+        status = check_health()
+        metrics["production_healthy"] = status.healthy
+        metrics["production_status_code"] = status.status_code
+        metrics["production_response_ms"] = round(status.response_ms, 1)
+
+        if not status.healthy:
+            findings.append(
+                Finding(
+                    id="PERF-PROD-UNHEALTHY",
+                    severity="critical",
+                    category="production_health",
+                    title=f"Production health check failed (HTTP {status.status_code})",
+                    detail=(
+                        f"The /health endpoint returned status {status.status_code} "
+                        f"(response time: {status.response_ms:.0f}ms). "
+                        f"The production service may be down or degraded."
+                    ),
+                    recommendation=(
+                        "Check Railway deployment logs. Verify the service is running "
+                        "and database connections are healthy."
+                    ),
+                    effort_hours=0.5,
+                )
+            )
+        elif status.response_ms > 2000:
+            findings.append(
+                Finding(
+                    id="PERF-PROD-SLOW",
+                    severity="high",
+                    category="production_health",
+                    title=f"Production response slow ({status.response_ms:.0f}ms)",
+                    detail=(
+                        f"The /health endpoint responded in {status.response_ms:.0f}ms "
+                        f"which exceeds the 2000ms threshold. The service may be "
+                        f"under load or experiencing connection pool exhaustion."
+                    ),
+                    recommendation=(
+                        "Check database connection pool settings and Railway metrics. "
+                        "Consider scaling the service if load is high."
+                    ),
+                    effort_hours=1.0,
+                )
+            )
+        elif status.response_ms > 500:
+            findings.append(
+                Finding(
+                    id="PERF-PROD-LATENCY",
+                    severity="medium",
+                    category="production_health",
+                    title=f"Production latency elevated ({status.response_ms:.0f}ms)",
+                    detail=(
+                        f"The /health endpoint responded in {status.response_ms:.0f}ms "
+                        f"(>500ms). This may indicate cold start or mild resource "
+                        f"contention."
+                    ),
+                    recommendation="Monitor over multiple scans to confirm trend.",
+                    effort_hours=0.5,
+                )
+            )
+    except ImportError:
+        metrics["production_health_skipped"] = "api_client not available"
+    except Exception as exc:
+        logger.warning("Production health check failed: %s", exc)
+        metrics["production_health_error"] = str(exc)
+
+    return findings, metrics
+
+
+# ---------------------------------------------------------------------------
 # Main scan entrypoint
 # ---------------------------------------------------------------------------
 
@@ -973,6 +1054,15 @@ def scan() -> AgentReport:
     except Exception as e:
         logger.error("Growth scan failed: %s", e)
         all_metrics["growth_scan_error"] = str(e)
+
+    # 7. Production Health Check
+    try:
+        health_findings, health_metrics = _scan_production_health()
+        all_findings.extend(health_findings)
+        all_metrics.update(health_metrics)
+    except Exception as e:
+        logger.error("Production health check failed: %s", e)
+        all_metrics["production_health_error"] = str(e)
 
     # ---------------------------------------------------------------------------
     # Self-learning: record findings and update attention weights

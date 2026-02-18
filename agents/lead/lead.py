@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agents.shared.config import (
     MAX_FINDINGS_PER_BRIEF,
+    PROJECT_ROOT,
     REPORTS_DIR,
     SEVERITY_WEIGHTS,
 )
@@ -18,6 +19,15 @@ from agents.shared import learning
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "lead"
+
+# Cross-team report directories (other team leads' reports)
+_CROSS_TEAM_REPORT_DIRS = {
+    "data": PROJECT_ROOT / "data_team" / "reports",
+    "product": PROJECT_ROOT / "product_team" / "reports",
+    "ops": PROJECT_ROOT / "ops_team" / "reports",
+    "finance": PROJECT_ROOT / "finance_team" / "reports",
+    "gtm": PROJECT_ROOT / "gtm_team" / "reports",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +49,27 @@ def _load_latest_reports() -> list[AgentReport]:
         except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
             logger.warning("Failed to load report %s: %s", path.name, exc)
     return reports
+
+
+def _load_cross_team_summaries() -> list[tuple[str, AgentReport]]:
+    """Load the lead report from each non-engineering team.
+
+    Returns list of (team_name, report) tuples.
+    """
+    summaries: list[tuple[str, AgentReport]] = []
+    for team, report_dir in _CROSS_TEAM_REPORT_DIRS.items():
+        if not report_dir.is_dir():
+            continue
+        # Each team lead saves <lead_name>_latest.json
+        for path in sorted(report_dir.glob("*_lead_latest.json")):
+            try:
+                data = json.loads(path.read_text())
+                summaries.append((team, AgentReport.from_dict(data)))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
+                logger.warning(
+                    "Failed to load cross-team report %s: %s", path.name, exc
+                )
+    return summaries
 
 
 def save_report(report: AgentReport) -> Path:
@@ -310,6 +341,29 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
                 for a in agenda[:2]:
                     lines.append(f"- **Research needed:** {a['question']}")
 
+            lines.append("")
+    except Exception:
+        pass
+
+    # Cross-Team Highlights (never breaks the brief)
+    try:
+        cross_team = _load_cross_team_summaries()
+        if cross_team:
+            lines.append("### Cross-Team Highlights")
+            for team, ct_report in cross_team:
+                ct_critical = [
+                    f for f in ct_report.findings if f.severity in ("critical", "high")
+                ]
+                if ct_critical:
+                    lines.append(
+                        f"- **{team}:** {len(ct_critical)} critical/high finding(s) — "
+                        f"{ct_critical[0].title}"
+                    )
+                else:
+                    lines.append(
+                        f"- **{team}:** {len(ct_report.findings)} findings, "
+                        f"scan {ct_report.scan_duration_seconds:.1f}s"
+                    )
             lines.append("")
     except Exception:
         pass

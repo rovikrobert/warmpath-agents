@@ -426,6 +426,283 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Vault isolation check
+# ---------------------------------------------------------------------------
+
+# Models that hold per-user data and MUST be filtered by user_id
+_VAULT_MODELS = {"Contact", "MarketplaceListing", "WarmScore", "MatchResult"}
+
+# Patterns that indicate user_id scoping
+_USER_ID_PATTERNS = re.compile(
+    r"user_id|current_user|token_data|get_current_user", re.IGNORECASE
+)
+
+
+def _scan_vault_isolation(findings: list[Finding]) -> None:
+    """Flag service/API functions that query vault models without user_id filtering."""
+    scan_dirs = [
+        PROJECT_ROOT / "app" / "services",
+        PROJECT_ROOT / "app" / "api",
+    ]
+    for scan_dir in scan_dirs:
+        for path in _py_files(scan_dir):
+            try:
+                source = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            rel_path = _relative(path)
+            # Skip test files and __init__
+            if "test" in rel_path or path.name == "__init__.py":
+                continue
+
+            # Split into functions and check each
+            tree = ast.parse(source, filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+
+                func_source = ast.get_source_segment(source, node)
+                if func_source is None:
+                    continue
+
+                # Check if function references a vault model
+                vault_hit = None
+                for model in _VAULT_MODELS:
+                    if model in func_source and (
+                        f"select({model})" in func_source
+                        or f".query({model})" in func_source
+                        or f"select({model}," in func_source
+                    ):
+                        vault_hit = model
+                        break
+
+                if vault_hit is None:
+                    continue
+
+                # Check if user_id scoping is present
+                if _USER_ID_PATTERNS.search(func_source):
+                    continue
+
+                findings.append(
+                    Finding(
+                        id="ARCH-VAULT-LEAK",
+                        severity="high",
+                        category="vault_isolation",
+                        title=f"Vault query on {vault_hit} without user_id scope",
+                        detail=(
+                            f"Function `{node.name}` in `{rel_path}:{node.lineno}` "
+                            f"queries {vault_hit} but has no visible user_id filtering. "
+                            f"This could allow cross-user data leakage."
+                        ),
+                        file=rel_path,
+                        line=node.lineno,
+                        recommendation=(
+                            f"Add .where({vault_hit}.user_id == current_user.id) "
+                            f"to ensure vault isolation."
+                        ),
+                        effort_hours=0.5,
+                    )
+                )
+
+
+# ---------------------------------------------------------------------------
+# Circular import detection
+# ---------------------------------------------------------------------------
+
+
+def _scan_circular_imports(findings: list[Finding]) -> int:
+    """Build import graph for app/ modules and detect circular dependencies.
+
+    Returns the number of cycles detected.
+    """
+    app_dir = PROJECT_ROOT / "app"
+    if not app_dir.is_dir():
+        return 0
+
+    # Build graph: module_path -> set of imported module_paths
+    graph: dict[str, set[str]] = {}
+
+    for path in _py_files(app_dir):
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+
+        rel = _relative(path)
+        graph.setdefault(rel, set())
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                # Only track internal app imports
+                if node.module.startswith("app."):
+                    # Convert module path to file path
+                    parts = node.module.replace(".", "/")
+                    target = f"{parts}.py"
+                    # Also check for package __init__
+                    target_init = f"{parts}/__init__.py"
+                    if (PROJECT_ROOT / target).exists():
+                        graph[rel].add(target)
+                    elif (PROJECT_ROOT / target_init).exists():
+                        graph[rel].add(target_init)
+
+    # DFS cycle detection
+    cycles: list[list[str]] = []
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = {n: WHITE for n in graph}
+    path_stack: list[str] = []
+
+    def dfs(node: str) -> None:
+        color[node] = GRAY
+        path_stack.append(node)
+        for neighbor in graph.get(node, set()):
+            if neighbor not in color:
+                continue
+            if color[neighbor] == GRAY:
+                # Found a cycle
+                cycle_start = path_stack.index(neighbor)
+                cycle = path_stack[cycle_start:] + [neighbor]
+                cycles.append(cycle)
+            elif color[neighbor] == WHITE:
+                dfs(neighbor)
+        path_stack.pop()
+        color[node] = BLACK
+
+    for node in graph:
+        if color[node] == WHITE:
+            dfs(node)
+
+    # Report cycles (deduplicate by frozenset of members)
+    seen_cycles: set[frozenset[str]] = set()
+    for cycle in cycles:
+        key = frozenset(cycle)
+        if key in seen_cycles:
+            continue
+        seen_cycles.add(key)
+        cycle_str = " -> ".join(cycle)
+        findings.append(
+            Finding(
+                id="ARCH-CIRCULAR-IMPORT",
+                severity="medium",
+                category="circular_import",
+                title=f"Circular import: {len(cycle) - 1} modules",
+                detail=f"Import cycle detected: {cycle_str}",
+                file=cycle[0],
+                recommendation=(
+                    "Break the cycle by moving shared types to a common module, "
+                    "using TYPE_CHECKING imports, or restructuring dependencies."
+                ),
+                effort_hours=1.0,
+            )
+        )
+
+    return len(seen_cycles)
+
+
+# ---------------------------------------------------------------------------
+# Dead code detection
+# ---------------------------------------------------------------------------
+
+
+def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
+    """Find public functions defined in app/ that are never referenced elsewhere.
+
+    Returns count of dead functions detected.
+    """
+    # Phase 1: Collect all public function definitions
+    definitions: dict[str, tuple[str, int]] = {}  # func_name -> (file, line)
+    # Skip names that are commonly used via framework magic
+    _FRAMEWORK_NAMES = {
+        "startup",
+        "shutdown",
+        "lifespan",
+        "get_db",
+        "get_current_user",
+        "main",
+        "app",
+        "create_app",
+    }
+
+    for path in py_files:
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+
+        rel = _relative(path)
+        # Skip __init__.py (re-exports) and test files
+        if path.name == "__init__.py" or "test" in rel:
+            continue
+
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            name = node.name
+            # Skip private, dunder, framework, and short names
+            if (
+                name.startswith("_")
+                or name in _FRAMEWORK_NAMES
+                or len(name) <= 2
+            ):
+                continue
+            # Only track if not already seen (first definition wins)
+            if name not in definitions:
+                definitions[name] = (rel, node.lineno)
+
+    # Phase 2: Scan all files for references to those names
+    all_sources: list[str] = []
+    for path in py_files:
+        try:
+            all_sources.append(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+
+    # Also scan test files for references (tests count as usage)
+    test_dir = PROJECT_ROOT / "tests"
+    if test_dir.is_dir():
+        for path in _py_files(test_dir):
+            try:
+                all_sources.append(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                continue
+
+    combined = "\n".join(all_sources)
+
+    dead_count = 0
+    for name, (file, line) in definitions.items():
+        # Count occurrences — must appear more than once (the definition itself)
+        # Use word boundary to avoid partial matches
+        pattern = re.compile(rf"\b{re.escape(name)}\b")
+        matches = pattern.findall(combined)
+        if len(matches) <= 1:
+            dead_count += 1
+            findings.append(
+                Finding(
+                    id="ARCH-DEAD-CODE",
+                    severity="low",
+                    category="dead_code",
+                    title=f"Potentially unused function: {name}",
+                    detail=(
+                        f"Public function `{name}` defined in `{file}:{line}` "
+                        f"has no references elsewhere in the codebase. "
+                        f"It may be dead code."
+                    ),
+                    file=file,
+                    line=line,
+                    recommendation=(
+                        "Verify this function is truly unused. If so, remove it "
+                        "to reduce maintenance burden."
+                    ),
+                    effort_hours=0.25,
+                )
+            )
+
+    return dead_count
+
+
+# ---------------------------------------------------------------------------
 # Main scan entry point
 # ---------------------------------------------------------------------------
 
@@ -467,7 +744,29 @@ def scan() -> AgentReport:
     # -- 6. N+1 query detection --
     _scan_n_plus_one(py_files, findings)
 
-    # -- 7. Record historical recurrence --
+    # -- 7. Vault isolation check --
+    _scan_vault_isolation(findings)
+
+    # -- 8. Circular import detection --
+    cycle_count = _scan_circular_imports(findings)
+    metrics["circular_import_cycles"] = cycle_count
+
+    # -- 9. Dead code detection --
+    dead_count = _scan_dead_code(py_files, findings)
+    metrics["dead_functions_detected"] = dead_count
+
+    # -- 10. External intelligence --
+    try:
+        from agents.shared.intelligence import ExternalIntelligence
+
+        ei = ExternalIntelligence()
+        relevant = ei.get_for_agent(AGENT_NAME)
+        for item in relevant:
+            intel_notes.append(f"[{item.category}] {item.title}")
+    except Exception:
+        pass
+
+    # -- 11. Record historical recurrence --
     for f in findings:
         prev = learning.get_recurrence_count(AGENT_NAME, f.category, f.file)
         if prev > 0:
