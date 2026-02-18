@@ -100,9 +100,8 @@ def _check_test_count_claims(
     actual_count = 0
     for test_file in test_files:
         content = _read_safe(test_file)
-        # Count def test_ functions and class Test classes
+        # Count only def test_ functions (class Test* are containers, not tests)
         actual_count += len(re.findall(r"def test_", content))
-        actual_count += len(re.findall(r"class Test\w+", content))
 
     metrics["test_count_actual"] = actual_count
 

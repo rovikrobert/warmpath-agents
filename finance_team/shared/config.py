@@ -192,14 +192,15 @@ EXPECTED_STRIPE_EVENTS: list[str] = [
 EXPECTED_CREDIT_EARN_ACTIONS: list[str] = [
     "csv_upload",
     "welcome_bonus",
-    "facilitation_bonus",
-    "freshness_bonus",
-    "credit_purchase",
+    "intro_facilitation",
+    "data_freshness",
+    "purchase",
 ]
 
 EXPECTED_CREDIT_SPEND_ACTIONS: list[str] = [
-    "cross_network_search",
+    "marketplace_search",
     "intro_request",
+    "smart_search_marketplace",
 ]
 
 # ---------------------------------------------------------------------------

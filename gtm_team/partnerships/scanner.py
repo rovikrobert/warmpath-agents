@@ -79,20 +79,26 @@ def _check_supply_side_readiness(
     insights: list[MarketInsight],
     metrics: dict,
 ) -> None:
-    """Scan app/api/contacts.py for CSV upload, marketplace opt-in endpoints."""
+    """Scan app/api/ for CSV upload, marketplace opt-in endpoints."""
     contacts_api = API_DIR / "contacts.py"
     contacts_content = _read_safe(contacts_api)
+
+    marketplace_api = API_DIR / "marketplace.py"
+    marketplace_content = _read_safe(marketplace_api)
 
     marketplace_indexer = SERVICES_DIR / "marketplace_indexer.py"
     indexer_content = _read_safe(marketplace_indexer)
 
     # Core supply-side features
+    supply_source = contacts_content + "\n" + marketplace_content
     has_csv_upload = bool(
         re.search(r"(?:upload|csv|import)", contacts_content, re.IGNORECASE)
     )
     has_marketplace_opt_in = bool(
         re.search(
-            r"(?:opt.in|marketplace|share|sharing)", contacts_content, re.IGNORECASE
+            r"(?:opt.in.marketplace|sharing.preferences|opt_in_marketplace)",
+            supply_source,
+            re.IGNORECASE,
         )
     )
     has_indexer = bool(indexer_content.strip())

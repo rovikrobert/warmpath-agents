@@ -681,9 +681,28 @@ def scan() -> FinanceTeamReport:
             )
         )
 
-    # Combined source for checks that span all three files
+    # Combined source for checks that span all credit-touching files.
+    # earn_credits() calls live in auth.py (welcome_bonus), csv_processing.py
+    # (csv_upload, data_freshness), marketplace.py (facilitation_bonus),
+    # referral_service.py, and search.py (smart_search spend).
+    extra_sources: list[str] = []
+    for extra_path in [
+        API_DIR / "auth.py",
+        API_DIR / "search.py",
+        SERVICES_DIR / "referral_service.py",
+        PROJECT_ROOT / "app" / "tasks" / "csv_processing.py",
+    ]:
+        src = _read_safe(extra_path)
+        if src:
+            extra_sources.append(src)
     combined = (
-        credits_svc_source + "\n" + credits_api_source + "\n" + marketplace_api_source
+        credits_svc_source
+        + "\n"
+        + credits_api_source
+        + "\n"
+        + marketplace_api_source
+        + "\n"
+        + "\n".join(extra_sources)
     )
 
     # --- Run checks ----------------------------------------------------------

@@ -87,11 +87,22 @@ def _check_money_transmitter_risk(
 
     metrics["money_transmitter_files_scanned"] = files_scanned
 
-    # Check for risk signals
+    # Check for risk signals (with context filtering for ambiguous terms)
     risk_signals_found: list[str] = []
+    # Terms that have legitimate non-financial meanings
+    _CONTEXT_SENSITIVE = {"withdraw": {"consent", "withdrawn", "application", "status"}}
     for signal in MONEY_TRANSMITTER_RISK_SIGNALS:
         pattern = re.compile(rf"\b{re.escape(signal)}\b", re.IGNORECASE)
-        if pattern.search(combined_source):
+        match = pattern.search(combined_source)
+        if match:
+            # For context-sensitive signals, check surrounding text
+            safe_contexts = _CONTEXT_SENSITIVE.get(signal)
+            if safe_contexts:
+                ctx_start = max(0, match.start() - 300)
+                ctx_end = min(len(combined_source), match.end() + 300)
+                context = combined_source[ctx_start:ctx_end].lower()
+                if any(c in context for c in safe_contexts):
+                    continue  # Skip — this is a non-financial usage
             risk_signals_found.append(signal)
 
     metrics["money_transmitter_risk_signals_found"] = len(risk_signals_found)
@@ -391,9 +402,11 @@ def _check_consent_gates(
     """
     marketplace_model_path = MODELS_DIR / "marketplace.py"
     marketplace_api_path = API_DIR / "marketplace.py"
+    privacy_model_path = MODELS_DIR / "privacy.py"
+    privacy_api_path = API_DIR / "privacy.py"
 
-    model_source = _read_safe(marketplace_model_path)
-    api_source = _read_safe(marketplace_api_path)
+    model_source = _read_safe(marketplace_model_path) + "\n" + _read_safe(privacy_model_path)
+    api_source = _read_safe(marketplace_api_path) + "\n" + _read_safe(privacy_api_path)
     combined = model_source + "\n" + api_source
 
     consent_patterns: dict[str, re.Pattern] = {
@@ -828,11 +841,12 @@ def _check_breach_notification(
         "BreachNotification": re.compile(r"\bBreachNotification\b"),
     }
 
-    # Scan services and utils
+    # Scan services, utils, and api directories
     service_files = sorted(SERVICES_DIR.glob("*.py")) if SERVICES_DIR.is_dir() else []
     utils_dir = APP_DIR / "utils"
     utils_files = sorted(utils_dir.glob("*.py")) if utils_dir.is_dir() else []
-    all_target_files = service_files + utils_files
+    api_files = sorted(API_DIR.glob("*.py")) if API_DIR.is_dir() else []
+    all_target_files = service_files + utils_files + api_files
 
     breach_found: dict[str, str] = {}  # pattern_name -> file where found
     for fp in all_target_files:
