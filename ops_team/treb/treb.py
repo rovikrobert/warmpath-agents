@@ -418,6 +418,7 @@ def _check_live_nh_funnel(
 
     session = get_session()
     if session is None:
+        logger.info("treb: live NH funnel — no DB session, skipping")
         findings.append(
             Finding(
                 id="treb-live-funnel-skip",
@@ -435,6 +436,7 @@ def _check_live_nh_funnel(
         from app.models.contact import CsvUpload
         from app.models.marketplace import NetworkSharingPreferences
 
+        logger.info("treb: live NH funnel — querying users/uploads/preferences")
         nh_signup = (
             session.execute(
                 select(func.count())
@@ -557,6 +559,7 @@ def _check_live_referral_workflow(
 
     session = get_session()
     if session is None:
+        logger.info("treb: live referral workflow — no DB session, skipping")
         findings.append(
             Finding(
                 id="treb-live-ref-skip",
@@ -573,6 +576,7 @@ def _check_live_referral_workflow(
         from app.models.marketplace import IntroFacilitation, ConnectorReputation
         from app.models.credits import CreditTransaction
 
+        logger.info("treb: live referral workflow — querying intros/credits/reputation")
         statuses = ["requested", "approved", "declined", "completed"]
         status_counts: dict[str, int] = {}
         for status in statuses:

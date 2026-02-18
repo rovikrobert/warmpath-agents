@@ -969,6 +969,7 @@ def _check_live_marketplace_volume(
 
     session = get_session()
     if session is None:
+        logger.info("marsh: live marketplace volume — no DB session, skipping")
         findings.append(
             Finding(
                 id="marsh-live-vol-skip",
@@ -987,6 +988,7 @@ def _check_live_marketplace_volume(
             IntroFacilitation,
         )
 
+        logger.info("marsh: live marketplace volume — querying listings/intros")
         active_listings = (
             session.execute(
                 select(func.count())

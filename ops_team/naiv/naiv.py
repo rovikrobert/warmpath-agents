@@ -641,6 +641,13 @@ def _check_live_satisfaction(
         metrics["live_feedback_negative"] = negative
         metrics["live_feedback_neutral"] = neutral
 
+        # Wire into satisfaction_score for ops_lead scorecard (0-1 scale)
+        if total > 0:
+            nps_raw = (positive - negative) / total  # -1 to +1
+            metrics["satisfaction_score"] = round((nps_raw + 1) / 2, 2)  # 0 to 1
+        else:
+            metrics["satisfaction_score"] = 0.5  # neutral when no data
+
         if total == 0:
             findings.append(
                 Finding(
