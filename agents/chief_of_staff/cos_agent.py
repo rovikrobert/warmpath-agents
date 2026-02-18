@@ -48,6 +48,7 @@ from .resolver import attempt_resolution
 from .router import get_request_tracking_report, route_and_track_request
 from .schemas import Conflict
 from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
+from .telegram_bridge import TelegramBridge, TELEGRAM_DIR
 from .whatsapp_bridge import WhatsAppBridge
 
 from agents.shared.whatsapp_formatter import WHATSAPP_DIR
@@ -272,8 +273,8 @@ def run_daily() -> str:
     except Exception:
         logger.debug("get_active_briefs skipped (Notion not configured)")
 
-    # Process any pending WhatsApp commands (Gap 8)
-    _process_whatsapp_commands()
+    # Process async commands (Gap 8 — WhatsApp + Telegram)
+    _process_async_commands()
 
     # Route and track cross-team requests (Gap 6)
     for req in cross_team_requests:
@@ -440,14 +441,42 @@ def _push_daily_outputs(
     wa_marker = WHATSAPP_DIR / f"whatsapp-daily-{today}.txt"
     if wa_marker.exists():
         logger.info("Daily WhatsApp already sent for %s — skipping", today)
-        return
+    else:
+        try:
+            wa = WhatsAppBridge()
+            wa_data = brief_data or {"decisions_needed": [], "progress": []}
+            wa.generate_morning_brief(wa_data, costs, alerts, notion_page_id=notion_page_id)
+        except Exception:
+            logger.debug("WhatsApp message generation skipped")
 
+    # Telegram message — skip if already sent today
+    tg_marker = TELEGRAM_DIR / f"telegram-daily-{today}.txt"
+    if tg_marker.exists():
+        logger.info("Daily Telegram already sent for %s — skipping", today)
+    else:
+        try:
+            tg = TelegramBridge()
+            tg_data = brief_data or {"decisions_needed": [], "team_summaries": []}
+            tg.generate_daily_brief(tg_data, costs, alerts, notion_page_id=notion_page_id)
+        except Exception:
+            logger.debug("Telegram daily brief generation skipped")
+
+    # Push per-team reports to Notion
     try:
-        wa = WhatsAppBridge()
-        wa_data = brief_data or {"decisions_needed": [], "progress": []}
-        wa.generate_morning_brief(wa_data, costs, alerts, notion_page_id=notion_page_id)
+        if brief_data:
+            notion = NotionSync()
+            if notion.enabled:
+                for ts in brief_data.get("team_summaries", []):
+                    notion.push_team_report(
+                        date=today,
+                        team=ts.get("team", "unknown"),
+                        health=ts.get("health", "green"),
+                        summary=ts.get("summary", ""),
+                        agent_count=ts.get("agent_count", 0),
+                        finding_count=ts.get("finding_count", 0),
+                    )
     except Exception:
-        logger.debug("WhatsApp message generation skipped")
+        logger.debug("Team report push to Notion skipped")
 
 
 def run_weekly() -> str:
@@ -503,6 +532,31 @@ def run_weekly() -> str:
         except Exception:
             logger.debug("Weekly WhatsApp summary skipped")
 
+    # Telegram weekly summary — skip if already sent
+    tg_weekly_marker = TELEGRAM_DIR / f"telegram-weekly-{today}.txt"
+    if tg_weekly_marker.exists():
+        logger.info("Weekly Telegram already sent for %s — skipping", today)
+    else:
+        try:
+            tg = TelegramBridge()
+            tg.generate_weekly_summary(
+                week_num=_current_week_number(),
+                metrics={
+                    "weekly_cost": f"${costs.get('total_estimated_cost_usd', 0) * 7:.2f}",
+                    "daily_avg": f"${costs.get('total_estimated_cost_usd', 0):.2f}/day",
+                },
+            )
+        except Exception:
+            logger.debug("Telegram weekly summary skipped")
+
+    # Push weekly synthesis to Notion
+    try:
+        notion = NotionSync()
+        if notion.enabled:
+            notion.push_weekly_synthesis(date=today, brief_markdown=brief)
+    except Exception:
+        logger.debug("Weekly Notion sync skipped")
+
     return brief
 
 
@@ -522,58 +576,67 @@ def _current_week_number() -> int:
 
 
 # ---------------------------------------------------------------------------
-# WhatsApp command processing (Gap 8)
+# Async command processing (Gap 8 — WhatsApp + Telegram)
 # ---------------------------------------------------------------------------
 
 
-def _process_whatsapp_commands() -> list[dict]:
-    """Scan for WhatsApp reply files and process commands.
-
-    Looks for files matching whatsapp-reply-*.txt in the WhatsApp directory,
-    parses each via WhatsAppBridge.process_command(), and dispatches actions.
-    """
+def _process_async_commands() -> list[dict]:
+    """Scan for WhatsApp and Telegram reply files and process commands."""
     results: list[dict] = []
-    reply_pattern = "whatsapp-reply-*.txt"
 
-    if not WHATSAPP_DIR.is_dir():
-        return results
+    # WhatsApp replies
+    if WHATSAPP_DIR.is_dir():
+        for reply_file in sorted(WHATSAPP_DIR.glob("whatsapp-reply-*.txt")):
+            parsed = _process_single_reply(reply_file, source="whatsapp")
+            if parsed:
+                results.append(parsed)
 
-    for reply_file in sorted(WHATSAPP_DIR.glob(reply_pattern)):
-        try:
-            text = reply_file.read_text(encoding="utf-8").strip()
-            if not text:
-                continue
-
-            wa = WhatsAppBridge()
-            parsed = wa.process_command(text)
-            command = parsed.get("command", "unknown")
-
-            # Dispatch based on command type
-            if command == "status":
-                logger.info("WhatsApp command: status request")
-            elif command == "approve":
-                item_id = parsed.get("item", "")
-                record_founder_decision(item_id, "cos_recommendation", "approved")
-                logger.info("WhatsApp command: approved %s", item_id)
-            elif command == "choose":
-                choice = parsed.get("choice", "")
-                logger.info("WhatsApp command: chose option %s", choice)
-            elif command == "ship":
-                feature = parsed.get("feature", "")
-                logger.info("WhatsApp command: ship %s", feature)
-            else:
-                logger.info("WhatsApp command: %s", command)
-
-            results.append(parsed)
-
-            # Archive processed reply
-            processed_path = reply_file.with_suffix(".processed")
-            reply_file.rename(processed_path)
-
-        except Exception:
-            logger.debug("Failed to process WhatsApp reply: %s", reply_file.name)
+    # Telegram replies (file-based fallback before webhook is live)
+    if TELEGRAM_DIR.is_dir():
+        for reply_file in sorted(TELEGRAM_DIR.glob("telegram-reply-*.txt")):
+            parsed = _process_single_reply(reply_file, source="telegram")
+            if parsed:
+                results.append(parsed)
 
     return results
+
+
+def _process_single_reply(reply_file: Path, source: str = "whatsapp") -> dict | None:
+    """Process a single reply file and archive it."""
+    try:
+        text = reply_file.read_text(encoding="utf-8").strip()
+        if not text:
+            return None
+
+        from agents.shared.whatsapp_formatter import WhatsAppFormatter
+
+        parsed = WhatsAppFormatter.parse_reply(text)
+        parsed["source"] = source
+        command = parsed.get("command", "unknown")
+
+        if command == "status":
+            logger.info("%s command: status request", source.title())
+        elif command == "approve":
+            item_id = parsed.get("item", "")
+            record_founder_decision(item_id, "cos_recommendation", "approved")
+            logger.info("%s command: approved %s", source.title(), item_id)
+        elif command == "choose":
+            choice = parsed.get("choice", "")
+            logger.info("%s command: chose option %s", source.title(), choice)
+        elif command == "ship":
+            feature = parsed.get("feature", "")
+            logger.info("%s command: ship %s", source.title(), feature)
+        else:
+            logger.info("%s command: %s", source.title(), command)
+
+        # Archive processed reply
+        processed_path = reply_file.with_suffix(".processed")
+        reply_file.rename(processed_path)
+
+        return parsed
+    except Exception:
+        logger.debug("Failed to process reply: %s", reply_file.name)
+        return None
 
 
 # ---------------------------------------------------------------------------
