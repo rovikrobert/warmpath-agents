@@ -556,6 +556,320 @@ def _check_empty_states(
 
 
 # ---------------------------------------------------------------------------
+# Check 6: Live User Satisfaction Data (CoS gap 3)
+# ---------------------------------------------------------------------------
+
+
+def _check_live_satisfaction(
+    findings: list[Finding],
+    sat_findings: list[SatisfactionFinding],
+    metrics: dict[str, Any],
+) -> None:
+    """Query user_feedback table for actual NPS/rating data."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="naiv-live-sat-skip",
+                severity="info",
+                category="live_satisfaction",
+                title="Live satisfaction data unavailable",
+                detail="DATABASE_URL not set — cannot query user_feedback",
+            )
+        )
+        return
+
+    try:
+        from sqlalchemy import func, select
+        from app.models.enrichment import UserFeedback
+
+        total = session.execute(
+            select(func.count()).select_from(UserFeedback)
+        ).scalar() or 0
+
+        avg_rating = session.execute(
+            select(func.avg(UserFeedback.rating))
+        ).scalar()
+
+        feature_rows = session.execute(
+            select(
+                UserFeedback.feature,
+                func.count().label("cnt"),
+                func.avg(UserFeedback.rating).label("avg_r"),
+            ).group_by(UserFeedback.feature)
+        ).all()
+
+        by_feature = {
+            row[0]: {"count": row[1], "avg_rating": round(float(row[2]), 2)}
+            for row in feature_rows
+        }
+
+        positive = session.execute(
+            select(func.count()).select_from(UserFeedback).where(
+                UserFeedback.rating == 1
+            )
+        ).scalar() or 0
+        negative = session.execute(
+            select(func.count()).select_from(UserFeedback).where(
+                UserFeedback.rating == -1
+            )
+        ).scalar() or 0
+        neutral = session.execute(
+            select(func.count()).select_from(UserFeedback).where(
+                UserFeedback.rating == 0
+            )
+        ).scalar() or 0
+
+        metrics["live_feedback_count"] = total
+        metrics["live_feedback_avg_rating"] = round(float(avg_rating), 2) if avg_rating is not None else None
+        metrics["live_feedback_by_feature"] = by_feature
+        metrics["live_feedback_positive"] = positive
+        metrics["live_feedback_negative"] = negative
+        metrics["live_feedback_neutral"] = neutral
+
+        if total == 0:
+            findings.append(
+                Finding(
+                    id="naiv-live-sat-000",
+                    severity="info",
+                    category="live_satisfaction",
+                    title="No user feedback collected yet",
+                    detail="user_feedback table is empty — pre-launch state",
+                )
+            )
+        else:
+            nps_like = round((positive - negative) / total, 2) if total > 0 else 0.0
+            metrics["live_feedback_nps_score"] = nps_like
+
+            if nps_like < 0:
+                sat_findings.append(
+                    SatisfactionFinding(
+                        id="naiv-live-sat-001",
+                        category="live_satisfaction",
+                        severity="high",
+                        title=f"Negative NPS score: {nps_like:.2f}",
+                        detail=f"Positive: {positive}, Negative: {negative}, Neutral: {neutral}",
+                        persona="both",
+                        recommendation="Investigate top negative-feedback features for root cause",
+                    )
+                )
+    except Exception as exc:
+        logger.error("naiv: live satisfaction check failed: %s", exc)
+        findings.append(
+            Finding(
+                id="naiv-live-sat-err",
+                severity="info",
+                category="live_satisfaction",
+                title="Live satisfaction check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Check 7: Live Error Telemetry (CoS gap 5)
+# ---------------------------------------------------------------------------
+
+
+def _check_live_error_telemetry(
+    findings: list[Finding],
+    sat_findings: list[SatisfactionFinding],
+    metrics: dict[str, Any],
+) -> None:
+    """Query usage_logs and audit_logs for error frequency and impact."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="naiv-live-err-skip",
+                severity="info",
+                category="error_telemetry",
+                title="Live error telemetry unavailable",
+                detail="DATABASE_URL not set — cannot query error logs",
+            )
+        )
+        return
+
+    try:
+        from datetime import datetime, timedelta, timezone
+        from sqlalchemy import func, select
+        from app.models.enrichment import UsageLog
+        from app.models.audit import AuditLog
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+
+        error_actions = session.execute(
+            select(
+                UsageLog.action,
+                func.count().label("cnt"),
+            )
+            .where(UsageLog.created_at >= cutoff)
+            .group_by(UsageLog.action)
+            .order_by(func.count().desc())
+        ).all()
+
+        total_actions_7d = sum(row[1] for row in error_actions)
+
+        security_events = session.execute(
+            select(func.count()).select_from(AuditLog).where(
+                AuditLog.created_at >= cutoff
+            )
+        ).scalar() or 0
+
+        top_actions = {row[0]: row[1] for row in error_actions[:10]}
+
+        metrics["live_error_total_actions_7d"] = total_actions_7d
+        metrics["live_error_security_events_7d"] = security_events
+        metrics["live_error_top_actions"] = top_actions
+
+        if security_events > 50:
+            sat_findings.append(
+                SatisfactionFinding(
+                    id="naiv-live-err-001",
+                    category="error_telemetry",
+                    severity="high",
+                    title=f"High security event volume: {security_events} in 7 days",
+                    detail="Elevated audit log entries may indicate attacks or config issues",
+                    persona="both",
+                    recommendation="Review audit_logs for patterns — brute force, unusual IPs",
+                )
+            )
+    except Exception as exc:
+        logger.error("naiv: live error telemetry failed: %s", exc)
+        findings.append(
+            Finding(
+                id="naiv-live-err-err",
+                severity="info",
+                category="error_telemetry",
+                title="Live error telemetry check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Check 8: Live Email Engagement Metrics (CoS gap 7)
+# ---------------------------------------------------------------------------
+
+
+def _check_live_email_engagement(
+    findings: list[Finding],
+    sat_findings: list[SatisfactionFinding],
+    metrics: dict[str, Any],
+) -> None:
+    """Query email_campaign_logs for open/click rates by email type."""
+    from ops_team.shared.db import get_session
+
+    session = get_session()
+    if session is None:
+        findings.append(
+            Finding(
+                id="naiv-live-email-skip",
+                severity="info",
+                category="email_engagement",
+                title="Live email engagement unavailable",
+                detail="DATABASE_URL not set — cannot query email_campaign_logs",
+            )
+        )
+        return
+
+    try:
+        from sqlalchemy import func, select
+        from app.models.email_campaign import EmailCampaignLog
+
+        total_sent = session.execute(
+            select(func.count()).select_from(EmailCampaignLog)
+        ).scalar() or 0
+
+        if total_sent == 0:
+            findings.append(
+                Finding(
+                    id="naiv-live-email-000",
+                    severity="info",
+                    category="email_engagement",
+                    title="No emails sent yet",
+                    detail="email_campaign_logs is empty — pre-launch state",
+                )
+            )
+            metrics["live_email_total_sent"] = 0
+            return
+
+        total_opened = session.execute(
+            select(func.count()).select_from(EmailCampaignLog).where(
+                EmailCampaignLog.opened_at.is_not(None)
+            )
+        ).scalar() or 0
+
+        total_clicked = session.execute(
+            select(func.count()).select_from(EmailCampaignLog).where(
+                EmailCampaignLog.clicked_at.is_not(None)
+            )
+        ).scalar() or 0
+
+        type_rows = session.execute(
+            select(
+                EmailCampaignLog.email_type,
+                func.count().label("sent"),
+                func.count(EmailCampaignLog.opened_at).label("opened"),
+                func.count(EmailCampaignLog.clicked_at).label("clicked"),
+            ).group_by(EmailCampaignLog.email_type)
+        ).all()
+
+        by_type = {}
+        for row in type_rows:
+            sent = row[1]
+            by_type[row[0]] = {
+                "sent": sent,
+                "opened": row[2],
+                "clicked": row[3],
+                "open_rate": round(row[2] / sent, 2) if sent > 0 else 0.0,
+                "click_rate": round(row[3] / sent, 2) if sent > 0 else 0.0,
+            }
+
+        open_rate = round(total_opened / total_sent, 2) if total_sent > 0 else 0.0
+        click_rate = round(total_clicked / total_sent, 2) if total_sent > 0 else 0.0
+
+        metrics["live_email_total_sent"] = total_sent
+        metrics["live_email_open_rate"] = open_rate
+        metrics["live_email_click_rate"] = click_rate
+        metrics["live_email_by_type"] = by_type
+
+        if open_rate < 0.15:
+            sat_findings.append(
+                SatisfactionFinding(
+                    id="naiv-live-email-001",
+                    category="email_engagement",
+                    severity="medium",
+                    title=f"Low email open rate: {open_rate:.0%}",
+                    detail=f"{total_opened}/{total_sent} emails opened (target >=15%)",
+                    persona="both",
+                    recommendation="Review subject lines and send timing. Consider A/B testing.",
+                )
+            )
+    except Exception as exc:
+        logger.error("naiv: live email engagement failed: %s", exc)
+        findings.append(
+            Finding(
+                id="naiv-live-email-err",
+                severity="info",
+                category="email_engagement",
+                title="Live email engagement check error",
+                detail=str(exc),
+            )
+        )
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
 # Main scan
 # ---------------------------------------------------------------------------
 
@@ -613,6 +927,24 @@ def scan() -> OpsTeamReport:
     except Exception as exc:
         logger.error("Empty states check failed: %s", exc)
         metrics["empty_states_check_error"] = str(exc)
+
+    try:
+        _check_live_satisfaction(findings, sat_findings, metrics)
+    except Exception as exc:
+        logger.error("Live satisfaction check failed: %s", exc)
+        metrics["live_satisfaction_check_error"] = str(exc)
+
+    try:
+        _check_live_error_telemetry(findings, sat_findings, metrics)
+    except Exception as exc:
+        logger.error("Live error telemetry check failed: %s", exc)
+        metrics["live_error_telemetry_check_error"] = str(exc)
+
+    try:
+        _check_live_email_engagement(findings, sat_findings, metrics)
+    except Exception as exc:
+        logger.error("Live email engagement check failed: %s", exc)
+        metrics["live_email_check_error"] = str(exc)
 
     # -- Self-learning -------------------------------------------------------
 
