@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agents.shared.report import Finding
@@ -124,7 +125,11 @@ def _check_test_count_claims(
             actual_count += len(re.findall(r"def test_", content))
 
     metrics["test_file_count"] = len(
-        list(set(list(TESTS_DIR.glob("test_*.py")) + list(TESTS_DIR.glob("**/test_*.py"))))
+        list(
+            set(
+                list(TESTS_DIR.glob("test_*.py")) + list(TESTS_DIR.glob("**/test_*.py"))
+            )
+        )
     )
     metrics["test_count_actual"] = actual_count
 
@@ -618,6 +623,28 @@ def _check_agent_team_maturity(
                 ),
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# Excel export
+# ---------------------------------------------------------------------------
+
+
+def _generate_investor_report():
+    """Generate investor report Excel file from cached reports."""
+    try:
+        from finance_team.shared.report_export import generate_workbook
+
+        wb_bytes = generate_workbook()
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        path = REPORTS_DIR / f"investor_report_{date_str}.xlsx"
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(wb_bytes)
+        logger.info("Investor report saved to %s", path)
+        return path
+    except Exception as exc:
+        logger.error("Failed to generate investor report: %s", exc)
+        return None
 
 
 # ---------------------------------------------------------------------------

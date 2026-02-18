@@ -28,7 +28,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from finance_team.shared.config import FINANCE_AGENT_NAMES, REPORTS_DIR
+from finance_team.shared.config import FINANCE_AGENT_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +192,6 @@ def cmd_intel_report() -> None:
 
 def cmd_learning_report() -> None:
     """Meta-learning reports for all finance team agents."""
-    from finance_team.shared.config import FINANCE_AGENT_NAMES
     from finance_team.shared.learning import FinanceLearningState
 
     print("=" * 60)
@@ -301,6 +300,21 @@ def cmd_compliance_audit() -> None:
                 print(f"    -> {c.recommendation}")
 
 
+def cmd_investor_report() -> None:
+    """Generate investor report Excel from cached reports."""
+    from finance_team.investor_relations.investor_relations import (
+        _generate_investor_report,
+    )
+
+    path = _generate_investor_report()
+    if path:
+        print(f"Investor report saved to: {path}")
+    else:
+        print(
+            "Failed to generate investor report. Run --all first to populate reports."
+        )
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -332,6 +346,11 @@ def main() -> None:
     )
     group.add_argument(
         "--compliance-audit", action="store_true", help="Compliance-focused report"
+    )
+    group.add_argument(
+        "--investor-report",
+        action="store_true",
+        help="Generate investor Excel report",
     )
     group.add_argument(
         "--consult",
@@ -373,6 +392,8 @@ def main() -> None:
         cmd_research_agenda()
     elif args.compliance_audit:
         cmd_compliance_audit()
+    elif args.investor_report:
+        cmd_investor_report()
     elif args.consult:
         from agents.shared.consultant import consult
 
