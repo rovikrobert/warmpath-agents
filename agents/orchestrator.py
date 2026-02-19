@@ -20,6 +20,7 @@ import importlib
 import logging
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 # Ensure project root is on sys.path so the orchestrator works when invoked
@@ -89,7 +90,12 @@ def _run_agent(name: str) -> AgentReport | None:
 
 
 def cmd_all(skip_tests: bool = False) -> None:
-    """Run all agents, then generate the daily brief."""
+    """Run all agents in parallel batches, then generate the daily brief.
+
+    Batch 1 (parallel): all agents except architect
+    Batch 2 (solo):     architect — runs after batch 1 so mutation testing
+                        can't corrupt files other agents are reading
+    """
     start = time.time()
     reports: list[AgentReport] = []
 
@@ -97,8 +103,22 @@ def cmd_all(skip_tests: bool = False) -> None:
     if skip_tests:
         agents_to_run = [a for a in agents_to_run if a != "test_engineer"]
 
-    for name in agents_to_run:
-        report = _run_agent(name)
+    # Split into two batches: batch1 (safe to parallelize) and architect (solo)
+    batch1 = [a for a in agents_to_run if a != "architect"]
+    run_architect = "architect" in agents_to_run
+
+    # Batch 1: run in parallel via ThreadPoolExecutor
+    if batch1:
+        with ThreadPoolExecutor(max_workers=len(batch1)) as pool:
+            futures = {pool.submit(_run_agent, name): name for name in batch1}
+            for future in as_completed(futures):
+                report = future.result()
+                if report:
+                    reports.append(report)
+
+    # Batch 2: architect runs solo (mutation testing modifies source files)
+    if run_architect:
+        report = _run_agent("architect")
         if report:
             reports.append(report)
 

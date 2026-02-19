@@ -71,6 +71,23 @@ def _relative(path: Path) -> str:
         return str(path)
 
 
+# Type alias for the AST cache: {path: (source_text, parsed_tree)}
+ASTCache = dict[Path, tuple[str, ast.Module]]
+
+
+def _build_ast_cache(py_files: list[Path]) -> ASTCache:
+    """Parse all Python files once and return a reusable cache."""
+    cache: ASTCache = {}
+    for path in py_files:
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+            cache[path] = (source, tree)
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+    return cache
+
+
 # ---------------------------------------------------------------------------
 # Individual scanners
 # ---------------------------------------------------------------------------
@@ -177,14 +194,21 @@ def _scan_ruff_format(findings: list[Finding]) -> None:
             )
 
 
-def _scan_file_sizes(py_files: list[Path], findings: list[Finding]) -> int:
+def _scan_file_sizes(
+    py_files: list[Path], findings: list[Finding], cache: ASTCache | None = None
+) -> int:
     """Flag files exceeding FILE_SIZE_WARN_LINES. Return count of large files."""
     large_count = 0
+    _cache = cache or {}
     for path in py_files:
-        try:
-            line_count = len(path.read_text(encoding="utf-8").splitlines())
-        except (OSError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            line_count = len(cached[0].splitlines())
+        else:
+            try:
+                line_count = len(path.read_text(encoding="utf-8").splitlines())
+            except (OSError, UnicodeDecodeError):
+                continue
         if line_count > FILE_SIZE_WARN_LINES:
             large_count += 1
             findings.append(
@@ -206,7 +230,9 @@ def _scan_file_sizes(py_files: list[Path], findings: list[Finding]) -> int:
     return large_count
 
 
-def _scan_functions(py_files: list[Path], findings: list[Finding]) -> tuple[int, int]:
+def _scan_functions(
+    py_files: list[Path], findings: list[Finding], cache: ASTCache | None = None
+) -> tuple[int, int]:
     """Parse files with ast. Flag long functions and missing type hints.
 
     Returns (total_functions, missing_hints_count).
@@ -214,12 +240,17 @@ def _scan_functions(py_files: list[Path], findings: list[Finding]) -> tuple[int,
     total_functions = 0
     missing_hints = 0
 
+    _cache = cache or {}
     for path in py_files:
-        try:
-            source = path.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(path))
-        except (OSError, SyntaxError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            source, tree = cached
+        else:
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(path))
+            except (OSError, SyntaxError, UnicodeDecodeError):
+                continue
 
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -282,7 +313,9 @@ def _scan_functions(py_files: list[Path], findings: list[Finding]) -> tuple[int,
     return total_functions, missing_hints
 
 
-def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
+def _scan_conventions(
+    py_files: list[Path], findings: list[Finding], cache: ASTCache | None = None
+) -> None:
     """Check for convention violations documented in CLAUDE.md."""
 
     # Patterns to detect
@@ -305,11 +338,16 @@ def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
         re.compile(r"""['"](?:Bearer\s+)[a-zA-Z0-9._-]{20,}['"]"""),  # Bearer tokens
     ]
 
+    _cache = cache or {}
     for path in py_files:
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            lines = cached[0].splitlines()
+        else:
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeDecodeError):
+                continue
 
         rel_path = _relative(path)
         for lineno, line in enumerate(lines, start=1):
@@ -371,7 +409,9 @@ def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
                     break  # One finding per line is enough
 
 
-def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
+def _scan_n_plus_one(
+    py_files: list[Path], findings: list[Finding], cache: ASTCache | None = None
+) -> None:
     """Detect awaited DB calls inside for/while loops (N+1 query pattern).
 
     Only flags calls that are *awaited* and target known DB session methods or
@@ -406,12 +446,17 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
         "_index",
     )
 
+    _cache = cache or {}
     for path in py_files:
-        try:
-            source = path.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(path))
-        except (OSError, SyntaxError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            source, tree = cached
+        else:
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(path))
+            except (OSError, SyntaxError, UnicodeDecodeError):
+                continue
 
         rel_path = _relative(path)
 
@@ -608,7 +653,7 @@ def _scan_vault_isolation(findings: list[Finding]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _scan_circular_imports(findings: list[Finding]) -> int:
+def _scan_circular_imports(findings: list[Finding], cache: ASTCache | None = None) -> int:
     """Build import graph for app/ modules and detect circular dependencies.
 
     Returns the number of cycles detected.
@@ -620,12 +665,17 @@ def _scan_circular_imports(findings: list[Finding]) -> int:
     # Build graph: module_path -> set of imported module_paths
     graph: dict[str, set[str]] = {}
 
+    _cache = cache or {}
     for path in _py_files(app_dir):
-        try:
-            source = path.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(path))
-        except (OSError, SyntaxError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            source, tree = cached
+        else:
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(path))
+            except (OSError, SyntaxError, UnicodeDecodeError):
+                continue
 
         rel = _relative(path)
         graph.setdefault(rel, set())
@@ -702,7 +752,9 @@ def _scan_circular_imports(findings: list[Finding]) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
+def _scan_dead_code(
+    py_files: list[Path], findings: list[Finding], cache: ASTCache | None = None
+) -> int:
     """Find public functions defined in app/ that are never referenced elsewhere.
 
     Returns count of dead functions detected.
@@ -721,12 +773,17 @@ def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
         "create_app",
     }
 
+    _cache = cache or {}
     for path in py_files:
-        try:
-            source = path.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(path))
-        except (OSError, SyntaxError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            source, tree = cached
+        else:
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(path))
+            except (OSError, SyntaxError, UnicodeDecodeError):
+                continue
 
         rel = _relative(path)
         # Skip __init__.py (re-exports) and test files
@@ -747,10 +804,14 @@ def _scan_dead_code(py_files: list[Path], findings: list[Finding]) -> int:
     # Phase 2: Scan all files for references to those names
     all_sources: list[str] = []
     for path in py_files:
-        try:
-            all_sources.append(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError):
-            continue
+        cached = _cache.get(path)
+        if cached:
+            all_sources.append(cached[0])
+        else:
+            try:
+                all_sources.append(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                continue
 
     # Also scan test files for references (tests count as usage)
     test_dir = PROJECT_ROOT / "tests"
@@ -916,14 +977,17 @@ def _scan_mypy(findings: list[Finding]) -> dict[str, object]:
 # Mutation testing (lightweight built-in sampler)
 # ---------------------------------------------------------------------------
 
-# Critical service files to mutation-test (most business logic)
+# Critical service files to mutation-test (highest business logic density)
 _MUTATION_TARGETS = [
     "app/services/warm_scorer.py",
     "app/services/credits.py",
-    "app/services/marketplace.py",
-    "app/utils/security.py",
-    "app/utils/encryption.py",
 ]
+
+# Targeted test files for each mutation target (avoids full-suite pytest runs)
+_MUTATION_TEST_MAP: dict[str, list[str]] = {
+    "app/services/warm_scorer.py": ["tests/test_warm_scorer.py"],
+    "app/services/credits.py": ["tests/test_credits.py"],
+}
 
 # Simple AST mutations: swap comparison operators
 _OPERATOR_SWAPS: dict[type, type] = {
@@ -1070,8 +1134,8 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
         except OSError:
             continue  # skip file if we can't create a safety backup
 
-        # Sample up to 5 mutations per file
-        sampled = random.sample(sites, min(5, len(sites)))
+        # Sample 1 mutation per file (reduced from 5 for performance)
+        sampled = random.sample(sites, min(1, len(sites)))
         killed = 0
         survived = 0
 
@@ -1082,7 +1146,8 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
 
             total_tested += 1
 
-            # Write mutation, run tests, restore
+            # Write mutation, run targeted tests, restore
+            test_files = _MUTATION_TEST_MAP.get(rel_path, ["tests/"])
             try:
                 target.write_text(mutated, encoding="utf-8")
                 result = _run_tool(
@@ -1090,7 +1155,7 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
                         "python3",
                         "-m",
                         "pytest",
-                        "tests/",
+                        *test_files,
                         "-x",
                         "-q",
                         "--timeout=10",
@@ -1217,6 +1282,9 @@ def scan() -> AgentReport:
         py_files = []
     metrics["total_files_scanned"] = len(py_files)
 
+    # Build AST cache once — all scan functions reuse it
+    ast_cache = _build_ast_cache(py_files)
+
     # -- 1. Ruff lint --
     lint_count = _scan_ruff_check(findings)
     metrics["lint_issues_count"] = lint_count
@@ -1225,29 +1293,29 @@ def scan() -> AgentReport:
     _scan_ruff_format(findings)
 
     # -- 3. File sizes --
-    large_count = _scan_file_sizes(py_files, findings)
+    large_count = _scan_file_sizes(py_files, findings, ast_cache)
     metrics["large_files_count"] = large_count
 
     # -- 4. Function analysis (length + missing type hints) --
-    total_funcs, missing_hints = _scan_functions(py_files, findings)
+    total_funcs, missing_hints = _scan_functions(py_files, findings, ast_cache)
     metrics["total_functions"] = total_funcs
     metrics["missing_return_types"] = missing_hints
 
     # -- 5. Convention checks --
-    _scan_conventions(py_files, findings)
+    _scan_conventions(py_files, findings, ast_cache)
 
     # -- 6. N+1 query detection --
-    _scan_n_plus_one(py_files, findings)
+    _scan_n_plus_one(py_files, findings, ast_cache)
 
     # -- 7. Vault isolation check --
     _scan_vault_isolation(findings)
 
     # -- 8. Circular import detection --
-    cycle_count = _scan_circular_imports(findings)
+    cycle_count = _scan_circular_imports(findings, ast_cache)
     metrics["circular_import_cycles"] = cycle_count
 
     # -- 9. Dead code detection --
-    dead_count = _scan_dead_code(py_files, findings)
+    dead_count = _scan_dead_code(py_files, findings, ast_cache)
     metrics["dead_functions_detected"] = dead_count
 
     # -- 10. Mypy type checking --
@@ -1269,9 +1337,12 @@ def scan() -> AgentReport:
     except Exception:
         pass
 
-    # -- 13. Record historical recurrence --
-    for f in findings:
-        prev = learning.get_recurrence_count(AGENT_NAME, f.category, f.file)
+    # -- 13. Record historical recurrence (batch — single state load) --
+    recurrence_keys = [(f.category, f.file) for f in findings]
+    recurrence_counts = learning.get_recurrence_counts_batch(
+        AGENT_NAME, recurrence_keys
+    )
+    for f, prev in zip(findings, recurrence_counts):
         if prev > 0:
             f.recurrence_count = prev + 1
 

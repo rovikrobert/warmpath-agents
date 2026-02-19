@@ -365,27 +365,34 @@ def fetch_dependency_versions() -> dict[str, dict]:
         if name:
             packages.append(name)
 
-    # Check each package
-    for pkg in packages:
-        try:
-            result = subprocess.run(
-                ["pip", "show", pkg],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                info: dict[str, str] = {}
-                for line in result.stdout.splitlines():
-                    if ": " in line:
-                        key, val = line.split(": ", 1)
-                        info[key.strip().lower()] = val.strip()
-                versions[pkg] = {
-                    "installed": info.get("version", "unknown"),
-                    "location": info.get("location", ""),
+    # Single pip list call instead of per-package pip show
+    installed_map: dict[str, dict[str, str]] = {}
+    try:
+        result = subprocess.run(
+            ["pip", "list", "--format=json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            for entry in json.loads(result.stdout):
+                name = entry.get("name", "").lower()
+                installed_map[name] = {
+                    "version": entry.get("version", "unknown"),
                 }
-        except (subprocess.TimeoutExpired, Exception):
-            continue
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, Exception) as e:
+        logger.warning("pip list failed: %s", e)
+
+    for pkg in packages:
+        pkg_lower = pkg.lower()
+        # pip normalizes names: underscores become hyphens
+        pkg_normalized = pkg_lower.replace("_", "-")
+        info = installed_map.get(pkg_lower) or installed_map.get(pkg_normalized)
+        if info:
+            versions[pkg] = {
+                "installed": info["version"],
+                "location": "",
+            }
 
     cache["dep_versions"] = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

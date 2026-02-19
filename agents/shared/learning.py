@@ -592,6 +592,37 @@ def get_recurrence_count(agent: str, category: str, file: str | None = None) -> 
     return ls.get_recurrence_count(category, file)
 
 
+def get_recurrence_counts_batch(
+    agent: str, keys: list[tuple[str, str | None]]
+) -> list[int]:
+    """Return recurrence counts for multiple (category, file) pairs in one load.
+
+    Loads the agent state once and scans finding_history once, instead of
+    creating a new AgentLearningState per finding.
+    """
+    ls = AgentLearningState(agent)
+    history = ls.state.get("finding_history", [])
+
+    # Pre-compute counts: (category, file) -> count
+    counts_map: dict[tuple[str, str | None], int] = {}
+    for h in history:
+        cat = h.get("category", "")
+        f = h.get("file")
+        # Increment both (cat, file) and (cat, None) keys
+        key_with_file = (cat, f)
+        key_without_file = (cat, None)
+        counts_map[key_with_file] = counts_map.get(key_with_file, 0) + 1
+        counts_map[key_without_file] = counts_map.get(key_without_file, 0) + 1
+
+    results = []
+    for category, file in keys:
+        if file is not None:
+            results.append(counts_map.get((category, file), 0))
+        else:
+            results.append(counts_map.get((category, None), 0))
+    return results
+
+
 def get_trend(agent: str, metric: str, window_days: int = 30) -> str:
     """Return 'up', 'down', or 'stable' for a metric over the window."""
     state = _load_state(agent)
