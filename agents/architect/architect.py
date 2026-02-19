@@ -372,9 +372,26 @@ def _scan_conventions(py_files: list[Path], findings: list[Finding]) -> None:
 
 
 def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
-    """Use ast to detect for-loops containing await db.execute / session.execute."""
+    """Detect awaited DB calls inside for/while loops (N+1 query pattern).
 
-    db_call_names = {"execute", "scalar", "scalars", "get", "fetch_one", "fetch_all"}
+    Only flags calls that are *awaited* and target known DB session methods or
+    known async service functions.  Excludes dict.get(), iteration over
+    already-loaded scalars, and lookups on in-memory maps/caches.
+    """
+
+    # Methods on db/session objects that hit the database
+    _DB_SESSION_METHODS = {"execute", "scalar", "scalar_one_or_none", "fetch_one", "fetch_all"}
+
+    # Known async service functions whose names imply a DB round-trip
+    _DB_SERVICE_FUNCS = {
+        "check_suppression",
+        "get_board_by_key",
+        "get_user_credits",
+        "get_credit_balance",
+    }
+
+    # Variable name suffixes that indicate an in-memory lookup structure
+    _SAFE_RECEIVER_SUFFIXES = ("_map", "_dict", "_cache", "_counts", "_lookup", "_index")
 
     for path in py_files:
         try:
@@ -386,32 +403,79 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
         rel_path = _relative(path)
 
         for node in ast.walk(tree):
-            if not isinstance(node, (ast.For, ast.AsyncFor)):
+            if not isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
                 continue
 
-            # Walk the loop body looking for DB calls
-            for child in ast.walk(node):
-                if not isinstance(child, (ast.Call, ast.Await)):
-                    continue
+            # Collect line numbers in the loop's iterator expression so we
+            # can skip them (e.g. ``for x in result.scalars()`` is safe).
+            iter_lines: set[int] = set()
+            if isinstance(node, (ast.For, ast.AsyncFor)) and node.iter:
+                for iter_child in ast.walk(node.iter):
+                    if hasattr(iter_child, "lineno"):
+                        iter_lines.add(iter_child.lineno)
 
-                # Unwrap Await(Call(...))
-                call_node = child
-                if isinstance(child, ast.Await) and isinstance(child.value, ast.Call):
+            # Walk the loop *body* (not the iterator) looking for awaited DB calls
+            body_nodes = node.body + getattr(node, "orelse", [])
+            found = False
+            for body_stmt in body_nodes:
+                if found:
+                    break
+                for child in ast.walk(body_stmt):
+                    if found:
+                        break
+                    if not isinstance(child, ast.Await):
+                        continue
+
+                    # We only care about Await(Call(...))
+                    if not isinstance(child.value, ast.Call):
+                        continue
+
                     call_node = child.value
-                elif not isinstance(child, ast.Call):
-                    continue
+                    func = call_node.func
 
-                # Check if call is <obj>.execute / <obj>.scalar / etc.
-                func = call_node.func if isinstance(call_node, ast.Call) else None
-                if isinstance(func, ast.Attribute) and func.attr in db_call_names:
+                    # --- Pattern 1: await <obj>.<method>(...) ---
+                    if isinstance(func, ast.Attribute):
+                        method_name = func.attr
+
+                        # Skip if the line is part of the loop iterator
+                        if hasattr(child, "lineno") and child.lineno in iter_lines:
+                            continue
+
+                        # Skip .get() on variables with safe-name suffixes
+                        # (e.g. user_map.get(...), row_dict.get(...))
+                        if method_name == "get" and isinstance(func.value, ast.Name):
+                            receiver_name = func.value.id
+                            if any(receiver_name.endswith(s) for s in _SAFE_RECEIVER_SUFFIXES):
+                                continue
+
+                        # For .get(), also skip if the receiver is not a known
+                        # DB variable (db, session, self.db, self.session)
+                        if method_name == "get":
+                            if not _is_db_receiver(func.value):
+                                continue
+
+                        # For session methods, must be on a DB-like receiver
+                        if method_name in _DB_SESSION_METHODS:
+                            label = method_name
+                        elif method_name == "get" and _is_db_receiver(func.value):
+                            label = "get"
+                        else:
+                            continue
+
+                    # --- Pattern 2: await <known_service_func>(...) ---
+                    elif isinstance(func, ast.Name) and func.id in _DB_SERVICE_FUNCS:
+                        label = func.id
+                    else:
+                        continue
+
                     findings.append(
                         Finding(
                             id="ARCH-N+1",
                             severity="high",
                             category="performance",
-                            title=f"Potential N+1 query: {func.attr}() inside loop",
+                            title=f"Potential N+1 query: {label}() inside loop",
                             detail=(
-                                f"Database call `{func.attr}()` found inside a loop at "
+                                f"Awaited DB call `{label}()` found inside a loop at "
                                 f"`{rel_path}:{node.lineno}`. This may cause N+1 query "
                                 "performance issues."
                             ),
@@ -424,7 +488,22 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
                             effort_hours=0.5,
                         )
                     )
-                    break  # One finding per loop is enough
+                    found = True  # One finding per loop is enough
+
+
+def _is_db_receiver(node: ast.expr) -> bool:
+    """Return True if *node* looks like a DB session variable.
+
+    Matches: ``db``, ``session``, ``self.db``, ``self.session``,
+    ``self._session``, ``self._db``.
+    """
+    _DB_NAMES = {"db", "session", "database", "conn", "connection"}
+    if isinstance(node, ast.Name):
+        return node.id in _DB_NAMES
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        if node.value.id == "self" and node.attr.lstrip("_") in _DB_NAMES:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
