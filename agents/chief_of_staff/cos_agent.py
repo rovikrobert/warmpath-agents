@@ -407,7 +407,15 @@ def run_daily() -> str:
     record_cost_snapshot(costs)
 
     # Push to Notion and generate Telegram message
-    _push_daily_outputs(brief, costs, alerts, brief_data)
+    team_report_groups = {
+        "engineering": eng_reports,
+        "data": data_reports,
+        "product": product_reports,
+        "ops": ops_reports,
+        "finance": finance_reports,
+        "gtm": gtm_reports,
+    }
+    _push_daily_outputs(brief, costs, alerts, brief_data, team_report_groups)
 
     # Log conflict resolutions to Notion Decision Log
     _log_resolutions_to_notion(resolutions, conflicts)
@@ -415,8 +423,67 @@ def run_daily() -> str:
     return brief
 
 
+def _build_team_detail_markdown(team: str, reports: list[AgentReport]) -> str:
+    """Build rich detail markdown for a team's Notion dashboard page."""
+    if not reports:
+        return ""
+    lines: list[str] = []
+
+    # Severity distribution
+    all_findings = [f for r in reports for f in r.findings]
+    severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+    for f in all_findings:
+        severity_counts[f.severity] = severity_counts.get(f.severity, 0) + 1
+    nonzero = {k: v for k, v in severity_counts.items() if v > 0}
+    if nonzero:
+        lines.append("## Severity Distribution")
+        for sev, count in nonzero.items():
+            lines.append(f"- {sev.title()}: {count}")
+    else:
+        lines.append("## Severity Distribution")
+        lines.append("- No findings this cycle")
+
+    # Per-agent breakdown
+    lines.append("## Agent Breakdown")
+    for r in sorted(reports, key=lambda x: len(x.findings), reverse=True):
+        duration = f"{r.scan_duration_seconds:.1f}s" if r.scan_duration_seconds else "N/A"
+        lines.append(f"- {r.agent}: {len(r.findings)} findings ({duration})")
+
+    # Top findings (up to 10, highest severity first)
+    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+    top = sorted(all_findings, key=lambda f: sev_order.get(f.severity, 5))[:10]
+    if top:
+        lines.append("## Top Findings")
+        for f in top:
+            lines.append(f"- [{f.severity.upper()}] {f.title}")
+            if f.recommendation:
+                lines.append(f"  Rec: {f.recommendation[:120]}")
+
+    # Key metrics (if any reports have them)
+    merged_metrics: dict = {}
+    for r in reports:
+        if r.metrics:
+            merged_metrics.update(r.metrics)
+    if merged_metrics:
+        lines.append("## Key Metrics")
+        # Show up to 10 most interesting metrics (skip internal/raw ones)
+        shown = 0
+        for k, v in merged_metrics.items():
+            if shown >= 10:
+                break
+            if isinstance(v, (int, float, str, bool)):
+                lines.append(f"- {k}: {v}")
+                shown += 1
+
+    return "\n".join(lines)
+
+
 def _push_daily_outputs(
-    brief: str, costs: dict, alerts: list[str], brief_data: dict | None = None
+    brief: str,
+    costs: dict,
+    alerts: list[str],
+    brief_data: dict | None = None,
+    team_report_groups: dict[str, list[AgentReport]] | None = None,
 ) -> None:
     """Push daily brief to Notion and generate Telegram message (best-effort).
 
@@ -488,14 +555,20 @@ def _push_daily_outputs(
                         today,
                     )
                 else:
+                    _trg = team_report_groups or {}
                     for ts in brief_data.get("team_summaries", []):
+                        team_name = ts.get("team", "unknown")
+                        detail_md = _build_team_detail_markdown(
+                            team_name, _trg.get(team_name, [])
+                        )
                         notion.push_team_report(
                             date=today,
-                            team=ts.get("team", "unknown"),
+                            team=team_name,
                             health=ts.get("health", "green"),
                             summary=ts.get("summary", ""),
                             agent_count=ts.get("agent_count", 0),
                             finding_count=ts.get("finding_count", 0),
+                            detail_markdown=detail_md,
                         )
                     notion._state["last_team_reports_sync"] = today
                     notion._save_state()

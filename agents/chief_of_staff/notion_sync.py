@@ -529,7 +529,9 @@ class NotionSync:
             stripped = line.strip()
             if not stripped:
                 continue
-            if stripped.startswith("## "):
+            if stripped.startswith("### "):
+                blocks.append(NotionClient.heading_block(stripped[4:], level=3))
+            elif stripped.startswith("## "):
                 blocks.append(NotionClient.heading_block(stripped[3:], level=2))
             elif stripped.startswith("# "):
                 blocks.append(NotionClient.heading_block(stripped[2:], level=1))
