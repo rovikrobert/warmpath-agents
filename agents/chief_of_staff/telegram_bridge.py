@@ -18,6 +18,44 @@ from agents.shared.whatsapp_formatter import WhatsAppFormatter
 logger = logging.getLogger(__name__)
 
 TELEGRAM_DIR = Path("agents/chief_of_staff/reports/telegram")
+TELEGRAM_MAX_LENGTH = 4000  # Telegram limit is 4096; leave buffer
+
+
+def split_telegram_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH) -> list[str]:
+    """Split a message into chunks that fit within Telegram's character limit.
+
+    Splits at paragraph boundaries first, then line boundaries, then hard-cuts.
+    """
+    if len(text) <= max_length:
+        return [text]
+
+    chunks: list[str] = []
+    remaining = text
+
+    while remaining:
+        if len(remaining) <= max_length:
+            chunks.append(remaining)
+            break
+
+        # Try to split at a paragraph boundary (\n\n)
+        cut = remaining.rfind("\n\n", 0, max_length)
+        if cut > 0:
+            chunks.append(remaining[:cut])
+            remaining = remaining[cut + 2:]
+            continue
+
+        # Try to split at a line boundary (\n)
+        cut = remaining.rfind("\n", 0, max_length)
+        if cut > 0:
+            chunks.append(remaining[:cut])
+            remaining = remaining[cut + 1:]
+            continue
+
+        # Hard cut
+        chunks.append(remaining[:max_length])
+        remaining = remaining[max_length:]
+
+    return chunks
 
 _MD_ESCAPE_CHARS = r"\_*[]()~`>#+-=|{}.!"
 _MD_ESCAPE_RE = re.compile(r"([" + re.escape(_MD_ESCAPE_CHARS) + r"])")
@@ -214,14 +252,22 @@ class TelegramBridge:
             import httpx
 
             url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
-            payload: dict[str, Any] = {"chat_id": self._chat_id, "text": message}
+            chunks = split_telegram_message(message)
+            last_msg_id = None
             with httpx.Client(timeout=15.0) as client:
-                response = client.post(url, json=payload)
-                response.raise_for_status()
-                result = response.json()
-                msg_id = result.get("result", {}).get("message_id")
-                logger.info("Telegram message sent: message_id=%s", msg_id)
-                return {"status": "sent", "telegram": True, "message_id": msg_id}
+                for chunk in chunks:
+                    payload: dict[str, Any] = {"chat_id": self._chat_id, "text": chunk}
+                    response = client.post(url, json=payload)
+                    response.raise_for_status()
+                    result = response.json()
+                    last_msg_id = result.get("result", {}).get("message_id")
+            logger.info(
+                "Telegram message sent (%d part%s): message_id=%s",
+                len(chunks),
+                "s" if len(chunks) > 1 else "",
+                last_msg_id,
+            )
+            return {"status": "sent", "telegram": True, "message_id": last_msg_id, "parts": len(chunks)}
         except Exception as e:
             logger.error("Telegram send failed: %s", e)
             return {"status": "error", "telegram": True, "error": str(e)}
