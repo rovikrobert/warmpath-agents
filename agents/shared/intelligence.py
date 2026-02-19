@@ -380,7 +380,12 @@ def fetch_dependency_versions() -> dict[str, dict]:
                 installed_map[name] = {
                     "version": entry.get("version", "unknown"),
                 }
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, Exception) as e:
+    except (
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+        FileNotFoundError,
+        Exception,
+    ) as e:
         logger.warning("pip list failed: %s", e)
 
     for pkg in packages:

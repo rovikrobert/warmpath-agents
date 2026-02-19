@@ -653,7 +653,9 @@ def _scan_vault_isolation(findings: list[Finding]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _scan_circular_imports(findings: list[Finding], cache: ASTCache | None = None) -> int:
+def _scan_circular_imports(
+    findings: list[Finding], cache: ASTCache | None = None
+) -> int:
     """Build import graph for app/ modules and detect circular dependencies.
 
     Returns the number of cycles detected.
