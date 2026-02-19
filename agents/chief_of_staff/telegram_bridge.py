@@ -21,7 +21,9 @@ TELEGRAM_DIR = Path("agents/chief_of_staff/reports/telegram")
 TELEGRAM_MAX_LENGTH = 4000  # Telegram limit is 4096; leave buffer
 
 
-def split_telegram_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH) -> list[str]:
+def split_telegram_message(
+    text: str, max_length: int = TELEGRAM_MAX_LENGTH
+) -> list[str]:
     """Split a message into chunks that fit within Telegram's character limit.
 
     Splits at paragraph boundaries first, then line boundaries, then hard-cuts.
@@ -41,14 +43,14 @@ def split_telegram_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH) -> 
         cut = remaining.rfind("\n\n", 0, max_length)
         if cut > 0:
             chunks.append(remaining[:cut])
-            remaining = remaining[cut + 2:]
+            remaining = remaining[cut + 2 :]
             continue
 
         # Try to split at a line boundary (\n)
         cut = remaining.rfind("\n", 0, max_length)
         if cut > 0:
             chunks.append(remaining[:cut])
-            remaining = remaining[cut + 1:]
+            remaining = remaining[cut + 1 :]
             continue
 
         # Hard cut
@@ -56,6 +58,7 @@ def split_telegram_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH) -> 
         remaining = remaining[max_length:]
 
     return chunks
+
 
 _MD_ESCAPE_CHARS = r"\_*[]()~`>#+-=|{}.!"
 _MD_ESCAPE_RE = re.compile(r"([" + re.escape(_MD_ESCAPE_CHARS) + r"])")
@@ -267,7 +270,12 @@ class TelegramBridge:
                 "s" if len(chunks) > 1 else "",
                 last_msg_id,
             )
-            return {"status": "sent", "telegram": True, "message_id": last_msg_id, "parts": len(chunks)}
+            return {
+                "status": "sent",
+                "telegram": True,
+                "message_id": last_msg_id,
+                "parts": len(chunks),
+            }
         except Exception as e:
             logger.error("Telegram send failed: %s", e)
             return {"status": "error", "telegram": True, "error": str(e)}
