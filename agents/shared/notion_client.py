@@ -137,9 +137,7 @@ class NotionClient:
         """Create a page as a child of another page (not a database)."""
         body: dict[str, Any] = {
             "parent": {"page_id": parent_page_id},
-            "properties": {
-                "title": {"title": [{"text": {"content": title}}]}
-            },
+            "properties": {"title": {"title": [{"text": {"content": title}}]}},
         }
         if children:
             body["children"] = children

@@ -111,35 +111,47 @@ def generate_daily_brief(reports: list[OpsTeamReport] | None = None) -> str:
     if "live_coaching_scenarios_tested" in all_metrics:
         rate = all_metrics.get("live_coaching_test_pass_rate", "N/A")
         tested = all_metrics.get("live_coaching_scenarios_tested", 0)
-        live_data_lines.append(f"- **Coaching:** {tested} scenarios tested, pass rate {rate}")
+        live_data_lines.append(
+            f"- **Coaching:** {tested} scenarios tested, pass rate {rate}"
+        )
     # Treb NH funnel
     if "live_nh_signup_count" in all_metrics:
         signups = all_metrics["live_nh_signup_count"]
         uploads = all_metrics.get("live_nh_upload_count", 0)
         optins = all_metrics.get("live_nh_optin_count", 0)
-        live_data_lines.append(f"- **NH Funnel:** {signups} signups → {uploads} uploads → {optins} opt-ins")
+        live_data_lines.append(
+            f"- **NH Funnel:** {signups} signups → {uploads} uploads → {optins} opt-ins"
+        )
     # Treb referral
     if "live_referral_completed_count" in all_metrics:
         completed = all_metrics["live_referral_completed_count"]
         credits = all_metrics.get("live_referral_credit_earned_count", 0)
-        live_data_lines.append(f"- **Referrals:** {completed} completed, {credits} credits earned")
+        live_data_lines.append(
+            f"- **Referrals:** {completed} completed, {credits} credits earned"
+        )
     # Naiv satisfaction
     if "live_feedback_count" in all_metrics:
         fb_count = all_metrics["live_feedback_count"]
         avg = all_metrics.get("live_feedback_avg_rating", "N/A")
         nps = all_metrics.get("live_feedback_nps_score", "N/A")
-        live_data_lines.append(f"- **Feedback:** {fb_count} entries, avg rating {avg}, NPS {nps}")
+        live_data_lines.append(
+            f"- **Feedback:** {fb_count} entries, avg rating {avg}, NPS {nps}"
+        )
     # Naiv errors
     if "live_error_total_actions_7d" in all_metrics:
         errs = all_metrics["live_error_total_actions_7d"]
         sec = all_metrics.get("live_error_security_events_7d", 0)
-        live_data_lines.append(f"- **Errors (7d):** {errs} error actions, {sec} security events")
+        live_data_lines.append(
+            f"- **Errors (7d):** {errs} error actions, {sec} security events"
+        )
     # Naiv email
     if "live_email_total_sent" in all_metrics:
         sent = all_metrics["live_email_total_sent"]
         open_rate = all_metrics.get("live_email_open_rate", "N/A")
         click = all_metrics.get("live_email_click_rate", "N/A")
-        live_data_lines.append(f"- **Email:** {sent} sent, open rate {open_rate}, click rate {click}")
+        live_data_lines.append(
+            f"- **Email:** {sent} sent, open rate {open_rate}, click rate {click}"
+        )
     # Marsh marketplace
     if "live_active_listings" in all_metrics:
         listings = all_metrics["live_active_listings"]
@@ -310,7 +322,9 @@ def generate_weekly_report(reports: list[OpsTeamReport] | None = None) -> str:
             f"{all_metrics.get('live_nh_optin_count', 0)}"
         )
     if "live_active_listings" in all_metrics:
-        live_items.append(f"Marketplace: {all_metrics['live_active_listings']} listings")
+        live_items.append(
+            f"Marketplace: {all_metrics['live_active_listings']} listings"
+        )
     if live_items:
         lines.append("## Live Platform Snapshot\n")
         for item in live_items:

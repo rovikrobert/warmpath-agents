@@ -446,7 +446,9 @@ def _build_team_detail_markdown(team: str, reports: list[AgentReport]) -> str:
     # Per-agent breakdown
     lines.append("## Agent Breakdown")
     for r in sorted(reports, key=lambda x: len(x.findings), reverse=True):
-        duration = f"{r.scan_duration_seconds:.1f}s" if r.scan_duration_seconds else "N/A"
+        duration = (
+            f"{r.scan_duration_seconds:.1f}s" if r.scan_duration_seconds else "N/A"
+        )
         lines.append(f"- {r.agent}: {len(r.findings)} findings ({duration})")
 
     # Top findings (up to 10, highest severity first)
@@ -540,7 +542,9 @@ def _push_daily_outputs(
         try:
             tg = TelegramBridge()
             tg_data = brief_data or {"decisions_needed": [], "team_summaries": []}
-            tg.generate_daily_brief(tg_data, costs, alerts, notion_page_id=notion_page_id)
+            tg.generate_daily_brief(
+                tg_data, costs, alerts, notion_page_id=notion_page_id
+            )
         except Exception:
             logger.debug("Telegram daily brief generation skipped")
 

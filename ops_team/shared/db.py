@@ -44,14 +44,16 @@ def get_session() -> Session | None:
 
             url = public_url
             if url.startswith("postgres://"):
-                url = "postgresql://" + url[len("postgres://"):]
+                url = "postgresql://" + url[len("postgres://") :]
             url = url.replace("postgresql+asyncpg://", "postgresql://")
 
             engine = create_engine(url, echo=False)
             factory = sessionmaker(bind=engine, expire_on_commit=False)
             return factory()
         except Exception as exc:
-            logger.warning("ops db: could not create session via DATABASE_PUBLIC_URL: %s", exc)
+            logger.warning(
+                "ops db: could not create session via DATABASE_PUBLIC_URL: %s", exc
+            )
             return None
 
     logger.info("ops db: no DATABASE_URL or DATABASE_PUBLIC_URL — live checks disabled")

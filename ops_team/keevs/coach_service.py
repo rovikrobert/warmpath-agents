@@ -322,9 +322,9 @@ async def _get_or_create_session(
 
     # Count previous sessions to determine session_number
     count_result = await db.execute(
-        select(func.count()).select_from(CoachingSession).where(
-            CoachingSession.user_id == user_id
-        )
+        select(func.count())
+        .select_from(CoachingSession)
+        .where(CoachingSession.user_id == user_id)
     )
     prev_count = count_result.scalar() or 0
 
@@ -355,6 +355,7 @@ async def _record_topic(
     coaching_session.topics_covered = topics
     # Trigger SQLAlchemy dirty flag for JSONB
     from sqlalchemy.orm.attributes import flag_modified
+
     flag_modified(coaching_session, "topics_covered")
 
 
@@ -379,7 +380,9 @@ async def _get_recent_topics(user_id: uuid.UUID, db: AsyncSession) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def _mock_briefing(context: dict, session_number: int = 1, stage: str = STAGE_ONBOARDING) -> str:
+def _mock_briefing(
+    context: dict, session_number: int = 1, stage: str = STAGE_ONBOARDING
+) -> str:
     """Generate a stage-aware, session-count-branched briefing (P1+P2+P3)."""
     user = context.get("user", {})
     name = user.get("name") or "there"
@@ -397,11 +400,17 @@ def _mock_briefing(context: dict, session_number: int = 1, stage: str = STAGE_ON
 
     # --- Greeting varies by session count (P2: quick win) ---
     if session_number == 1:
-        parts.append(f"Welcome to WarmPath, {first_name}! I'm Keevs, your career coach.")
+        parts.append(
+            f"Welcome to WarmPath, {first_name}! I'm Keevs, your career coach."
+        )
     elif session_number <= 2:
-        parts.append(f"Good to see you again, {first_name}. Let's pick up where we left off.")
+        parts.append(
+            f"Good to see you again, {first_name}. Let's pick up where we left off."
+        )
     elif session_number <= 5:
-        parts.append(f"Hey {first_name}, session #{session_number} — you're building momentum.")
+        parts.append(
+            f"Hey {first_name}, session #{session_number} — you're building momentum."
+        )
     else:
         parts.append(f"Hey {first_name}, welcome back (session #{session_number}).")
 
@@ -467,7 +476,9 @@ def _mock_briefing(context: dict, session_number: int = 1, stage: str = STAGE_ON
             "Set your [job preferences](/preferences) so I can give you targeted advice."
         )
     elif not prefs and session_number > 3:
-        parts.append("Reminder: [set your preferences](/preferences) to unlock personalized matching.")
+        parts.append(
+            "Reminder: [set your preferences](/preferences) to unlock personalized matching."
+        )
 
     # Stalled users: give a gentle push (P1)
     if stage == STAGE_STALLED and session_number > 3:
@@ -681,7 +692,9 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
     if settings.AI_MOCK_MODE:
         briefing_text = _mock_briefing(context, session_number, stage)
     else:
-        briefing_text = await _generate_briefing_via_claude(context, session_number, stage)
+        briefing_text = await _generate_briefing_via_claude(
+            context, session_number, stage
+        )
 
     suggested = get_suggested_prompts(context)
 
@@ -751,7 +764,9 @@ async def generate_chat_response(
     recent_topics = await _get_recent_topics(user_id, db)
 
     if settings.AI_MOCK_MODE:
-        response_text, topic = _mock_chat_response(message, context_snapshot, recent_topics)
+        response_text, topic = _mock_chat_response(
+            message, context_snapshot, recent_topics
+        )
     else:
         response_text = await _generate_chat_via_claude(
             message, conversation_history or [], context_snapshot

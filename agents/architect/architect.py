@@ -380,7 +380,13 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
     """
 
     # Methods on db/session objects that hit the database
-    _DB_SESSION_METHODS = {"execute", "scalar", "scalar_one_or_none", "fetch_one", "fetch_all"}
+    _DB_SESSION_METHODS = {
+        "execute",
+        "scalar",
+        "scalar_one_or_none",
+        "fetch_one",
+        "fetch_all",
+    }
 
     # Known async service functions whose names imply a DB round-trip
     _DB_SERVICE_FUNCS = {
@@ -391,7 +397,14 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
     }
 
     # Variable name suffixes that indicate an in-memory lookup structure
-    _SAFE_RECEIVER_SUFFIXES = ("_map", "_dict", "_cache", "_counts", "_lookup", "_index")
+    _SAFE_RECEIVER_SUFFIXES = (
+        "_map",
+        "_dict",
+        "_cache",
+        "_counts",
+        "_lookup",
+        "_index",
+    )
 
     for path in py_files:
         try:
@@ -445,7 +458,10 @@ def _scan_n_plus_one(py_files: list[Path], findings: list[Finding]) -> None:
                         # (e.g. user_map.get(...), row_dict.get(...))
                         if method_name == "get" and isinstance(func.value, ast.Name):
                             receiver_name = func.value.id
-                            if any(receiver_name.endswith(s) for s in _SAFE_RECEIVER_SUFFIXES):
+                            if any(
+                                receiver_name.endswith(s)
+                                for s in _SAFE_RECEIVER_SUFFIXES
+                            ):
                                 continue
 
                         # For .get(), also skip if the receiver is not a known

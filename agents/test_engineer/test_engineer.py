@@ -49,7 +49,10 @@ def _count_assertions(node: ast.FunctionDef) -> int:
                 ctx = item.context_expr
                 if isinstance(ctx, ast.Call):
                     # pytest.raises(...)
-                    if isinstance(ctx.func, ast.Attribute) and ctx.func.attr == "raises":
+                    if (
+                        isinstance(ctx.func, ast.Attribute)
+                        and ctx.func.attr == "raises"
+                    ):
                         count += 1
                     # standalone raises(...) import
                     elif isinstance(ctx.func, ast.Name) and ctx.func.id == "raises":
@@ -314,9 +317,8 @@ def _measure_setup_complexity(node: ast.FunctionDef) -> dict:
             if isinstance(left, ast.Attribute):
                 assertion_targets.append(left.attr)
 
-    status_code_only = (
-        len(assertion_targets) > 0
-        and all(t == "status_code" for t in assertion_targets)
+    status_code_only = len(assertion_targets) > 0 and all(
+        t == "status_code" for t in assertion_targets
     )
 
     return {
@@ -334,15 +336,26 @@ def _is_focused_test(name: str) -> bool:
     are legitimately single-assertion by design.
     """
     focused_patterns = (
-        "_returns_", "_fails_", "_rejects_", "_raises_",
-        "_forbidden", "_unauthorized", "_not_found",
-        "_invalid_", "_missing_", "_empty_",
-        "_duplicate_", "_expired_", "_locked_",
+        "_returns_",
+        "_fails_",
+        "_rejects_",
+        "_raises_",
+        "_forbidden",
+        "_unauthorized",
+        "_not_found",
+        "_invalid_",
+        "_missing_",
+        "_empty_",
+        "_duplicate_",
+        "_expired_",
+        "_locked_",
     )
     return any(p in name for p in focused_patterns)
 
 
-def _analyze_test_quality(all_tests: list[dict], test_nodes: dict | None = None) -> list[Finding]:
+def _analyze_test_quality(
+    all_tests: list[dict], test_nodes: dict | None = None
+) -> list[Finding]:
     """Flag genuinely weak tests — complex setup with only status_code assertion.
 
     A test is weak when it has:

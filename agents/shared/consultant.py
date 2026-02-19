@@ -247,9 +247,7 @@ def consult(
                 },
             ]
             for turn in conversation_history:
-                messages.append(
-                    {"role": turn["role"], "content": turn["content"]}
-                )
+                messages.append({"role": turn["role"], "content": turn["content"]})
             messages.append({"role": "user", "content": query})
         else:
             messages = [{"role": "user", "content": user_message}]
