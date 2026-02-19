@@ -50,12 +50,13 @@ def _count_assertions(node: ast.FunctionDef) -> int:
                 if isinstance(ctx, ast.Call):
                     # pytest.raises(...)
                     if (
-                        isinstance(ctx.func, ast.Attribute)
-                        and ctx.func.attr == "raises"
+                        (
+                            isinstance(ctx.func, ast.Attribute)
+                            and ctx.func.attr == "raises"
+                        )
+                        or isinstance(ctx.func, ast.Name)
+                        and ctx.func.id == "raises"
                     ):
-                        count += 1
-                    # standalone raises(...) import
-                    elif isinstance(ctx.func, ast.Name) and ctx.func.id == "raises":
                         count += 1
     return count
 

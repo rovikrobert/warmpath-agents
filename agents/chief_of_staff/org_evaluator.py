@@ -177,9 +177,7 @@ def run_agent_value_audit(team: str, reports: list[AgentReport]) -> list[AgentAu
         cost = r.scan_duration_seconds * 0.001  # rough estimate
 
         # Determine verdict
-        if finding_count == 0:
-            verdict = "marginal"
-        elif info_ratio > 0.7:
+        if finding_count == 0 or info_ratio > 0.7:
             verdict = "marginal"
         elif finding_count > 3 and info_ratio < 0.3:
             verdict = "essential"
