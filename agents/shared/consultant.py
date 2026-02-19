@@ -169,6 +169,7 @@ def consult(
     *,
     include_reports: bool = True,
     max_tokens: int = 2048,
+    conversation_history: list[dict[str, str]] | None = None,
 ) -> ConsultResponse:
     """Run an interactive consultation with a specific team.
 
@@ -177,6 +178,8 @@ def consult(
         team: Which team to consult (engineering, data, product, ops, gtm, finance, cos).
         include_reports: Whether to include recent team reports as context.
         max_tokens: Max response tokens.
+        conversation_history: Optional list of prior conversation turns for multi-turn
+            support. Each entry is a dict with "role" (user/assistant) and "content".
 
     Returns:
         ConsultResponse with the team's answer.
@@ -233,11 +236,29 @@ def consult(
 
         model = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
         client = anthropic.Anthropic(api_key=api_key)
+
+        # Build messages list — multi-turn when conversation_history is provided
+        if conversation_history:
+            messages: list[dict[str, str]] = [
+                {"role": "user", "content": f"PROJECT CONTEXT:\n{context}"},
+                {
+                    "role": "assistant",
+                    "content": "I've reviewed the project context. How can I help?",
+                },
+            ]
+            for turn in conversation_history:
+                messages.append(
+                    {"role": turn["role"], "content": turn["content"]}
+                )
+            messages.append({"role": "user", "content": query})
+        else:
+            messages = [{"role": "user", "content": user_message}]
+
         message = client.messages.create(
             model=model,
             max_tokens=max_tokens,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
+            messages=messages,
         )
         answer = message.content[0].text.strip()
 
