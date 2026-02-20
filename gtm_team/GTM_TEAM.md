@@ -213,3 +213,10 @@ python -m gtm_team.orchestrator --learning-report
 # KPI tracking
 python -m gtm_team.orchestrator --kpi-check
 ```
+
+## Recent Changes: Smart Digest & Feed Engagement
+
+- **Smart Digest Email** — New email type `smart_digest` in `email_engagement.py`. Sends top 3 unseen feed items per active user via Resend. Runs Mon + Thu 8:30 AM UTC via Celery Beat (`feed-smart-digest-mon`, `feed-smart-digest-thu`). Deduped via `email_campaign_logs`. Replaces basic weekly digest with personalized, feed-powered content.
+- **Feed System** — 6 feed generators produce personalized engagement items 3x daily. Key engagement metrics to track: feed item view rate, click-through rate, enrichment prompt response rate, smart digest open rate.
+- **Keevs Branding** — AI coach has a visual identity now. Smart digest emails come "from Keevs" with subject lines like "Keevs found 3 new insights for you." This is the push-based engagement the GTM team should leverage in messaging.
+- **Outcome Attribution** — `Application.source_type` tracks how users found their leads. GTM team should monitor conversion rates by source type (own_network vs manual vs marketplace).

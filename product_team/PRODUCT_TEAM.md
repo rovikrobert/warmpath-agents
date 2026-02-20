@@ -129,3 +129,14 @@ python -m product_team.orchestrator --learning-report
 ```bash
 pytest tests/test_product_team.py -v
 ```
+
+## Recent Changes: Feed System & Keevs AI Coach
+
+**Product team agents should be aware of these new user-facing features:**
+
+- **Keevs AI Coach Identity** — The AI coach now has a visual identity (`KeevsAvatar.jsx`) and is introduced during onboarding (step 8 of 10: "Meet Keevs"). Keevs appears across the app via `KeevsBar` (contextual nudge bar on every page) and the coach page header.
+- **Proactive Engagement Feed** — Background-generated personalized insights (job alerts, enrichment prompts, follow-up nudges, marketplace signals, outcome checks, network insights). Surfaced in-app on coach page and via KeevsBar, plus twice-weekly smart digest email.
+- **Enrichment Prompts** — Feed items that ask users to categorize their contacts (relationship type, would_refer). Inline response buttons in `FeedCard`. This is a key data collection mechanism — every response enriches the trust graph.
+- **Feed Badge** — Unseen count shown in sidebar nav (desktop) and bottom tab bar (mobile). Refreshes every 2 minutes.
+- **10-Step Onboarding** — Was 9 steps, now 10. Step 8 is "Meet Keevs" (between privacy explainer and CSV upload). Product team should track completion rates per step.
+- **Outcome Attribution** — Applications now track `source_type` (own_network | manual). Future: marketplace, external. This enables conversion funnel analysis by acquisition channel.

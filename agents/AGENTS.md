@@ -162,3 +162,17 @@ Each agent produces an `AgentReport` containing:
 - Metrics (coverage %, finding counts, costs, etc.)
 - Intelligence notes (what external data informed the scan)
 - Learning updates (attention weight changes, trend observations)
+
+## Recent System Additions (Feed / Keevs Engagement Engine)
+
+**Agents should be aware of these new subsystems when scanning:**
+
+- **`app/models/feed.py`** — 3 new tables: `feed_items`, `feed_item_interactions`, `contact_freshness_signals`. Feed items have dedup keys, lifecycle timestamps, and JSONB metadata. `contact_freshness_signals` uses SHA-256 `name_company_hash` for cross-user aggregation — privacy-sensitive.
+- **`app/services/feed_generator.py`** — 6 generators producing feed items. Each generator queries the DB and creates items with SHA-256 dedup keys. Performance-sensitive: runs for ALL active users 3x daily. Watch for N+1 queries and missing indexes.
+- **`app/tasks/feed_tasks.py`** — 3 Celery tasks: `generate_feed_all_users` (3x daily), `cleanup_expired_feed_items` (weekly), `send_smart_digest` (twice weekly). Uses async-to-sync bridge pattern (`_run_async`).
+- **`app/api/feed.py`** — 8 endpoints. The `enrichment-response` endpoint writes to `contact_freshness_signals` AND updates `Contact.relationship_type` — cross-table write, test for consistency.
+- **Frontend: `KeevsAvatar.jsx`, `FeedCard.jsx`, `KeevsBar.jsx`** — New components. `KeevsBar` fetches feed items on every route change — watch for excessive API calls. `FeedCard` handles inline enrichment responses.
+- **`OnboardingPage.jsx`** — Now 10 steps (was 9). Step 8 is "Meet Keevs". Step numbering is important — step 3 is conditionally skipped for job seekers.
+- **`Layout.jsx`** — Polls `feed/count` every 2 minutes for badge. `KeevsBar` rendered above `<Outlet>`.
+- **`CoachPage.jsx`** — Feed section above chat. Loads top 5 feed items on mount.
+- **Outcome attribution** — `Application.source_type` now populated (own_network | manual). `UsageLog` has `session_id` and `event_source` columns.
