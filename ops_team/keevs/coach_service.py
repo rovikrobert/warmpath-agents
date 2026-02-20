@@ -8,6 +8,7 @@ briefings and chat responses via Claude (or deterministic mocks).
 import asyncio
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -45,13 +46,71 @@ RULES:
 - Always reference specific data when available. Never generic when specific is possible.
 - For briefings: 3-5 sentences. Greeting, key insight, concrete next step. Include markdown links like [find referrals](/referrals) or [upload contacts](/contacts).
 - For chat: 1-3 paragraphs. Always end with something actionable.
-- Do NOT name specific contacts (privacy). Talk about counts at companies ("you have 3 contacts at Stripe").
+- When contact search results are provided, name specific contacts with their title and company. These are the user's own contacts — no privacy concern.
+- When no search results are available, talk about counts at companies ("you have 3 contacts at Stripe").
 - Do NOT invent data. If something is missing, acknowledge it and suggest filling it in.
 - Include markdown links to relevant pages: [contacts](/contacts), [find referrals](/referrals), [applications](/applications), [preferences](/preferences), [credits](/credits).
 - Never use "I hope this finds you well" or similar filler.
 - Never mention that you're an AI unless directly asked.
 
 CONTEXT: You receive the user's data as a JSON snapshot. Use it to give personalized advice."""
+
+
+# ---------------------------------------------------------------------------
+# Contact search detection
+# ---------------------------------------------------------------------------
+
+_CONTACT_SEARCH_PATTERNS = [
+    re.compile(r"\bwho\b.*\b(?:know|have|got)\b.*\bat\b", re.IGNORECASE),
+    re.compile(r"\bcontacts?\b.*\bat\b", re.IGNORECASE),
+    re.compile(r"\bshow\b.*\b(?:contacts?|people|connections?)\b", re.IGNORECASE),
+    re.compile(r"\bany(?:one|body)?\b.*\bat\b", re.IGNORECASE),
+    re.compile(r"\bfind\b.*\b(?:contacts?|people)\b", re.IGNORECASE),
+    re.compile(r"\bsearch\b.*\b(?:contacts?|network)\b", re.IGNORECASE),
+    re.compile(r"\bnetwork\b.*\bat\b", re.IGNORECASE),
+    re.compile(r"\b\w+\s+contacts?\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:senior|staff|lead|principal|director|vp|manager)\b.*"
+        r"\b(?:engineers?|designers?|product)\b",
+        re.IGNORECASE,
+    ),
+]
+
+
+def is_contact_search_query(message: str) -> bool:
+    """Detect if a chat message is asking about specific contacts."""
+    return any(p.search(message) for p in _CONTACT_SEARCH_PATTERNS)
+
+
+def _format_contact_results_markdown(search_result: dict, limit: int = 10) -> str:
+    """Format contact search results as a markdown response for mock mode."""
+    results = search_result["results"][:limit]
+    total_matched = search_result["total_matched"]
+    raw_query = search_result["interpretation"].get("raw_query", "")
+
+    if not results:
+        return (
+            f'No contacts found matching "{raw_query}". '
+            "Try [searching your contacts](/contacts) with different keywords."
+        )
+
+    lines = [f'Here are your contacts matching "{raw_query}":\n']
+    for r in results:
+        name = r["full_name"] or "Unknown"
+        title = r["current_title"] or "Unknown role"
+        company = r["current_company"] or "Unknown company"
+        warm = r["warm_score"]
+        warm_str = f" (warm score: {int(warm)})" if warm is not None else ""
+        lines.append(f"- **{name}** — {title} at {company}{warm_str}")
+
+    if total_matched > limit:
+        lines.append(
+            f"\nShowing {limit} of {total_matched} matches. "
+            "[Search your contacts](/contacts) for the full list."
+        )
+
+    lines.append("\nWant me to help you draft a referral message to any of them?")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +299,13 @@ def get_suggested_prompts(context: dict) -> list[str]:
 
     if total_apps > 0:
         prompts.append("How's my pipeline looking?")
+
+    # Suggest contact search if user has contacts
+    if total_contacts > 0:
+        top = (network or {}).get("top_companies", [])
+        if top:
+            top_company = top[0]["company"]
+            prompts.append(f"Who do I know at {top_company}?")
 
     if not prompts:
         prompts.append("What should I focus on today?")
@@ -497,6 +563,9 @@ def _mock_briefing(
 
 def _detect_topic(message: str) -> str | None:
     """Detect which topic a message is about (for topic tracking)."""
+    # Check contact search first (more specific than generic "network")
+    if is_contact_search_query(message):
+        return "contact_search"
     msg_lower = message.lower()
     topic_keywords = {
         "follow_ups": ("follow-up", "follow up", "followup"),
@@ -513,7 +582,10 @@ def _detect_topic(message: str) -> str | None:
 
 
 def _mock_chat_response(
-    message: str, context: dict, recent_topics: set[str] | None = None
+    message: str,
+    context: dict,
+    recent_topics: set[str] | None = None,
+    contact_results: dict | None = None,
 ) -> tuple[str, str | None]:
     """Generate keyword-based mock chat responses with anti-repetition (P4).
 
@@ -525,6 +597,17 @@ def _mock_chat_response(
     prefs = context.get("preferences")
     topic = _detect_topic(message)
     seen = recent_topics or set()
+
+    # Contact search results — return formatted markdown
+    if (
+        topic == "contact_search"
+        and contact_results is not None
+        and contact_results["total_matched"] > 0
+    ):
+        return _format_contact_results_markdown(contact_results), topic
+    # If contact_search topic but no results, fall through to network handler
+    if topic == "contact_search":
+        topic = "network"
 
     if topic == "follow_ups":
         follow_ups = pipeline.get("follow_ups_needed", 0)
@@ -753,6 +836,7 @@ async def generate_chat_response(
     conversation_history: list[dict] | None,
     context_snapshot: dict | None,
     db: AsyncSession,
+    contact_results: dict | None = None,
 ) -> dict:
     """Generate a chat response from Keevs with topic tracking (P4)."""
     # If no context provided, assemble fresh
@@ -765,11 +849,11 @@ async def generate_chat_response(
 
     if settings.AI_MOCK_MODE:
         response_text, topic = _mock_chat_response(
-            message, context_snapshot, recent_topics
+            message, context_snapshot, recent_topics, contact_results
         )
     else:
         response_text = await _generate_chat_via_claude(
-            message, conversation_history or [], context_snapshot
+            message, conversation_history or [], context_snapshot, contact_results
         )
         topic = _detect_topic(message)
 
@@ -798,6 +882,7 @@ def _build_chat_messages(
     message: str,
     conversation_history: list[dict],
     context: dict,
+    contact_results: dict | None = None,
 ) -> list[dict]:
     """Build Claude messages array with context injection + history."""
     messages: list[dict] = []
@@ -815,6 +900,24 @@ def _build_chat_messages(
             "content": "Understood. I have your context. How can I help?",
         }
     )
+
+    # Inject contact search results if available
+    if contact_results and contact_results.get("total_matched", 0) > 0:
+        results_json = json.dumps(contact_results["results"], default=str)
+        search_msg = (
+            "CONTACT SEARCH RESULTS for the user's query. "
+            "These are the user's own contacts (no privacy issue). "
+            "Reference them by name.\n\n"
+            f"Matched {contact_results['total_matched']} contacts "
+            f"(showing top {len(contact_results['results'])}):\n{results_json}"
+        )
+        messages.append({"role": "user", "content": search_msg})
+        messages.append(
+            {
+                "role": "assistant",
+                "content": "Got it. I'll reference these contacts by name in my response.",
+            }
+        )
 
     # Last 10 messages of history (validated entries only)
     for entry in (conversation_history or [])[-10:]:
@@ -836,11 +939,14 @@ async def _generate_chat_via_claude(
     message: str,
     conversation_history: list[dict],
     context: dict,
+    contact_results: dict | None = None,
 ) -> str:
     """Call Claude API for chat response."""
     try:
         client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-        messages = _build_chat_messages(message, conversation_history, context)
+        messages = _build_chat_messages(
+            message, conversation_history, context, contact_results
+        )
 
         response = await client.messages.create(
             model=CLAUDE_MODEL,
@@ -852,7 +958,7 @@ async def _generate_chat_via_claude(
         return response.content[0].text.strip()
     except Exception as exc:
         logger.error("Claude chat API failed: %s — falling back to mock", exc)
-        text, _ = _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context, contact_results=contact_results)
         return text
 
 
@@ -860,16 +966,19 @@ async def generate_chat_response_stream(
     message: str,
     conversation_history: list[dict],
     context: dict,
+    contact_results: dict | None = None,
 ):
     """Yield text chunks as they arrive from Claude. Mock mode yields full text at once."""
     if settings.AI_MOCK_MODE:
-        text, _ = _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context, contact_results=contact_results)
         yield text
         return
 
     try:
         client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-        messages = _build_chat_messages(message, conversation_history, context)
+        messages = _build_chat_messages(
+            message, conversation_history, context, contact_results
+        )
 
         async with client.messages.stream(
             model=CLAUDE_MODEL,
@@ -881,5 +990,5 @@ async def generate_chat_response_stream(
                 yield text
     except Exception as exc:
         logger.error("Claude stream API failed: %s — falling back to mock", exc)
-        text, _ = _mock_chat_response(message, context)
+        text, _ = _mock_chat_response(message, context, contact_results=contact_results)
         yield text
