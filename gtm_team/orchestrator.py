@@ -28,7 +28,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from gtm_team.shared.config import GTM_AGENT_NAMES, KPI_TARGETS, REPORTS_DIR
+from gtm_team.shared.config import GTM_AGENT_NAMES, KPI_TARGETS, REPORTS_DIR  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

@@ -121,7 +121,7 @@ def _check_persona_balance(
     supply_pages = set()
     actual_pages = {_page_name(p) for p in page_files}
 
-    for persona_id, persona in PERSONAS.items():
+    for _persona_id, persona in PERSONAS.items():
         matched = set(persona.get("key_pages", [])) & actual_pages
         if persona.get("tier") == "demand":
             demand_pages.update(matched)

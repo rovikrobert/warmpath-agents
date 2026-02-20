@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from product_team.shared.config import PRODUCT_AGENT_NAMES
+from product_team.shared.config import PRODUCT_AGENT_NAMES  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

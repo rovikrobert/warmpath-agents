@@ -147,14 +147,13 @@ class PrivacyGuard:
         self._check_audit_immutability(normalized)
 
         # k-anonymity check: if GROUP BY present, require HAVING COUNT >= k
-        if "group by" in normalized:
-            if not self._has_k_anonymity_guard(normalized):
-                raise PrivacyViolation(
-                    "Aggregation query with GROUP BY must include "
-                    f"HAVING COUNT(*) >= {_MIN_K} for k-anonymity",
-                    violation_type="missing_k_anonymity",
-                    privy_category="info_leak",
-                )
+        if "group by" in normalized and not self._has_k_anonymity_guard(normalized):
+            raise PrivacyViolation(
+                "Aggregation query with GROUP BY must include "
+                f"HAVING COUNT(*) >= {_MIN_K} for k-anonymity",
+                violation_type="missing_k_anonymity",
+                privy_category="info_leak",
+            )
 
         self.log_query(sql, context or "validate_aggregation")
         return True
@@ -230,32 +229,32 @@ class PrivacyGuard:
             # Self-join pattern
             if t1 == t2:
                 pattern = rf"\b{re.escape(t1)}\b.*\bjoin\b.*\b{re.escape(t2)}\b"
-                if re.search(pattern, normalized):
-                    # Check exceptions
-                    if not self._matches_exception(normalized):
-                        raise PrivacyViolation(
-                            f"Cross-vault JOIN: {t1} JOIN {t2}",
-                            violation_type="cross_vault_join",
-                            privy_category="vault_isolation",
-                        )
-
-        # General cross-vault: contacts JOIN marketplace_listings needs consent
-        if (
-            "contacts" in normalized
-            and "join" in normalized
-            and "marketplace_listings" in normalized
-        ):
-            if not self._matches_exception(normalized):
-                if (
-                    "opt_in_marketplace" not in normalized
-                    and "consent" not in normalized
+                if re.search(pattern, normalized) and not self._matches_exception(
+                    normalized
                 ):
+                    # Check exceptions
                     raise PrivacyViolation(
-                        "contacts JOIN marketplace_listings requires consent gate "
-                        "(opt_in_marketplace or consent check)",
+                        f"Cross-vault JOIN: {t1} JOIN {t2}",
                         violation_type="cross_vault_join",
                         privy_category="vault_isolation",
                     )
+
+        # General cross-vault: contacts JOIN marketplace_listings needs consent
+        if (
+            (
+                "contacts" in normalized
+                and "join" in normalized
+                and "marketplace_listings" in normalized
+            )
+            and not self._matches_exception(normalized)
+            and ("opt_in_marketplace" not in normalized and "consent" not in normalized)
+        ):
+            raise PrivacyViolation(
+                "contacts JOIN marketplace_listings requires consent gate "
+                "(opt_in_marketplace or consent check)",
+                violation_type="cross_vault_join",
+                privy_category="vault_isolation",
+            )
 
     def _check_vault_scoping(self, normalized: str) -> None:
         """Vault tables need user_id scoping unless aggregated (privy: vault_isolation)."""
@@ -265,26 +264,29 @@ class PrivacyGuard:
 
         for table in VAULT_TABLES:
             # Check if the table is referenced in FROM or JOIN
-            if re.search(rf"\b{re.escape(table)}\b", normalized):
+            if (
+                re.search(rf"\b{re.escape(table)}\b", normalized)
+                and "user_id" not in normalized
+                and "where" not in normalized
+            ):
                 # Must have user_id in WHERE or JOIN condition
-                if "user_id" not in normalized and "where" not in normalized:
-                    # Exception for suppression_list (queried by hash)
-                    if table == "suppression_list" and (
-                        "email_hash" in normalized or "name_company_hash" in normalized
-                    ):
-                        continue
-                    # Exception for marketplace_listings (public anonymous data)
-                    if table == "marketplace_listings" and "group by" in normalized:
-                        continue
-                    # Exception for usage_logs (metering, not PII)
-                    if table == "usage_logs":
-                        continue
-                    raise PrivacyViolation(
-                        f"Vault table '{table}' queried without user_id scoping",
-                        violation_type="missing_user_scope",
-                        privy_category="vault_isolation",
-                        detail=f"Table: {table}",
-                    )
+                # Exception for suppression_list (queried by hash)
+                if table == "suppression_list" and (
+                    "email_hash" in normalized or "name_company_hash" in normalized
+                ):
+                    continue
+                # Exception for marketplace_listings (public anonymous data)
+                if table == "marketplace_listings" and "group by" in normalized:
+                    continue
+                # Exception for usage_logs (metering, not PII)
+                if table == "usage_logs":
+                    continue
+                raise PrivacyViolation(
+                    f"Vault table '{table}' queried without user_id scoping",
+                    violation_type="missing_user_scope",
+                    privy_category="vault_isolation",
+                    detail=f"Table: {table}",
+                )
 
     def _check_suppression_plaintext(self, normalized: str) -> None:
         """Suppression list must be queried by hash, not plaintext (privy: suppression)."""

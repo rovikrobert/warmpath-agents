@@ -583,10 +583,10 @@ def synthesize_status(reports: list[AgentReport]) -> str:
     for f in all_findings:
         sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
 
-    critical = sev_counts.get("critical", 0)
-    high = sev_counts.get("high", 0)
-    medium = sev_counts.get("medium", 0)
-    low = sev_counts.get("low", 0) + sev_counts.get("info", 0)
+    sev_counts.get("critical", 0)
+    sev_counts.get("high", 0)
+    sev_counts.get("medium", 0)
+    sev_counts.get("low", 0) + sev_counts.get("info", 0)
 
     # Split reports by team
     _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}

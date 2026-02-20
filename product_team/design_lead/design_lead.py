@@ -342,10 +342,7 @@ def _compute_design_system_score(
         total_inline_styles += len(inline_pattern.findall(source))
 
     total = total_tw_classes + total_inline_styles
-    if total == 0:
-        score = 100.0
-    else:
-        score = round((total_tw_classes / total) * 100, 1)
+    score = 100.0 if total == 0 else round(total_tw_classes / total * 100, 1)
 
     metrics["tailwind_class_usages"] = total_tw_classes
     metrics["inline_style_usages"] = total_inline_styles
@@ -465,7 +462,7 @@ def scan() -> ProductTeamReport:
         _check_component_patterns(jsx_files, design_findings, metrics)
         _check_dark_mode(jsx_files, design_findings, metrics)
         _check_animations(jsx_files, design_findings, metrics)
-        ds_score = _compute_design_system_score(jsx_files, metrics)
+        _compute_design_system_score(jsx_files, metrics)
         _validate_against_design_tokens(jsx_files, design_findings, metrics)
 
     duration = time.time() - start

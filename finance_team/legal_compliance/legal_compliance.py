@@ -565,12 +565,11 @@ def _check_suppression_list(
     api_files = sorted(API_DIR.glob("*.py")) if API_DIR.is_dir() else []
 
     hash_util_found = False
-    hash_util_location = ""
     for fp in list(service_files) + list(api_files):
         src = _read_safe(fp)
         if re.search(r"\bhash_for_suppression\b", src):
             hash_util_found = True
-            hash_util_location = _relative(fp)
+            _relative(fp)
             break
 
     metrics["has_hash_for_suppression"] = hash_util_found

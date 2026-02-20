@@ -379,9 +379,12 @@ def _extract_indexed_columns(models_dir: Path) -> dict[str, set[str]]:
                 # Check if the call has index=True in keywords
                 if isinstance(value, ast.Call):
                     for kw in value.keywords:
-                        if kw.arg == "index" and isinstance(kw.value, ast.Constant):
-                            if kw.value.value is True:
-                                cols.add(col_name)
+                        if (
+                            kw.arg == "index"
+                            and isinstance(kw.value, ast.Constant)
+                            and kw.value.value is True
+                        ):
+                            cols.add(col_name)
 
             if cols:
                 indexed[class_name] = cols
@@ -447,7 +450,7 @@ def _scan_missing_indexes(
                 label = f"{model}.{col}"
                 unindexed_query_cols.append(label)
                 # Report up to first 3 locations
-                loc_str = "; ".join(f"{f}:{l}" for f, l in locations[:3])
+                loc_str = "; ".join(f"{f}:{line}" for f, line in locations[:3])
                 if len(locations) > 3:
                     loc_str += f" (+{len(locations) - 3} more)"
 
@@ -553,9 +556,10 @@ def _scan_n_plus_one(app_dir: Path) -> tuple[list[Finding], int]:
 
                         # Try to identify the loop variable
                         loop_info = ""
-                        if isinstance(node, (ast.For, ast.AsyncFor)):
-                            if isinstance(node.target, ast.Name):
-                                loop_info = f" (iterating over '{node.target.id}')"
+                        if isinstance(node, (ast.For, ast.AsyncFor)) and isinstance(
+                            node.target, ast.Name
+                        ):
+                            loop_info = f" (iterating over '{node.target.id}')"
 
                         findings.append(
                             Finding(
@@ -724,9 +728,10 @@ def _scan_test_timing() -> tuple[list[Finding], dict[str, Any]]:
         if tree is None:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name.startswith("test_"):
-                    test_func_count += 1
+            if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef)
+            ) and node.name.startswith("test_"):
+                test_func_count += 1
 
     # Check for JUnit XML results
     junit_path = PROJECT_ROOT / "junit.xml"

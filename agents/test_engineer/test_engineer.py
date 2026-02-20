@@ -10,6 +10,7 @@ from pathlib import Path
 from agents.shared.config import PROJECT_ROOT, SKIP_DIRS
 from agents.shared.report import Finding, AgentReport
 from agents.shared import learning
+import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +48,12 @@ def _count_assertions(node: ast.FunctionDef) -> int:
         if isinstance(child, ast.With):
             for item in child.items:
                 ctx = item.context_expr
-                if isinstance(ctx, ast.Call):
-                    # pytest.raises(...)
-                    if (
-                        (
-                            isinstance(ctx.func, ast.Attribute)
-                            and ctx.func.attr == "raises"
-                        )
-                        or isinstance(ctx.func, ast.Name)
-                        and ctx.func.id == "raises"
-                    ):
-                        count += 1
+                if isinstance(ctx, ast.Call) and (
+                    (isinstance(ctx.func, ast.Attribute) and ctx.func.attr == "raises")
+                    or isinstance(ctx.func, ast.Name)
+                    and ctx.func.id == "raises"
+                ):
+                    count += 1
     return count
 
 
@@ -80,19 +76,20 @@ def _extract_test_functions(
     rel_path = str(filepath.relative_to(PROJECT_ROOT))
     tests = []
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node.name.startswith("test_"):
-                assertions = _count_assertions(node)
-                tests.append(
-                    {
-                        "name": node.name,
-                        "file": rel_path,
-                        "line": node.lineno,
-                        "assertions": assertions,
-                    }
-                )
-                if node_registry is not None:
-                    node_registry[f"{rel_path}::{node.name}"] = node
+        if isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ) and node.name.startswith("test_"):
+            assertions = _count_assertions(node)
+            tests.append(
+                {
+                    "name": node.name,
+                    "file": rel_path,
+                    "line": node.lineno,
+                    "assertions": assertions,
+                }
+            )
+            if node_registry is not None:
+                node_registry[f"{rel_path}::{node.name}"] = node
     return tests
 
 
@@ -167,10 +164,8 @@ def _run_pytest_coverage() -> dict:
     # Remove stale coverage files
     for f in (coverage_json, PROJECT_ROOT / ".coverage"):
         if f.exists():
-            try:
+            with contextlib.suppress(OSError):
                 f.unlink()
-            except OSError:
-                pass
 
     cmd = [
         "python3",

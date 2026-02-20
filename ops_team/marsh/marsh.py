@@ -621,7 +621,7 @@ def _check_suppression_impact(
     metrics: dict,
 ) -> None:
     """Verify suppression list is referenced and checked during marketplace ops."""
-    model_path = _relative(MODELS_DIR / "marketplace.py")
+    _relative(MODELS_DIR / "marketplace.py")
     api_path = _relative(API_DIR / "marketplace.py")
 
     # Check that the suppression list model/table exists somewhere in the codebase
@@ -818,7 +818,7 @@ def _check_production_config(
 
     # Build config table for insights
     set_vars = [v for v in config.variables if v.is_set]
-    unset_vars = [v for v in config.variables if not v.is_set]
+    [v for v in config.variables if not v.is_set]
     metrics["production_vars_set"] = len(set_vars)
     metrics["production_vars_total"] = len(config.variables)
     metrics["production_critical_ok"] = config.all_critical_set

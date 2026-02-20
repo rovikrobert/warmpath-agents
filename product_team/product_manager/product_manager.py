@@ -218,7 +218,7 @@ def _audit_test_coverage(
     """Check test files for acceptance-criteria patterns."""
     total_tests = 0
     test_with_assertions = 0
-    acceptance_patterns = re.compile(
+    re.compile(
         r"(?:test_.*(?:success|happy|flow|scenario|should|returns|creates|updates|deletes))",
         re.IGNORECASE,
     )
@@ -273,7 +273,7 @@ def _check_integration_gaps(
     all_test_text = "\n".join(test_sources)
 
     endpoint_tested = 0
-    for module, eps in endpoints.items():
+    for _module, eps in endpoints.items():
         for ep in eps:
             if ep["path"] in all_test_text or ep["function"] in all_test_text:
                 endpoint_tested += 1

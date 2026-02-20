@@ -21,6 +21,7 @@ from agents.shared.config import (
 )
 from agents.shared.report import AgentReport, Finding
 from agents.shared import learning
+import contextlib
 
 logger = logging.getLogger(__name__)
 
@@ -511,9 +512,8 @@ def _scan_n_plus_one(
 
                         # For .get(), also skip if the receiver is not a known
                         # DB variable (db, session, self.db, self.session)
-                        if method_name == "get":
-                            if not _is_db_receiver(func.value):
-                                continue
+                        if method_name == "get" and not _is_db_receiver(func.value):
+                            continue
 
                         # For session methods, must be on a DB-like receiver
                         if method_name in _DB_SESSION_METHODS:
@@ -561,10 +561,12 @@ def _is_db_receiver(node: ast.expr) -> bool:
     _DB_NAMES = {"db", "session", "database", "conn", "connection"}
     if isinstance(node, ast.Name):
         return node.id in _DB_NAMES
-    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-        if node.value.id == "self" and node.attr.lstrip("_") in _DB_NAMES:
-            return True
-    return False
+    return (
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+        and node.attr.lstrip("_") in _DB_NAMES
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -683,18 +685,21 @@ def _scan_circular_imports(
         graph.setdefault(rel, set())
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("app.")
+            ):
                 # Only track internal app imports
-                if node.module.startswith("app."):
-                    # Convert module path to file path
-                    parts = node.module.replace(".", "/")
-                    target = f"{parts}.py"
-                    # Also check for package __init__
-                    target_init = f"{parts}/__init__.py"
-                    if (PROJECT_ROOT / target).exists():
-                        graph[rel].add(target)
-                    elif (PROJECT_ROOT / target_init).exists():
-                        graph[rel].add(target_init)
+                # Convert module path to file path
+                parts = node.module.replace(".", "/")
+                target = f"{parts}.py"
+                # Also check for package __init__
+                target_init = f"{parts}/__init__.py"
+                if (PROJECT_ROOT / target).exists():
+                    graph[rel].add(target)
+                elif (PROJECT_ROOT / target_init).exists():
+                    graph[rel].add(target_init)
 
     # DFS cycle detection
     cycles: list[list[str]] = []
@@ -1181,10 +1186,8 @@ def _scan_mutation_testing(findings: list[Finding]) -> dict[str, object]:
                 target.write_text(original, encoding="utf-8")
 
         # All mutations done for this file — remove backup journal
-        try:
+        with contextlib.suppress(OSError):
             backup.unlink(missing_ok=True)
-        except OSError:
-            pass
 
         file_results[rel_path] = {
             "sites": len(sites),
@@ -1278,10 +1281,7 @@ def scan() -> AgentReport:
 
     # Collect Python files to scan
     backend_root = SCAN_TARGETS.get("backend", PROJECT_ROOT / "app")
-    if isinstance(backend_root, Path):
-        py_files = _py_files(backend_root)
-    else:
-        py_files = []
+    py_files = _py_files(backend_root) if isinstance(backend_root, Path) else []
     metrics["total_files_scanned"] = len(py_files)
 
     # Build AST cache once — all scan functions reuse it
@@ -1344,7 +1344,7 @@ def scan() -> AgentReport:
     recurrence_counts = learning.get_recurrence_counts_batch(
         AGENT_NAME, recurrence_keys
     )
-    for f, prev in zip(findings, recurrence_counts):
+    for f, prev in zip(findings, recurrence_counts, strict=False):
         if prev > 0:
             f.recurrence_count = prev + 1
 

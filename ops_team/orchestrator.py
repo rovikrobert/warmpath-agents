@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from ops_team.shared.config import OPS_AGENT_NAMES
+from ops_team.shared.config import OPS_AGENT_NAMES  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

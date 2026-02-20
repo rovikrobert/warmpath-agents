@@ -200,13 +200,12 @@ def _check_landing_page_readiness(
         "AuthPage.jsx",
     ]
     landing_content = ""
-    landing_file = ""
 
     for candidate in landing_candidates:
         for path in jsx_files:
             if path.name == candidate:
                 landing_content = _read_safe(path)
-                landing_file = _relative(path)
+                _relative(path)
                 break
         if landing_content:
             break
@@ -290,7 +289,7 @@ def _check_brand_messaging(
     metrics: dict,
 ) -> None:
     """Scan JSX pages for messaging consistency with CLAUDE.md key phrases."""
-    claude_md = get_strategy_doc("CLAUDE.md")
+    get_strategy_doc("CLAUDE.md")
 
     # Key brand phrases that should appear in the frontend
     brand_phrases = {

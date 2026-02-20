@@ -84,9 +84,7 @@ def _find_api_endpoints(api_dir: Path) -> list[dict]:
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.AsyncFunctionDef) or isinstance(
-                node, ast.FunctionDef
-            ):
+            if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
                 for deco in node.decorator_list:
                     deco_str = ast.dump(deco)
                     if any(

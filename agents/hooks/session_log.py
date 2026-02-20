@@ -11,6 +11,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import contextlib
 
 LOG_DIR = Path("agents/hooks/session_logs")
 DAILY_BUDGET_USD = 3.0
@@ -98,10 +99,8 @@ def main() -> None:
     # Parse any session data passed as argument
     session_data = None
     if len(sys.argv) > 1:
-        try:
+        with contextlib.suppress(json.JSONDecodeError, IndexError):
             session_data = json.loads(sys.argv[1])
-        except (json.JSONDecodeError, IndexError):
-            pass
 
     log_session(session_data)
 

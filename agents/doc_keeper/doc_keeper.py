@@ -76,9 +76,10 @@ def _check_test_count(findings: list[Finding]) -> tuple[int, int | None]:
             continue
 
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name.startswith("test_"):
-                    actual_count += 1
+            if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef)
+            ) and node.name.startswith("test_"):
+                actual_count += 1
 
     # Extract claimed count from CLAUDE.md
     claude_md = _load_claude_md()
@@ -122,7 +123,7 @@ def _check_test_file_count(findings: list[Finding]) -> tuple[int, int | None]:
     actual_count = 0
 
     if tests_dir.is_dir():
-        for py_file in sorted(tests_dir.glob("test_*.py")):
+        for _py_file in sorted(tests_dir.glob("test_*.py")):
             actual_count += 1
 
     # Extract claimed file count from CLAUDE.md
@@ -261,10 +262,12 @@ def _check_endpoint_docstrings(findings: list[Finding]) -> tuple[int, int]:
                         is_endpoint = True
                         break
                 # @router.get (without call, unlikely but possible)
-                elif isinstance(decorator, ast.Attribute):
-                    if decorator.attr in http_methods:
-                        is_endpoint = True
-                        break
+                elif (
+                    isinstance(decorator, ast.Attribute)
+                    and decorator.attr in http_methods
+                ):
+                    is_endpoint = True
+                    break
 
             if not is_endpoint:
                 continue
@@ -331,9 +334,8 @@ def _check_model_conventions(findings: list[Finding]) -> int:
                         if (
                             isinstance(target, ast.Name)
                             and target.id == "__tablename__"
-                        ):
-                            if isinstance(item.value, ast.Constant):
-                                tablename = item.value.value
+                        ) and isinstance(item.value, ast.Constant):
+                            tablename = item.value.value
 
                 # Find created_at / updated_at as annotated assignments or regular assignments
                 if isinstance(item, (ast.AnnAssign, ast.Assign)):
@@ -433,12 +435,13 @@ def _check_response_envelope(findings: list[Finding]) -> int:
 
             is_endpoint = False
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Call) and isinstance(
-                    decorator.func, ast.Attribute
+                if (
+                    isinstance(decorator, ast.Call)
+                    and isinstance(decorator.func, ast.Attribute)
+                    and decorator.func.attr in http_methods
                 ):
-                    if decorator.func.attr in http_methods:
-                        is_endpoint = True
-                        break
+                    is_endpoint = True
+                    break
 
             if not is_endpoint:
                 continue

@@ -369,9 +369,10 @@ class DataLearningState:
         """How many times has this type of issue appeared historically?"""
         count = 0
         for h in self.state["finding_history"]:
-            if h.get("category") == category:
-                if file is None or h.get("file") == file:
-                    count += 1
+            if h.get("category") == category and (
+                file is None or h.get("file") == file
+            ):
+                count += 1
         return count
 
     # -- Attention weights ---------------------------------------------------

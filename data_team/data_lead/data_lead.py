@@ -468,18 +468,21 @@ def _populate_live_kpis(
         if not target_info:
             continue
         yellow = target_info.get("yellow", 0)
-        if isinstance(value, (int, float)) and isinstance(yellow, (int, float)):
-            if value < yellow:
-                findings.append(
-                    Finding(
-                        id=f"lead-kpi-{kpi_name}",
-                        severity="high",
-                        category="kpi",
-                        title=f"KPI '{kpi_name}' at {value} — below yellow threshold ({yellow})",
-                        detail=f"Target: {target_info['target']}, Current: {value}",
-                        recommendation=f"Investigate drivers of low {kpi_name}",
-                    )
+        if (
+            isinstance(value, (int, float))
+            and isinstance(yellow, (int, float))
+            and value < yellow
+        ):
+            findings.append(
+                Finding(
+                    id=f"lead-kpi-{kpi_name}",
+                    severity="high",
+                    category="kpi",
+                    title=f"KPI '{kpi_name}' at {value} — below yellow threshold ({yellow})",
+                    detail=f"Target: {target_info['target']}, Current: {value}",
+                    recommendation=f"Investigate drivers of low {kpi_name}",
                 )
+            )
 
 
 # ---------------------------------------------------------------------------

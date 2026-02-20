@@ -479,7 +479,7 @@ def _analyze_user_flows(
             )
         )
 
-    all_pages = set(graph.keys())
+    set(graph.keys())
     for persona_id, journeys in PERSONA_JOURNEYS.items():
         reachable_count = 0
         total_steps = 0

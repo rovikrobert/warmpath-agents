@@ -519,7 +519,7 @@ def _mock_chat_response(
 
     Returns (response_text, topic_name_or_none).
     """
-    msg_lower = message.lower()
+    message.lower()
     network = context.get("network")
     pipeline = context.get("pipeline", {})
     prefs = context.get("preferences")

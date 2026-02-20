@@ -164,10 +164,7 @@ def _check_stripe_webhook_handlers(
             e for e in events_missing if "payment" in e or "invoice" in e
         ]
 
-        if subscription_missing or payment_missing:
-            severity = "high"
-        else:
-            severity = "medium"
+        severity = "high" if subscription_missing or payment_missing else "medium"
 
         findings.append(
             Finding(

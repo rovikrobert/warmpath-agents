@@ -26,29 +26,29 @@ try:
 except ImportError:
     pass
 
-from agents.shared.config import REPORTS_DIR
-from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary
-from agents.shared.report import AgentReport
+from agents.shared.config import REPORTS_DIR  # noqa: E402
+from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary  # noqa: E402
+from agents.shared.report import AgentReport  # noqa: E402
 
-from .budget_enforcer import (
+from .budget_enforcer import (  # noqa: E402
     enforce_budget,
     get_budget_enforcement_report,
     update_throttle_status,
 )
-from .cos_config import COS_CONFIG
-from .cos_learning import (
+from .cos_config import COS_CONFIG  # noqa: E402
+from .cos_learning import (  # noqa: E402
     record_cost_snapshot,
     record_founder_decision,
     update_team_reliability,
 )
-from .notion_sync import NotionSync
-from .org_evaluator import evaluate_triggers, generate_restructuring_proposal
-from .pod_manager import detect_permanent_pods, get_pod_report
-from .resolver import attempt_resolution
-from .router import get_request_tracking_report, route_and_track_request
-from .schemas import Conflict
-from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly
-from .telegram_bridge import TelegramBridge, TELEGRAM_DIR
+from .notion_sync import NotionSync  # noqa: E402
+from .org_evaluator import evaluate_triggers, generate_restructuring_proposal  # noqa: E402
+from .pod_manager import detect_permanent_pods, get_pod_report  # noqa: E402
+from .resolver import attempt_resolution  # noqa: E402
+from .router import get_request_tracking_report, route_and_track_request  # noqa: E402
+from .schemas import Conflict  # noqa: E402
+from .synthesizer import synthesize_daily, synthesize_status, synthesize_weekly  # noqa: E402
+from .telegram_bridge import TelegramBridge, TELEGRAM_DIR  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

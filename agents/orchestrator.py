@@ -29,8 +29,8 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from agents.shared.report import AgentReport, merge_reports
-from agents.lead.lead import (
+from agents.shared.report import AgentReport, merge_reports  # noqa: E402
+from agents.lead.lead import (  # noqa: E402
     generate_daily_brief,
     generate_weekly_report,
     record_brief_metrics,

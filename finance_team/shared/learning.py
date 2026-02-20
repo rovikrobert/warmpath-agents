@@ -362,9 +362,10 @@ class FinanceLearningState:
     def get_recurrence_count(self, category: str, file: str | None = None) -> int:
         count = 0
         for h in self.state["finding_history"]:
-            if h.get("category") == category:
-                if file is None or h.get("file") == file:
-                    count += 1
+            if h.get("category") == category and (
+                file is None or h.get("file") == file
+            ):
+                count += 1
         return count
 
     # -- Attention weights ---------------------------------------------------
