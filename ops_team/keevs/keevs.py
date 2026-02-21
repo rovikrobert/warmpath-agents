@@ -529,10 +529,20 @@ def _check_live_coaching_quality(
     test_context = {
         "user": {"name": "Test User", "type": "job_seeker"},
         "preferences": {"target_role": "Software Engineer"},
-        "network": {"total_contacts": 50, "top_companies": ["Google", "Meta"]},
-        "pipeline": {"active": 3, "follow_ups_due": 1},
+        "network": {
+            "total_contacts": 50,
+            "top_companies": [
+                {"company": "Google", "count": 8},
+                {"company": "Meta", "count": 5},
+            ],
+        },
+        "pipeline": {
+            "total": 3,
+            "follow_ups_needed": 1,
+            "status_counts": {"applied": 2, "interviewing": 1},
+        },
         "recent_searches": [],
-        "credits": {"balance": 100},
+        "credits": 100,
         "market_trends": {},
     }
 

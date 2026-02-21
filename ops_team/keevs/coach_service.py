@@ -638,7 +638,13 @@ def _mock_chat_response(
         if network:
             total = network.get("total_contacts", 0)
             top = network.get("top_companies", [])
-            top_str = ", ".join(f"{c['company']} ({c['count']})" for c in top[:3])
+            top_parts: list[str] = []
+            for c in top[:3]:
+                if isinstance(c, dict):
+                    top_parts.append(f"{c.get('company', '?')} ({c.get('count', '?')})")
+                else:
+                    top_parts.append(str(c))
+            top_str = ", ".join(top_parts)
             if "network" in seen:
                 return (
                     f"Your network ({total} contacts) hasn't changed since we last discussed it. "

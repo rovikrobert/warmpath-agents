@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 CRITICAL_VARS = {
     "RESEND_API_KEY": "Email delivery (verification, welcome, password reset)",
     "FRONTEND_URL": "Email link targets + CORS",
-    "SECRET_KEY": "JWT signing (must not be default)",
+    "CLERK_SECRET_KEY": "Clerk auth — JWT verification via JWKS",
     "ENCRYPTION_KEY": "PII encryption at rest",
     "DATABASE_URL": "PostgreSQL connection",
 }

@@ -444,8 +444,20 @@ def _analyze_user_flows(
     nav_patterns = [
         re.compile(r'navigate\s*\(\s*["\']([^"\']+)["\']'),
         re.compile(r'<Link\s+to\s*=\s*["\']([^"\']+)["\']'),
+        re.compile(r'<NavLink\s+to\s*=\s*["\']([^"\']+)["\']'),
         re.compile(r'href\s*=\s*["\'](/[^"\']+)["\']'),
     ]
+
+    # Parse Layout.jsx for persistent sidebar navigation (always visible)
+    layout_file = FRONTEND_SRC / "components" / "Layout.jsx"
+    sidebar_targets: set[str] = set()
+    if layout_file.exists():
+        layout_source = _read_safe(layout_file)
+        sidebar_pattern = re.compile(r"to:\s*['\"]([^'\"]+)['\"]")
+        for match in sidebar_pattern.finditer(layout_source):
+            target_page = route_to_page.get(match.group(1))
+            if target_page:
+                sidebar_targets.add(target_page)
 
     for page_path in page_files:
         page_name = page_path.stem
@@ -457,6 +469,8 @@ def _analyze_user_flows(
                 target_page = route_to_page.get(target_path)
                 if target_page:
                     targets.add(target_page)
+        # Sidebar nav is always visible — every page can reach sidebar targets
+        targets.update(sidebar_targets)
         graph[page_name] = targets
 
     metrics["flow_graph_nodes"] = len(graph)

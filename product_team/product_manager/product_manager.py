@@ -128,16 +128,23 @@ def _map_feature_coverage(
             "ForgotPasswordPage",
             "ResetPasswordPage",
             "VerifyEmailPage",
+            "EditProfile",
+            "OnboardingPage",
         ],
         "contacts": ["ContactsPage"],
         "search": ["NewSearch", "SearchResults", "FindReferrals", "ReferralResults"],
-        "marketplace": ["MarketplaceOverview", "SharingSettings"],
+        "marketplace": [
+            "MarketplaceOverview",
+            "SharingSettings",
+            "MarketplaceBrowse",
+            "MyRequests",
+        ],
         "credits": ["CreditsPage"],
         "applications": ["ApplicationsPage"],
-        "intro": ["MyRequests"],
-        "profile": ["EditProfile", "CoachPage"],
-        "onboarding": ["OnboardingPage"],
-        "privacy": ["PrivacyPage"],
+        "coach": ["CoachPage"],
+        "privacy": ["PrivacyPage", "PrivacySettingsPage"],
+        "referrals": ["ReferralCodesPage"],
+        "feed": ["CoachPage"],
     }
 
     # Check for orphan API modules (no frontend consumer)

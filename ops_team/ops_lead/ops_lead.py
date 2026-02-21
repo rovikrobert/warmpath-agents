@@ -64,14 +64,22 @@ def generate_daily_brief(reports: list[OpsTeamReport] | None = None) -> str:
         lines.append("No agent reports available. Run ops team scans first.")
         return "\n".join(lines)
 
-    # Aggregate
+    # Aggregate (dedup by finding/insight ID)
     all_findings: list[Finding] = []
     all_insights: list[OpsInsight] = []
     all_metrics: dict = {}
     all_cross_team: list[dict] = []
+    _seen_finding_ids: set[str] = set()
+    _seen_insight_ids: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
-        all_insights.extend(r.ops_insights)
+        for f in r.findings:
+            if f.id not in _seen_finding_ids:
+                all_findings.append(f)
+                _seen_finding_ids.add(f.id)
+        for i in r.ops_insights:
+            if i.id not in _seen_insight_ids:
+                all_insights.append(i)
+                _seen_insight_ids.add(i.id)
         for k, v in r.metrics.items():
             all_metrics[k] = v
         all_cross_team.extend(r.cross_team_requests)
