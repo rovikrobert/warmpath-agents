@@ -37,12 +37,6 @@ COS_CONFIG: dict = {
         "team_reports_db_env": "NOTION_TEAM_REPORTS_DB",
         "weekly_synthesis_db_env": "NOTION_WEEKLY_SYNTHESIS_DB",
     },
-    "whatsapp": {
-        "morning_brief_time": "08:00",
-        "weekly_summary_day": "sunday",
-        "weekly_summary_time": "20:00",
-        "max_message_lines": 15,
-    },
     "telegram": {
         "morning_brief_time": "08:00",
         "weekly_summary_day": "sunday",

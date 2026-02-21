@@ -348,13 +348,14 @@ def summarize_team(team: str, reports: list[AgentReport]) -> dict[str, Any]:
         top = next(
             (f for f in all_findings if f.severity in ("critical", "high")), None
         )
-        summary = f"{team.title()}: {crit + high} critical/high issues."
         if top:
-            summary += f" Top: {top.title}."
+            summary = f"Needs attention — {top.title}."
+        else:
+            summary = f"Has {crit + high} issues that need fixing."
     elif health == "yellow":
-        summary = f"{team.title()}: {medium} medium issues under review."
+        summary = f"{medium} items being tracked, nothing blocking."
     else:
-        summary = f"{team.title()}: clean scan across {len(reports)} agents."
+        summary = f"All clear across {len(reports)} agents."
 
     return {
         "team": team,
@@ -366,110 +367,87 @@ def summarize_team(team: str, reports: list[AgentReport]) -> dict[str, Any]:
 
 
 def _render_daily_brief(brief: FounderBrief, alerts: list[str]) -> str:
-    """Render FounderBrief as markdown in the spec's format."""
+    """Render FounderBrief as natural-language markdown for Notion."""
     lines: list[str] = []
-    lines.append(f"# Founder Daily Brief - {brief.date}\n")
+    lines.append(f"# Daily Brief — {brief.date}\n")
 
-    # Decisions needed
-    lines.append("## Decisions Needed")
+    # Lead with decisions — the only section that requires founder action
     if brief.decisions_needed:
+        lines.append("## Your call needed\n")
         for d in brief.decisions_needed:
-            severity_icon = {
-                "critical": "!!",
-                "high": "!",
-            }.get(d["severity"], "")
-            lines.append(f"- **[{d['id']}] {severity_icon} {d['summary']}**")
-            lines.append(f"  - Impact: {d['business_impact']}")
-            if d.get("recommended_action"):
-                lines.append(f"  - Action: {d['recommended_action']}")
-            if d.get("outcomes"):
-                labels = [OUTCOME_LABELS.get(o, o) for o in d["outcomes"]]
-                lines.append(f"  - Outcomes: {', '.join(labels)}")
+            lines.append(
+                f"**{d['summary']}** — {d['business_impact']} "
+                f"{d.get('recommended_action', '')}".rstrip()
+            )
+            lines.append("")
     else:
-        lines.append("No decisions needed today.")
-    lines.append("")
+        lines.append("Nothing needs your decision today.\n")
 
-    # Founder requests (active briefs from Notion)
+    # Founder requests
     if brief.founder_requests:
-        lines.append("## Founder Requests")
+        lines.append("## Open requests from you\n")
         for fr in brief.founder_requests:
-            priority = fr.get("priority", "P3")
-            title = fr.get("title", "Untitled")
-            lines.append(f"- **[{priority}]** {title}")
+            lines.append(f"- {fr.get('title', 'Untitled')}")
         lines.append("")
 
     # Conflict resolutions
     if brief.resolutions:
-        lines.append("## Conflict Resolutions")
+        lines.append("## Resolved conflicts\n")
         for res in brief.resolutions:
-            escalated_tag = " **[ESCALATED]**" if res.get("escalated") else ""
-            strategy = res.get("strategy_used", "unknown")
-            outcome = res.get("outcome", "")
-            lines.append(f"- [{strategy}]{escalated_tag} {outcome}")
+            escalated = " (escalated to you)" if res.get("escalated") else ""
+            lines.append(f"- {res.get('outcome', '')}{escalated}")
         lines.append("")
 
-    # Key updates
-    lines.append("## Key Updates")
+    # Team summaries — prose, not tables
+    lines.append("## What each team is doing\n")
+    for ts in brief.team_summaries:
+        lines.append(f"**{ts['team'].title()}** — {ts['summary']}")
+        lines.append("")
+
+    # Key updates — only if there's something worth reading
     if brief.key_updates:
+        lines.append("## Other updates\n")
         for u in brief.key_updates:
-            lines.append(f"- **[{u['id']}]** {u['summary']}")
-            if u.get("business_impact"):
-                lines.append(f"  - {u['business_impact']}")
-    else:
-        lines.append("No notable updates.")
-    lines.append("")
+            impact = f" ({u['business_impact']})" if u.get("business_impact") else ""
+            lines.append(f"- {u['summary']}{impact}")
+        lines.append("")
 
-    # Progress
-    lines.append("## Progress")
-    if brief.progress:
-        for p in brief.progress:
-            lines.append(f"- {p['note']}")
-    else:
-        lines.append("All teams reporting — see details above.")
-    lines.append("")
-
-    # Cross-team requests
+    # Cross-team handoffs — only urgent ones
     if brief.cross_team_requests:
-        lines.append("## Cross-Team Requests")
-        urgency_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        sorted_reqs = sorted(
-            brief.cross_team_requests,
-            key=lambda r: urgency_order.get(r.get("urgency", "medium"), 2),
-        )
-        for req in sorted_reqs:
-            urgency = req.get("urgency", "medium")
-            urgency_icon = {"critical": "!!", "high": "!"}.get(urgency, "")
-            source = req.get("source_agent", req.get("team", "unknown"))
-            lines.append(
-                f"- {urgency_icon} **[{urgency}]** {req.get('request', 'N/A')} "
-                f"(from: {source})"
-            )
-            if req.get("blocking"):
-                lines.append(f"  - Blocking: {req['blocking']}")
-        lines.append("")
+        urgent = [
+            r
+            for r in brief.cross_team_requests
+            if r.get("urgency") in ("critical", "high")
+        ]
+        if urgent:
+            lines.append("## Cross-team handoffs needing attention\n")
+            for req in urgent:
+                source = req.get("source_agent", req.get("team", "unknown"))
+                lines.append(f"- {req.get('request', 'N/A')} (from {source})")
+            lines.append("")
 
-    # Operational health
+    # Operational health — only show warnings, skip "all clear" noise
     if brief.operational_health:
-        lines.append("## Operational Health")
-        status_icon = {"ok": "+", "warning": "~", "info": "i"}
-        for item in brief.operational_health:
-            icon = status_icon.get(item.get("status", "info"), "?")
-            lines.append(f"- [{icon}] **{item['indicator']}**: {item['detail']}")
-        lines.append("")
+        warnings = [
+            item for item in brief.operational_health if item.get("status") == "warning"
+        ]
+        if warnings:
+            lines.append("## Heads up\n")
+            for item in warnings:
+                lines.append(f"- {item['indicator']}: {item['detail']}")
+            lines.append("")
 
-    # Cost summary
+    # Cost — one line, not a section
     if brief.cost_summary:
-        lines.append("## Cost Summary")
         total = brief.cost_summary.get("total_estimated_cost_usd", 0)
-        tokens = brief.cost_summary.get("total_estimated_tokens", 0)
-        duration = brief.cost_summary.get("total_duration_seconds", 0)
-        lines.append(f"- Total: ${total:.4f} | {tokens} tokens | {duration:.1f}s")
+        if total > 0:
+            lines.append(f"**Agent cost yesterday:** ${total:.2f}")
         if alerts:
             for alert in alerts:
-                lines.append(f"- **ALERT:** {alert}")
+                lines.append(f"**Cost alert:** {alert}")
         lines.append("")
 
-    # KPI snapshot
+    # Top risks — only if KPI snapshot provided
     if brief.kpi_snapshot:
         lines.append(brief.kpi_snapshot)
         lines.append("")

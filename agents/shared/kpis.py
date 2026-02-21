@@ -823,9 +823,6 @@ def render_kpi_summary(dashboard: KPIDashboard) -> str:
     health = next(
         (k for k in dashboard.team_kpis.kpis if k.name == "overall_health"), None
     )
-    debt = next(
-        (k for k in dashboard.team_kpis.kpis if k.name == "tech_debt_score"), None
-    )
     criticals = next(
         (k for k in dashboard.team_kpis.kpis if k.name == "zero_criticals"), None
     )
@@ -836,26 +833,41 @@ def render_kpi_summary(dashboard: KPIDashboard) -> str:
     reds = sum(1 for k in all_kpis if k.grade == "red")
 
     red_kpis = [k for ak in dashboard.agent_kpis for k in ak.kpis if k.grade == "red"]
-    risk_names = [f"{k.agent}/{k.name}" for k in red_kpis[:3]]
 
-    lines = ["### KPI Snapshot"]
+    # Build human-readable risk descriptions
+    _RISK_DESCRIPTIONS: dict[str, str] = {
+        "test_count": "test count below target",
+        "finding_trend": "security findings trending up",
+        "weak_test_ratio": "too many weak tests",
+        "tests_per_file": "low test density per file",
+        "dependency_freshness": "outdated dependencies",
+        "doc_coverage": "documentation gaps",
+    }
+    risk_labels = [
+        _RISK_DESCRIPTIONS.get(k.name, f"{k.description} ({k.agent})")
+        for k in red_kpis[:3]
+    ]
 
-    parts: list[str] = []
+    lines: list[str] = []
+
+    # Prose summary instead of dashboard-style badges
+    summary_parts: list[str] = []
     if health:
-        parts.append(f"**Health:** {_fmt_value(health)}/100 {GRADE_ICON[health.grade]}")
-    if debt:
-        parts.append(f"**Debt:** {_fmt_value(debt)} {GRADE_ICON[debt.grade]}")
-    if criticals:
-        parts.append(
-            f"**Criticals:** {_fmt_value(criticals)} {GRADE_ICON[criticals.grade]}"
+        summary_parts.append(f"codebase health is {_fmt_value(health)}/100")
+    if criticals and criticals.value > 0:
+        summary_parts.append(
+            f"{int(criticals.value)} critical finding{'s' if criticals.value != 1 else ''}"
         )
-    if parts:
-        lines.append("- " + " | ".join(parts))
+    if summary_parts:
+        lines.append(
+            f"**KPIs:** {', '.join(summary_parts)}. "
+            f"{greens} green, {yellows} yellow, {reds} red."
+        )
+    else:
+        lines.append(f"**KPIs:** {greens} green, {yellows} yellow, {reds} red.")
 
-    lines.append(f"- {greens} \u2705 | {yellows} \u26a0\ufe0f | {reds} \u274c")
-
-    if risk_names:
-        lines.append(f"- Top risks: {', '.join(risk_names)}")
+    if risk_labels:
+        lines.append(f"**Watch:** {', '.join(risk_labels)}.")
 
     return "\n".join(lines)
 

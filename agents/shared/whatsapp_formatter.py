@@ -1,7 +1,7 @@
-"""WhatsApp message formatter for CoS → Founder communication.
+"""Message formatter for CoS → Founder communication.
 
-Phase 1: Generates text files for manual copy-paste.
-Phase 2: Sends via Twilio WhatsApp Business API.
+Generates structured text messages for Telegram bot delivery.
+Also provides reply parsing grammar reused by the Telegram bridge.
 
 Usage:
     from agents.shared.whatsapp_formatter import WhatsAppFormatter
@@ -14,7 +14,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,12 +28,7 @@ class WhatsAppFormatter:
     """Formats messages for WhatsApp (max 5 lines, actionable, binary questions)."""
 
     def __init__(self) -> None:
-        self._twilio_enabled = bool(os.environ.get("TWILIO_ACCOUNT_SID"))
         WHATSAPP_DIR.mkdir(parents=True, exist_ok=True)
-
-    @property
-    def twilio_enabled(self) -> bool:
-        return self._twilio_enabled
 
     @staticmethod
     def notion_url(page_id: str) -> str:
@@ -291,50 +285,7 @@ class WhatsAppFormatter:
         logger.info("WhatsApp message saved: %s", path)
         return path
 
-    def send_via_twilio(self, message: str) -> dict[str, Any]:
-        """Send a message via Twilio WhatsApp Business API (Phase 2).
-
-        Requires env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
-        TWILIO_WHATSAPP_FROM, ROVIK_WHATSAPP_NUMBER.
-        """
-        if not self._twilio_enabled:
-            logger.info("Twilio not configured — message saved to file only")
-            return {"status": "file_only", "twilio": False}
-
-        account_sid = os.environ["TWILIO_ACCOUNT_SID"]
-        auth_token = os.environ["TWILIO_AUTH_TOKEN"]
-        from_number = os.environ["TWILIO_WHATSAPP_FROM"]
-        to_number = os.environ["ROVIK_WHATSAPP_NUMBER"]
-
-        try:
-            import httpx
-
-            url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-            data = {
-                "From": f"whatsapp:{from_number}",
-                "To": f"whatsapp:{to_number}",
-                "Body": message,
-            }
-            with httpx.Client(timeout=15.0) as client:
-                response = client.post(url, data=data, auth=(account_sid, auth_token))
-                response.raise_for_status()
-                result = response.json()
-                logger.info("WhatsApp message sent via Twilio: %s", result.get("sid"))
-                return {"status": "sent", "twilio": True, "sid": result.get("sid")}
-        except Exception as e:
-            logger.error("Twilio send failed: %s", e)
-            return {"status": "error", "twilio": True, "error": str(e)}
-
     def send(self, message: str, msg_type: str = "daily") -> dict[str, Any]:
-        """Save message and optionally send via Twilio."""
+        """Save message to file. Delivery handled by Telegram bridge."""
         path = self.save_message(message, msg_type)
-        result: dict[str, Any] = {"file": str(path)}
-
-        if self._twilio_enabled:
-            twilio_result = self.send_via_twilio(message)
-            result.update(twilio_result)
-        else:
-            result["status"] = "file_only"
-            result["twilio"] = False
-
-        return result
+        return {"file": str(path), "status": "file_only"}
