@@ -433,17 +433,24 @@ def _scan_live_data_quality(
     metrics["live_empty_tables"] = len(empty_tables)
     metrics["live_total_rows"] = sum(row_counts.values())
 
+    # Suppress noisy findings pre-launch (< 10 users)
+    user_count = row_counts.get("users", 0)
+    pre_launch = user_count < 10
+
     if empty_tables:
-        findings.append(
-            Finding(
-                id="pipe-010",
-                severity="high" if "users" in empty_tables else "medium",
-                category="data_quality",
-                title=f"{len(empty_tables)} critical tables are empty",
-                detail=f"Empty: {', '.join(empty_tables)}",
-                recommendation="Seed data or verify platform is receiving traffic",
+        if pre_launch:
+            metrics["live_empty_suppressed"] = "pre-launch (<10 users)"
+        else:
+            findings.append(
+                Finding(
+                    id="pipe-010",
+                    severity="high" if "users" in empty_tables else "medium",
+                    category="data_quality",
+                    title=f"{len(empty_tables)} critical tables are empty",
+                    detail=f"Empty: {', '.join(empty_tables)}",
+                    recommendation="Seed data or verify platform is receiving traffic",
+                )
             )
-        )
 
     # Staleness check — most recent activity across key tables
     staleness_sql = "SELECT MAX(created_at) AS latest FROM usage_logs"
@@ -457,7 +464,7 @@ def _scan_live_data_quality(
         age_hours = (datetime.now(timezone.utc) - latest).total_seconds() / 3600
         metrics["live_latest_activity_hours_ago"] = round(age_hours, 1)
 
-        if age_hours > 72:
+        if age_hours > 72 and not pre_launch:
             findings.append(
                 Finding(
                     id="pipe-011",

@@ -65,12 +65,16 @@ def generate_daily_brief(reports: list[DataTeamReport] | None = None) -> str:
         lines.append("No agent reports available. Run data team scans first.")
         return "\n".join(lines)
 
-    # Aggregate metrics
+    # Aggregate metrics (deduplicate findings by ID)
     all_findings: list[Finding] = []
     all_insights: list[Insight] = []
     all_metrics: dict = {}
+    _seen_ids: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _seen_ids:
+                all_findings.append(f)
+                _seen_ids.add(f.id)
         all_insights.extend(r.insights)
         for k, v in r.metrics.items():
             all_metrics[k] = v
@@ -192,8 +196,12 @@ def generate_weekly_report(reports: list[DataTeamReport] | None = None) -> str:
 
     all_findings: list[Finding] = []
     all_metrics: dict = {}
+    _seen_ids_w: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _seen_ids_w:
+                all_findings.append(f)
+                _seen_ids_w.add(f.id)
         all_metrics.update(r.metrics)
 
     # Analytics readiness scorecard
@@ -500,9 +508,13 @@ def scan() -> DataTeamReport:
     metrics: dict = {}
     cross_team_requests: list[dict] = []
 
-    # Aggregate sub-agent metrics
+    # Aggregate sub-agent metrics (deduplicate findings by ID)
+    _seen_ids_s: set[str] = set()
     for r in reports:
-        findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _seen_ids_s:
+                findings.append(f)
+                _seen_ids_s.add(f.id)
         insights.extend(r.insights)
         for k, v in r.metrics.items():
             metrics[k] = v
