@@ -79,8 +79,12 @@ def _make_sub_reports(
     all_cross_team: list[dict[str, Any]] = []
     conflicts: list[str] = []
 
+    _seen_finding_ids: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _seen_finding_ids:
+                all_findings.append(f)
+                _seen_finding_ids.add(f.id)
         all_insights.extend(r.market_insights)
         all_partnerships.extend(r.partnership_opportunities)
         all_pricing.extend(r.pricing_experiments)
@@ -91,23 +95,33 @@ def _make_sub_reports(
             all_metrics[k] = v
 
     # Cross-agent conflict detection: pricing vs. marketing misalignment
+    # Only flag when experiment tiers explicitly contradict marketing
+    # recommendations (e.g. one says "raise prices", other says "lower").
+    # Experiments and insights are different formats so text overlap is
+    # not a reliable signal — check for directional contradictions instead.
     pricing_agents = {r.agent for r in reports if r.pricing_experiments}
     marketing_agents = {r.agent for r in reports if r.market_insights}
     if pricing_agents and marketing_agents:
-        pricing_tiers = set()
-        marketing_tiers = set()
+        pricing_texts = []
+        marketing_texts = []
         for r in reports:
             for exp in r.pricing_experiments:
                 if exp.hypothesis:
-                    pricing_tiers.add(exp.hypothesis[:60])
+                    pricing_texts.append(exp.hypothesis.lower())
             for ins in r.market_insights:
                 if ins.category == "pricing" and ins.recommended_response:
-                    marketing_tiers.add(ins.recommended_response[:60])
-        if pricing_tiers and marketing_tiers and not pricing_tiers & marketing_tiers:
+                    marketing_texts.append(ins.recommended_response.lower())
+        # Only flag if pricing direction words directly conflict
+        _UP = {"raise", "increase", "higher", "premium"}
+        _DOWN = {"lower", "reduce", "discount", "cheaper", "decrease"}
+        pricing_up = any(w in t for t in pricing_texts for w in _UP)
+        pricing_down = any(w in t for t in pricing_texts for w in _DOWN)
+        marketing_up = any(w in t for t in marketing_texts for w in _UP)
+        marketing_down = any(w in t for t in marketing_texts for w in _DOWN)
+        if (pricing_up and marketing_down) or (pricing_down and marketing_up):
             conflicts.append(
-                f"Potential pricing misalignment: monetization proposes "
-                f"{len(pricing_tiers)} experiment(s), marketing references "
-                f"{len(marketing_tiers)} different pricing approach(es)"
+                "Pricing direction conflict: monetization and marketing "
+                "recommend opposing price movements — review alignment"
             )
 
     # Check for strategy divergences across agents
