@@ -375,7 +375,15 @@ def _check_subscription_model(
     metrics["subscription_signals_found"] = subscription_signals
     metrics["subscription_signals_expected"] = 4
 
-    if not has_subscription_class:
+    # Subscription model — Stripe manages subscription lifecycle via webhooks
+    # (app/api/webhooks.py).  Only flag if Stripe webhook integration is absent.
+    _webhooks_source = _read_safe(API_DIR / "webhooks.py")
+    has_stripe_webhooks = bool(
+        re.search(
+            r"customer\.subscription|invoice\.paid", _webhooks_source, re.IGNORECASE
+        )
+    )
+    if not has_subscription_class and not has_stripe_webhooks:
         findings.append(
             Finding(
                 id="finmgr-sub-001",
@@ -403,7 +411,9 @@ def _check_subscription_model(
             )
         )
 
-    if not has_subscription_tier:
+    # subscription_tier — WarmPath uses action-based identity (CLAUDE.md #15):
+    # behaviour determines features via UserCapabilities, not a tier column.
+    if not has_subscription_tier and not has_stripe_webhooks:
         findings.append(
             Finding(
                 id="finmgr-sub-002",
@@ -669,9 +679,16 @@ def _check_billing_instrumentation(
         )
 
     # -- Usage tracking --
+    # Usage tracking lives in app/utils/tracking.py and app/middleware/usage.py,
+    # not inside credits.py.  Check those files too.
+    tracking_source = _read_safe(SERVICES_DIR.parent / "utils" / "tracking.py")
+    usage_middleware = _read_safe(SERVICES_DIR.parent / "middleware" / "usage.py")
+    usage_combined = combined + "\n" + tracking_source + "\n" + usage_middleware
     has_usage_log = bool(
         re.search(
-            r"(?:UsageLog|usage_log|usage_logs|log_usage)", combined, re.IGNORECASE
+            r"(?:UsageLog|usage_log|usage_logs|log_usage|track_action)",
+            usage_combined,
+            re.IGNORECASE,
         )
     )
     metrics["billing_has_usage_tracking"] = has_usage_log
@@ -682,8 +699,8 @@ def _check_billing_instrumentation(
                 id="finmgr-billing-002",
                 severity="medium",
                 category="billing",
-                title="Usage tracking (UsageLog) not found in credits files",
-                detail="UsageLog or usage_log references absent from credits service and API",
+                title="Usage tracking (UsageLog) not found in credits or tracking files",
+                detail="UsageLog or track_action references absent from credits and tracking modules",
                 file=svc_rel,
                 recommendation=(
                     "Link credit spend actions to UsageLog rows for metered billing analytics "

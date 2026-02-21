@@ -852,7 +852,9 @@ def scan() -> FinanceTeamReport:
     extra_sources: list[str] = []
     for extra_path in [
         API_DIR / "auth.py",
+        API_DIR / "clerk_webhooks.py",
         API_DIR / "search.py",
+        API_DIR / "webhooks.py",
         SERVICES_DIR / "referral_service.py",
         PROJECT_ROOT / "app" / "tasks" / "csv_processing.py",
     ]:

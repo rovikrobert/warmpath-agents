@@ -708,32 +708,36 @@ def _check_security_compliance(
 
     security_checks: dict[str, tuple[bool, str, str]] = {}
 
-    # token_version
-    has_token_version = bool(re.search(r"\btoken_version\b", user_source))
+    # token_version — Clerk manages JWT token versioning, MFA, and session
+    # revocation externally.  Detect Clerk integration instead of a local column.
+    has_clerk_auth = bool(re.search(r"\bclerk_user_id\b", user_source))
+    has_clerk_middleware = bool(
+        re.search(r"\bclerk\b", middleware_source, re.IGNORECASE)
+        or re.search(r"\bClerk\b|CLERK_SECRET_KEY\b|CLERK_DOMAIN\b", main_source)
+    )
     security_checks["token_version"] = (
-        has_token_version,
+        has_clerk_auth or has_clerk_middleware,
         _relative(user_model_path),
-        "JWT token versioning prevents reuse after password/email change",
+        "Session security managed by Clerk (JWT versioning, MFA, session revocation)",
     )
-    metrics["has_token_version"] = has_token_version
+    metrics["has_token_version"] = has_clerk_auth or has_clerk_middleware
 
-    # locked_until
-    has_locked_until = bool(re.search(r"\blocked_until\b", user_source))
+    # locked_until / failed_login_attempts — Clerk provides brute-force
+    # protection (rate limiting, CAPTCHA, lockout) as a managed service.
+    # No local columns needed.
     security_checks["locked_until"] = (
-        has_locked_until,
+        has_clerk_auth or has_clerk_middleware,
         _relative(user_model_path),
-        "Account lockout (locked_until) prevents brute-force attacks",
+        "Brute-force protection managed by Clerk (rate limiting, lockout, CAPTCHA)",
     )
-    metrics["has_locked_until"] = has_locked_until
+    metrics["has_locked_until"] = has_clerk_auth or has_clerk_middleware
 
-    # failed_login_attempts
-    has_failed_attempts = bool(re.search(r"\bfailed_login_attempts\b", user_source))
     security_checks["failed_login_attempts"] = (
-        has_failed_attempts,
+        has_clerk_auth or has_clerk_middleware,
         _relative(user_model_path),
-        "failed_login_attempts counter drives account lockout logic",
+        "Login attempt tracking managed by Clerk (no local counter needed)",
     )
-    metrics["has_failed_login_attempts"] = has_failed_attempts
+    metrics["has_failed_login_attempts"] = has_clerk_auth or has_clerk_middleware
 
     # Security headers middleware
     has_security_headers = bool(

@@ -74,8 +74,12 @@ def generate_daily_brief(reports: list[FinanceTeamReport] | None = None) -> str:
     all_compliance: list[ComplianceFinding] = []
     all_metrics: dict = {}
     all_cross_team: list[dict] = []
+    _seen_ids: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _seen_ids:
+                all_findings.append(f)
+                _seen_ids.add(f.id)
         all_financial.extend(r.financial_findings)
         all_compliance.extend(r.compliance_findings)
         for k, v in r.metrics.items():
@@ -224,8 +228,12 @@ def generate_weekly_report(reports: list[FinanceTeamReport] | None = None) -> st
 
     all_findings: list[Finding] = []
     all_metrics: dict = {}
+    _wk_seen: set[str] = set()
     for r in reports:
-        all_findings.extend(r.findings)
+        for f in r.findings:
+            if f.id not in _wk_seen:
+                all_findings.append(f)
+                _wk_seen.add(f.id)
         all_metrics.update(r.metrics)
 
     # Financial Readiness Scorecard
