@@ -493,19 +493,37 @@ def _check_password_storage(findings: list[Finding]) -> bool:
     auth_file = PROJECT_ROOT / "app" / "api" / "auth.py"
     verified = False
 
-    for filepath in [security_file, auth_file]:
-        content = _read_text_safe(filepath)
-        if content is None:
-            continue
-
-        has_passlib = "passlib" in content or "CryptContext" in content
-        has_bcrypt = "bcrypt" in content
-        has_hash_password = "def hash_password" in content
-        has_verify_password = "def verify_password" in content
-
-        if (has_passlib or has_bcrypt) and has_hash_password and has_verify_password:
-            verified = True
+    # Clerk manages authentication — check for Clerk integration first.
+    # When Clerk is the auth provider, passwords are never stored locally.
+    clerk_webhooks = PROJECT_ROOT / "app" / "api" / "clerk_webhooks.py"
+    user_model = PROJECT_ROOT / "app" / "models" / "user.py"
+    clerk_detected = False
+    for fp in [clerk_webhooks, user_model, auth_file]:
+        content = _read_text_safe(fp)
+        if content and ("clerk_user_id" in content or "Clerk" in content):
+            clerk_detected = True
             break
+
+    if clerk_detected:
+        verified = True
+    else:
+        for filepath in [security_file, auth_file]:
+            content = _read_text_safe(filepath)
+            if content is None:
+                continue
+
+            has_passlib = "passlib" in content or "CryptContext" in content
+            has_bcrypt = "bcrypt" in content
+            has_hash_password = "def hash_password" in content
+            has_verify_password = "def verify_password" in content
+
+            if (
+                (has_passlib or has_bcrypt)
+                and has_hash_password
+                and has_verify_password
+            ):
+                verified = True
+                break
 
     if not verified:
         findings.append(

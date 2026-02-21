@@ -465,6 +465,14 @@ def _scan_n_plus_one(
             if not isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
                 continue
 
+            # Skip FastAPI dependency injection pattern: ``async for db in get_db()``
+            if (
+                isinstance(node, ast.AsyncFor)
+                and isinstance(node.target, ast.Name)
+                and node.target.id in ("db", "session")
+            ):
+                continue
+
             # Collect line numbers in the loop's iterator expression so we
             # can skip them (e.g. ``for x in result.scalars()`` is safe).
             iter_lines: set[int] = set()
@@ -582,6 +590,12 @@ _USER_ID_PATTERNS = re.compile(
 )
 
 
+_CROSS_VAULT_ALLOWLIST = {
+    "_propagate_direct",
+    "_create_company_change_feed_items",
+}
+
+
 def _scan_vault_isolation(findings: list[Finding]) -> None:
     """Flag service/API functions that query vault models without user_id filtering."""
     scan_dirs = [
@@ -622,6 +636,10 @@ def _scan_vault_isolation(findings: list[Finding]) -> None:
                         break
 
                 if vault_hit is None:
+                    continue
+
+                # Skip allowlisted cross-vault functions (blind-index operations)
+                if node.name in _CROSS_VAULT_ALLOWLIST:
                     continue
 
                 # Check if user_id scoping is present
