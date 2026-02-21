@@ -35,7 +35,7 @@ FEATURE_VARS = {
     "LINKEDIN_CLIENT_ID": "LinkedIn OAuth login/signup",
     "LINKEDIN_CLIENT_SECRET": "LinkedIn OAuth login/signup",
     "RESEND_WEBHOOK_SECRET": "Email open/click tracking",
-    "TWILIO_ACCOUNT_SID": "WhatsApp error alerts to founder",
+    "TELEGRAM_BOT_TOKEN": "Telegram bot for CoS -> Founder messaging",
 }
 
 INFRA_VARS = {

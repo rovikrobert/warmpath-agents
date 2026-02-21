@@ -133,7 +133,7 @@ def synthesize_daily(
     )
 
     rendered = _render_daily_brief(brief, alerts or [])
-    # Return both markdown and structured data for WhatsApp/Notion consumers
+    # Return both markdown and structured data for Telegram/Notion consumers
     return rendered, brief.model_dump()
 
 

@@ -1,12 +1,12 @@
-"""Message formatter for CoS → Founder communication.
+"""Message formatter for CoS -> Founder communication.
 
 Generates structured text messages for Telegram bot delivery.
 Also provides reply parsing grammar reused by the Telegram bridge.
 
 Usage:
-    from agents.shared.whatsapp_formatter import WhatsAppFormatter
+    from agents.shared.message_formatter import MessageFormatter
 
-    fmt = WhatsAppFormatter()
+    fmt = MessageFormatter()
     msg = fmt.morning_brief(team_status, decisions, cost)
     fmt.save_message(msg, "daily")
 """
@@ -20,15 +20,15 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Output directory for WhatsApp-formatted messages
-WHATSAPP_DIR = Path("agents/chief_of_staff/reports/whatsapp")
+# Output directory for formatted messages
+MESSAGE_DIR = Path("agents/chief_of_staff/reports/messages")
 
 
-class WhatsAppFormatter:
-    """Formats messages for WhatsApp (max 5 lines, actionable, binary questions)."""
+class MessageFormatter:
+    """Formats messages for Telegram (max 5 lines, actionable, binary questions)."""
 
     def __init__(self) -> None:
-        WHATSAPP_DIR.mkdir(parents=True, exist_ok=True)
+        MESSAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def notion_url(page_id: str) -> str:
@@ -216,19 +216,19 @@ class WhatsAppFormatter:
 
     @staticmethod
     def parse_reply(text: str) -> dict[str, Any]:
-        """Parse a founder's WhatsApp reply into structured commands.
+        """Parse a founder's reply into structured commands.
 
         Supports:
-            "1" or "1=yes" → approve decision 1
-            "A" or "B" → choose option A or B
-            "Y" or "N" → yes/no
-            "status" → request status
-            "cost" → request cost report
-            "blockers" → request blockers list
-            "ship X" → trigger ship feature
-            "approve Z" → approve pending decision
-            "reprioritize: A > B" → reorder priorities
-            "brief me on X" → request Notion brief
+            "1" or "1=yes" -> approve decision 1
+            "A" or "B" -> choose option A or B
+            "Y" or "N" -> yes/no
+            "status" -> request status
+            "cost" -> request cost report
+            "blockers" -> request blockers list
+            "ship X" -> trigger ship feature
+            "approve Z" -> approve pending decision
+            "reprioritize: A > B" -> reorder priorities
+            "brief me on X" -> request Notion brief
         """
         text = text.strip().lower()
 
@@ -279,10 +279,10 @@ class WhatsAppFormatter:
     def save_message(self, message: str, msg_type: str = "daily") -> Path:
         """Save a formatted message to a text file for manual copy-paste."""
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        filename = f"whatsapp-{msg_type}-{today}.txt"
-        path = WHATSAPP_DIR / filename
+        filename = f"message-{msg_type}-{today}.txt"
+        path = MESSAGE_DIR / filename
         path.write_text(message, encoding="utf-8")
-        logger.info("WhatsApp message saved: %s", path)
+        logger.info("Message saved: %s", path)
         return path
 
     def send(self, message: str, msg_type: str = "daily") -> dict[str, Any]:

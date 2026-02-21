@@ -1,6 +1,5 @@
 """Telegram Bot bridge for Chief of Staff -> Founder communication.
 
-Replaces WhatsApp/Twilio with the free Telegram Bot API.
 Uses httpx (already a project dependency) for HTTP calls.
 """
 
@@ -13,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agents.shared.whatsapp_formatter import WhatsAppFormatter
+from agents.shared.message_formatter import MessageFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +183,7 @@ class TelegramBridge:
 
     @staticmethod
     def parse_reply(text: str) -> dict[str, Any]:
-        return WhatsAppFormatter.parse_reply(text)
+        return MessageFormatter.parse_reply(text)
 
     # -- CoS-level generators ------------------------------------------------
 

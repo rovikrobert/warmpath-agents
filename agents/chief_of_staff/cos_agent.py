@@ -678,16 +678,16 @@ def _process_async_commands() -> list[dict]:
     return results
 
 
-def _process_single_reply(reply_file: Path, source: str = "whatsapp") -> dict | None:
+def _process_single_reply(reply_file: Path, source: str = "telegram") -> dict | None:
     """Process a single reply file and archive it."""
     try:
         text = reply_file.read_text(encoding="utf-8").strip()
         if not text:
             return None
 
-        from agents.shared.whatsapp_formatter import WhatsAppFormatter
+        from agents.shared.message_formatter import MessageFormatter
 
-        parsed = WhatsAppFormatter.parse_reply(text)
+        parsed = MessageFormatter.parse_reply(text)
         parsed["source"] = source
         command = parsed.get("command", "unknown")
 
