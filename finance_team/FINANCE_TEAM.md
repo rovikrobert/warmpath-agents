@@ -10,7 +10,7 @@ Every scan enforces WarmPath's credit economy and compliance architecture:
 
 1. **Credits are not currency** -- Non-transferable, 12-month expiry, no cash-out. Stays in "loyalty program" territory to avoid money transmitter regulations (FinCEN, Singapore Payment Services Act).
 2. **Referral bonus flow** -- Currently employer referral bonuses flow employer-to-employee outside our system. Revenue-sharing may be explored post-traction.
-3. **Revenue from demand side** -- Job seekers pay for marketplace access ($20-30/month). Network holders are free forever.
+3. **Revenue from demand side** -- Job seekers pay for marketplace access ($20-30/month). Network holders are currently free to use.
 4. **Payment card isolation** -- All card data goes directly to Stripe. We never see, transmit, or store card numbers (outside PCI DSS scope).
 5. **Webhook integrity** -- All Stripe webhooks verified against `STRIPE_WEBHOOK_SECRET`. Unsigned/replayed events rejected.
 6. **Audit immutability** -- `audit_logs` table is append-only (no UPDATE/DELETE). Credit transactions are immutable records.
