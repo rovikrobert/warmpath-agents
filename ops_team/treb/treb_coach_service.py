@@ -75,6 +75,18 @@ _NH_TOPIC_PATTERNS = [
     re.compile(r"\bnetwork\s*sharing\b", re.IGNORECASE),
     re.compile(r"\bwho\s*requested\b", re.IGNORECASE),
     re.compile(r"\bwhich\s*contacts?\s*(?:are\s*)?shared\b", re.IGNORECASE),
+    # Supply-side referral language (giving/making referrals, not seeking them)
+    re.compile(
+        r"\b(?:give|giving|make|making|send|sending)\b.*\breferral",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\brefer\s+(?:someone|people|candidates?)\b", re.IGNORECASE),
+    re.compile(r"\bwho\s+(?:should|do)\s+i\s+refer\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:my|the)\s+referral",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bfacilitat\w*\b.*\bintro", re.IGNORECASE),
 ]
 
 
