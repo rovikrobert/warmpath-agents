@@ -1,0 +1,116 @@
+{
+  "ux-001": {
+    "resolution_type": "fixed",
+    "resolved_at": "2026-02-18T02:07:36.484762+00:00",
+    "reason": "ARIA attributes added to all 19 JSX pages",
+    "skip_until": "2026-03-20T02:07:36.484762+00:00"
+  },
+  "cm-earn-001": {
+    "resolution_type": "fixed",
+    "resolved_at": "2026-02-18T02:07:36.485071+00:00",
+    "reason": "All 4 credit earn actions wired",
+    "skip_until": "2026-03-20T02:07:36.485071+00:00"
+  },
+  "analyst-001": {
+    "resolution_type": "fixed",
+    "resolved_at": "2026-02-18T02:07:36.485177+00:00",
+    "reason": "All 5 funnel steps instrumented",
+    "skip_until": "2026-03-20T02:07:36.485177+00:00"
+  },
+  "cm-abuse-001": {
+    "resolution_type": "fixed",
+    "resolved_at": "2026-02-18T02:07:36.485260+00:00",
+    "reason": "Rate limiting added to credit endpoints",
+    "skip_until": "2026-03-20T02:07:36.485260+00:00"
+  },
+  "finmgr-sub-001": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-02-18T02:07:43.965184+00:00",
+    "reason": "Stripe subscription model is post-build roadmap item",
+    "skip_until": "2026-03-20T02:07:43.965184+00:00"
+  },
+  "pipe-001": {
+    "resolution_type": "fixed",
+    "resolved_at": "2026-02-18T02:07:43.965456+00:00",
+    "reason": "Table registry updated to match actual models",
+    "skip_until": "2026-03-20T02:07:43.965456+00:00"
+  },
+  "pipe-003": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-18T02:07:43.965557+00:00",
+    "reason": "archived_credit_transactions uses archived_at (semantically equivalent to created_at)",
+    "skip_until": null
+  },
+  "marsh-config-resend_api_key": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "RESEND_API_KEY set in Railway env vars, not available locally",
+    "skip_until": null
+  },
+  "marsh-config-frontend_url": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "FRONTEND_URL set in Railway env vars, not available locally",
+    "skip_until": null
+  },
+  "marsh-config-secret_key": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "SECRET_KEY set in Railway env vars, not available locally",
+    "skip_until": null
+  },
+  "lc-sec-token_vers": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "Token versioning removed in Clerk migration — Clerk manages sessions",
+    "skip_until": null
+  },
+  "lc-sec-locked_unti": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "Account lockout removed in Clerk migration — Clerk handles brute-force protection",
+    "skip_until": null
+  },
+  "lc-sec-failed_logi": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "Failed login tracking removed in Clerk migration — Clerk handles this",
+    "skip_until": null
+  },
+  "DOC-PRIVACY-PWD": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "Password hashing docs not applicable — Clerk handles password management",
+    "skip_until": null
+  },
+  "pipe-010": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "Empty tables expected pre-launch — no users yet",
+    "skip_until": "2026-04-01"
+  },
+  "pipe-011": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-02-21T12:00:00+00:00",
+    "reason": "No activity expected pre-launch — no users yet",
+    "skip_until": "2026-04-01"
+  },
+  "PRIV-ENCRYPTION-0": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-22T12:00:00+00:00",
+    "reason": "ENCRYPTION_KEY set in Railway prod env vars, empty locally by design",
+    "skip_until": null
+  },
+  "PRIV-VAULT-ISOLATION-app-api-marketplace.py:114": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-22T12:00:00+00:00",
+    "reason": "Query scoped by listing.network_holder_id (IS a user_id scope, scanner doesn't recognize the pattern)",
+    "skip_until": null
+  },
+  "PRIV-VAULT-ISOLATION-app-services-freshness_aggregator.py:171": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-02-22T12:00:00+00:00",
+    "reason": "Intentional cross-vault freshness propagation, documented in code and ARCHITECTURE.md",
+    "skip_until": null
+  }
+}

@@ -549,19 +549,24 @@ def _push_daily_outputs(
             logger.debug("Telegram daily brief generation skipped")
 
     # Push per-team reports to Notion (skip if already pushed today)
-    try:
-        if brief_data:
+    if brief_data:
+        try:
             notion = NotionSync()
-            if notion.enabled:
-                if notion._state.get("last_team_reports_sync") == today:
-                    logger.info(
-                        "Team reports already synced to Notion for %s — skipping",
-                        today,
-                    )
-                else:
-                    _trg = team_report_groups or {}
-                    for ts in brief_data.get("team_summaries", []):
-                        team_name = ts.get("team", "unknown")
+        except Exception:
+            notion = None
+            logger.warning("Failed to initialize NotionSync for team reports")
+        if notion and notion.enabled:
+            if notion._state.get("last_team_reports_sync") == today:
+                logger.info(
+                    "Team reports already synced to Notion for %s — skipping",
+                    today,
+                )
+            else:
+                _trg = team_report_groups or {}
+                failed_teams: list[str] = []
+                for ts in brief_data.get("team_summaries", []):
+                    team_name = ts.get("team", "unknown")
+                    try:
                         detail_md = _build_team_detail_markdown(
                             team_name, _trg.get(team_name, [])
                         )
@@ -574,10 +579,20 @@ def _push_daily_outputs(
                             finding_count=ts.get("finding_count", 0),
                             detail_markdown=detail_md,
                         )
+                    except Exception:
+                        logger.warning(
+                            "Failed to push %s team report to Notion", team_name
+                        )
+                        failed_teams.append(team_name)
+
+                if not failed_teams:
                     notion._state["last_team_reports_sync"] = today
                     notion._save_state()
-    except Exception:
-        logger.debug("Team report push to Notion skipped")
+                else:
+                    logger.warning(
+                        "Team report push incomplete — failed: %s",
+                        ", ".join(failed_teams),
+                    )
 
 
 def run_weekly() -> str:
