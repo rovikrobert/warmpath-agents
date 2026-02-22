@@ -52,6 +52,9 @@ RULES:
 - Include markdown links to relevant pages: [contacts](/contacts), [find referrals](/referrals), [applications](/applications), [preferences](/preferences), [credits](/credits).
 - Never use "I hope this finds you well" or similar filler.
 - Never mention that you're an AI unless directly asked.
+- NEVER highlight empty states negatively for new users. Zero applications, zero contacts, zero searches are EXPECTED for someone who just joined. Don't say "you have 0 applications" — instead focus on what they CAN do. Frame everything as opportunity, not deficit.
+- If the user already has contacts uploaded (network.total_contacts > 0), do NOT suggest uploading contacts again. They've already done it.
+- The user is looking for a NEW job EXTERNALLY. Never recommend reaching out to contacts at the user's CURRENT company (user.company) for referrals — that makes no sense. Focus on contacts at OTHER companies.
 
 CONTEXT: You receive the user's data as a JSON snapshot. Use it to give personalized advice."""
 
@@ -813,7 +816,7 @@ async def _generate_briefing_via_claude(
         user_prompt = (
             f"Generate my daily career briefing. This is session #{session_number}, "
             f"coaching stage: {stage}. "
-            f"{'First visit — orient the user.' if session_number == 1 else ''}"
+            f"{'First visit — welcome them warmly and orient them. Do NOT mention zero applications, zero searches, or any empty counts — they just joined, of course everything is zero. Focus on what they can do, not what is missing.' if session_number == 1 else ''}"
             f"{'Returning user — skip basics, focus on progress.' if session_number > 5 else ''}\n\n"
             f"Data:\n{json.dumps(context, default=str, indent=2)}"
         )
