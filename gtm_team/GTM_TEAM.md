@@ -175,7 +175,7 @@ The GTM team operates under strict privacy constraints because marketing is the 
 3. **No cross-vault claims** -- Never imply we can see across users' networks
 4. **Suppression list respected** -- Marketing targeting must check suppression list
 5. **Jurisdiction compliance** -- Marketing must comply with PDPA (Singapore), GDPR (EU), CCPA (US)
-6. **Referral bonus framing** -- Never imply WarmPath pays referral bonuses; they flow employer -> employee
+6. **Referral bonus framing** -- Never imply WarmPath pays referral bonuses. Currently they flow employer -> employee; do not promise this arrangement is permanent
 
 ## Cross-Team Coordination
 
