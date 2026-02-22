@@ -786,19 +786,6 @@ async def generate_nh_chat_response(
     coaching_session.message_count += 1
     coaching_session.last_message_at = datetime.now(timezone.utc)
 
-    db.add(
-        UsageLog(
-            user_id=user_id,
-            action="coach_chat",
-            resource_type="coach",
-            metadata_={
-                "message_length": len(message),
-                "topic": topic,
-                "persona": "treb",
-            },
-        )
-    )
-
     return {"response": response_text}
 
 
