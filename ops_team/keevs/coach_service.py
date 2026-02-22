@@ -49,7 +49,7 @@ RULES:
 - When contact search results are provided, name specific contacts with their title and company. These are the user's own contacts — no privacy concern.
 - When no search results are available, talk about counts at companies ("you have 3 contacts at Stripe").
 - Do NOT invent data. If something is missing, acknowledge it and suggest filling it in.
-- Include markdown links to relevant pages: [contacts](/contacts), [find referrals](/referrals), [applications](/applications), [preferences](/preferences), [credits](/credits).
+- Include markdown links to relevant pages: [contacts](/contacts), [find referrals](/referrals), [applications](/applications), [preferences](/settings?tab=profile), [credits](/credits).
 - Never use "I hope this finds you well" or similar filler.
 - Never mention that you're an AI unless directly asked.
 - NEVER highlight empty states negatively for new users. Zero applications, zero contacts, zero searches are EXPECTED for someone who just joined. Don't say "you have 0 applications" — instead focus on what they CAN do. Frame everything as opportunity, not deficit.
@@ -297,7 +297,7 @@ def get_suggested_prompts(context: dict) -> list[str]:
     if follow_ups > 0:
         prompts.append("What follow-ups should I send?")
 
-    if prefs:
+    if prefs and total_contacts > 0:
         prompts.append("What's the market like for my role?")
 
     if total_apps > 0:
@@ -308,14 +308,15 @@ def get_suggested_prompts(context: dict) -> list[str]:
         top = (network or {}).get("top_companies", [])
         if top:
             top_company = top[0]["company"]
-            prompts.append(f"Who do I know at {top_company}?")
+            prompts.insert(1, f"Who do I know at {top_company}?")
 
+    focus_prompt = "What should I focus on today?"
     if not prompts:
-        prompts.append("What should I focus on today?")
+        prompts.append(focus_prompt)
 
-    # Always include a general option
-    if len(prompts) < 2:
-        prompts.append("What should I focus on today?")
+    # Always include a general option (but avoid duplicates)
+    if len(prompts) < 2 and focus_prompt not in prompts:
+        prompts.append(focus_prompt)
 
     return prompts[:4]
 
@@ -347,8 +348,10 @@ def _determine_coaching_stage(context: dict) -> str:
     if total_contacts == 0:
         return STAGE_ONBOARDING
 
-    # Has contacts but no preferences or apps → network building
+    # Has contacts but no preferences or apps → network building (or stalled if no activity)
     if not prefs or not prefs.get("target_role"):
+        if total_apps == 0 and len(recent_searches) == 0:
+            return STAGE_STALLED
         return STAGE_NETWORK_BUILDING
 
     # Has contacts + prefs but no apps and no recent searches → stalled
@@ -477,9 +480,14 @@ def _mock_briefing(
             f"Good to see you again, {first_name}. Let's pick up where we left off."
         )
     elif session_number <= 5:
-        parts.append(
-            f"Hey {first_name}, session #{session_number} — you're building momentum."
-        )
+        if stage == STAGE_STALLED:
+            parts.append(
+                f"Hey {first_name}, session #{session_number} — let's get things moving."
+            )
+        else:
+            parts.append(
+                f"Hey {first_name}, session #{session_number} — you're building momentum."
+            )
     else:
         parts.append(f"Hey {first_name}, welcome back (session #{session_number}).")
 
@@ -507,14 +515,22 @@ def _mock_briefing(
         active = sum(
             v for k, v in status_counts.items() if k not in ("rejected", "withdrawn")
         )
-        parts.append(
-            f"You have {active} active application{'s' if active != 1 else ''} in your pipeline."
-        )
+        rejected = status_counts.get("rejected", 0)
+        if active == 0 and rejected > 0:
+            parts.append(
+                f"Your pipeline has {rejected} closed application{'s' if rejected != 1 else ''}. "
+                "Every 'no' gets you closer — [find new referral paths](/referrals)."
+            )
+        else:
+            parts.append(
+                f"You have {active} active application{'s' if active != 1 else ''} in your pipeline."
+            )
 
     # Follow-ups: always show if due
     if follow_ups > 0:
+        urgency = "**Urgent:** " if follow_ups >= 3 else ""
         parts.append(
-            f"**{follow_ups} follow-up{'s' if follow_ups != 1 else ''}** "
+            f"{urgency}**{follow_ups} follow-up{'s' if follow_ups != 1 else ''}** "
             f"{'are' if follow_ups != 1 else 'is'} due — check your [applications](/applications)."
         )
 
@@ -538,23 +554,40 @@ def _mock_briefing(
                     f"You've searched {len(recent_searches)} companies recently. "
                     "[Find more referral paths](/referrals)."
                 )
+            elif top and stage == STAGE_STALLED:
+                top_name = top[0]["company"]
+                parts.append(
+                    f"Your network still has strong paths — especially at {top_name}. "
+                    "[Search for referral paths](/referrals)."
+                )
 
     # Preferences: only prompt if missing AND early session (P3)
     if not prefs and session_number <= 3:
         parts.append(
-            "Set your [job preferences](/preferences) so I can give you targeted advice."
+            "Set your [job preferences](/settings?tab=profile) so I can give you targeted advice."
         )
     elif not prefs and session_number > 3:
         parts.append(
-            "Reminder: [set your preferences](/preferences) to unlock personalized matching."
+            "Reminder: [set your preferences](/settings?tab=profile) to unlock personalized matching."
         )
 
-    # Stalled users: give a gentle push (P1)
+    # Stalled users: escalating nudge (P1)
     if stage == STAGE_STALLED and session_number > 3:
-        parts.append(
-            "Looks like your search has slowed down. Want to [explore new companies](/referrals) "
-            "or review your [network for untapped connections](/contacts)?"
-        )
+        if session_number <= 5:
+            parts.append(
+                "Looks like your search has slowed down. Want to [explore new companies](/referrals) "
+                "or review your [network for untapped connections](/contacts)?"
+            )
+        elif session_number <= 8:
+            parts.append(
+                "Try [browsing the marketplace](/referrals) for companies you haven't considered — "
+                "sometimes the best referral paths are ones you didn't expect."
+            )
+        else:
+            parts.append(
+                "Even one warm intro this week can change your trajectory. "
+                "[Find a new referral path](/referrals) — your network has more reach than you think."
+            )
 
     # Market data (unchanged — only show if available)
     market = context.get("market")
@@ -594,7 +627,6 @@ def _mock_chat_response(
 
     Returns (response_text, topic_name_or_none).
     """
-    message.lower()
     network = context.get("network")
     pipeline = context.get("pipeline", {})
     prefs = context.get("preferences")
@@ -687,7 +719,7 @@ def _mock_chat_response(
             )
         return (
             "I don't have your target role yet. "
-            "[Set your preferences](/preferences) and I can give you specific guidance.",
+            "[Set your preferences](/settings?tab=profile) and I can give you specific guidance.",
             topic,
         )
 
@@ -718,7 +750,7 @@ def _mock_chat_response(
         return (
             "Here's your game plan:\n\n"
             "1. [Upload your LinkedIn CSV](/contacts) — this maps your network.\n"
-            "2. [Set your job preferences](/preferences) — target role, seniority, locations.\n"
+            "2. [Set your job preferences](/settings?tab=profile) — target role, seniority, locations.\n"
             "3. [Search for referrals](/referrals) — I'll find warm paths to your target companies.\n\n"
             "The key insight: referrals convert at 10-40% vs 1-3% for cold applications. "
             "Your existing network is more valuable than you think.",
@@ -817,7 +849,7 @@ async def _generate_briefing_via_claude(
             f"Generate my daily career briefing. This is session #{session_number}, "
             f"coaching stage: {stage}. "
             f"{'First visit — welcome them warmly and orient them. Do NOT mention zero applications, zero searches, or any empty counts — they just joined, of course everything is zero. Focus on what they can do, not what is missing.' if session_number == 1 else ''}"
-            f"{'Returning user — skip basics, focus on progress.' if session_number > 5 else ''}\n\n"
+            f"{'Session ' + str(session_number) + ' — they know the basics. Focus on progress, suggest one concrete next step.' if 2 <= session_number <= 5 else ('Returning user — skip basics, focus on new insights and progress.' if session_number > 5 else '')}\n\n"
             f"Data:\n{json.dumps(context, default=str, indent=2)}"
         )
 
@@ -831,7 +863,7 @@ async def _generate_briefing_via_claude(
         return message.content[0].text.strip()
     except Exception as exc:
         logger.error("Claude briefing API failed: %s — falling back to mock", exc)
-        return _mock_briefing(context)
+        return _mock_briefing(context, session_number, stage)
 
 
 # ---------------------------------------------------------------------------
@@ -934,9 +966,11 @@ def _build_chat_messages(
             continue
         role_val = entry.get("role")
         content_val = entry.get("content")
-        if role_val not in ("user", "keevs") or not isinstance(content_val, str):
+        if role_val not in ("user", "keevs", "treb") or not isinstance(
+            content_val, str
+        ):
             continue
-        role = "assistant" if role_val == "keevs" else "user"
+        role = "assistant" if role_val in ("keevs", "treb") else "user"
         messages.append({"role": role, "content": content_val[:5000]})
 
     # Current message
