@@ -26,6 +26,7 @@ def main() -> None:
     register_tools()
 
     if args.transport == "sse":
+        mcp.settings.host = "0.0.0.0"  # bind all interfaces (container-accessible)
         mcp.settings.port = args.port
     mcp.run(transport=args.transport)
 
