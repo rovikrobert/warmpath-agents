@@ -87,6 +87,26 @@ Also accessible via orchestrator: `--cos-daily`, `--cos-weekly`, `--cos-status`
 
 *For detailed organizational restructuring authority (add/remove/consolidate agents, form pods, restructure teams), see Section 7: Organizational Restructuring Framework.*
 
+## Decision Lifecycle (Preventing Stale Decisions)
+
+**Problem:** Briefs contain Decision Log tables with PENDING items that remain PENDING even after the founder decides and engineering implements. Future briefs reference stale PENDING items, wasting founder attention.
+
+**Rules:**
+
+1. **Close the loop.** When a founder decision is made, immediately update the Decision Log in the originating brief file. Change `PENDING` → `RESOLVED` with the date and decision taken.
+
+2. **Verify before surfacing.** Before referencing a prior PENDING decision in any new brief:
+   - Check the originating brief's Decision Log for current status
+   - Cross-check the codebase: search for implementation evidence (git log, code changes) that indicates the decision was already acted on
+   - Only surface as "pending" if both the brief AND the codebase confirm no action taken
+
+3. **Quarterly sweep.** During weekly briefs, scan all `agents/chief_of_staff/reports/*.md` files for any remaining `PENDING` entries older than 14 days. Flag these as potentially stale and verify before including in the weekly brief.
+
+4. **Format.** When resolving a decision log entry:
+   ```
+   | Date | Decision | Decider | **RESOLVED** — [decision taken]. Decided YYYY-MM-DD |
+   ```
+
 ## Team Optimization Playbooks
 
 ### 2.1 Engineering Team
