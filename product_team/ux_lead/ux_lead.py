@@ -30,10 +30,10 @@ AGENT_NAME = "ux_lead"
 
 
 def _find_jsx_files() -> list[Path]:
-    """Return all .jsx files under frontend/src/."""
+    """Return all .jsx/.tsx files under frontend/src/."""
     if not FRONTEND_SRC.is_dir():
         return []
-    return sorted(FRONTEND_SRC.rglob("*.jsx"))
+    return sorted([*FRONTEND_SRC.rglob("*.jsx"), *FRONTEND_SRC.rglob("*.tsx")])
 
 
 def _read_safe(path: Path) -> str:
@@ -430,8 +430,10 @@ def _analyze_user_flows(
     graph: dict[str, set[str]] = {}
     page_files = [p for p in jsx_files if "pages/" in str(p)]
 
-    # Parse App.jsx for route definitions
-    app_jsx = FRONTEND_SRC / "App.jsx"
+    # Parse App.jsx/App.tsx for route definitions
+    app_jsx = FRONTEND_SRC / "App.tsx"
+    if not app_jsx.exists():
+        app_jsx = FRONTEND_SRC / "App.jsx"
     route_to_page: dict[str, str] = {}
     if app_jsx.exists():
         app_source = _read_safe(app_jsx)
@@ -448,8 +450,10 @@ def _analyze_user_flows(
         re.compile(r'href\s*=\s*["\'](/[^"\']+)["\']'),
     ]
 
-    # Parse Layout.jsx for persistent sidebar navigation (always visible)
-    layout_file = FRONTEND_SRC / "components" / "Layout.jsx"
+    # Parse Layout.jsx/Layout.tsx for persistent sidebar navigation (always visible)
+    layout_file = FRONTEND_SRC / "components" / "Layout.tsx"
+    if not layout_file.exists():
+        layout_file = FRONTEND_SRC / "components" / "Layout.jsx"
     sidebar_targets: set[str] = set()
     if layout_file.exists():
         layout_source = _read_safe(layout_file)

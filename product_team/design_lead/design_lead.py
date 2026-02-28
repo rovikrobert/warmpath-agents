@@ -30,10 +30,10 @@ AGENT_NAME = "design_lead"
 
 
 def _find_jsx_files() -> list[Path]:
-    """Return all .jsx files under frontend/src/."""
+    """Return all .jsx/.tsx files under frontend/src/."""
     if not FRONTEND_SRC.is_dir():
         return []
-    return sorted(FRONTEND_SRC.rglob("*.jsx"))
+    return sorted([*FRONTEND_SRC.rglob("*.jsx"), *FRONTEND_SRC.rglob("*.tsx")])
 
 
 def _find_css_files() -> list[Path]:
