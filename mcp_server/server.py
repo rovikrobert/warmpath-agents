@@ -13,6 +13,6 @@ mcp = FastMCP("warmpath")
 
 def register_tools() -> None:
     """Import tool modules to trigger @mcp.tool() registration."""
-    from mcp_server.tools import audit, database, health, reports, stripe  # noqa: F401
+    from mcp_server.tools import audit, database, health, memory, reports, stripe  # noqa: F401
 
     logger.info("All MCP tools registered")

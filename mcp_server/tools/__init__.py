@@ -1,1 +1,1 @@
-"""MCP tool modules for database, health, Stripe, audit, and reports."""
+"""MCP tool modules for database, health, memory, Stripe, audit, and reports."""
