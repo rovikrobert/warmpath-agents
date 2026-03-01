@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s %(message)s")
 
@@ -26,8 +27,25 @@ def main() -> None:
     register_tools()
 
     if args.transport == "sse":
+        from mcp.server.transport_security import TransportSecuritySettings
+
         mcp.settings.host = "0.0.0.0"  # bind all interfaces (container-accessible)
         mcp.settings.port = args.port
+
+        # Railway (and other reverse proxies) forward requests with the
+        # public hostname as the Host header.  The MCP SDK's default DNS
+        # rebinding protection rejects anything that isn't localhost,
+        # returning 421.  Whitelist the Railway domain via env var.
+        railway_host = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+        allowed_hosts = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
+        if railway_host:
+            allowed_hosts.append(f"{railway_host}:*")
+            allowed_hosts.append(railway_host)
+        mcp.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+        )
+
     mcp.run(transport=args.transport)
 
 
