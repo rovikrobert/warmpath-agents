@@ -59,8 +59,18 @@ class AgentReport:
 
     @classmethod
     def from_dict(cls, data: dict) -> "AgentReport":
+        data = dict(data)  # Don't mutate caller's dict
         findings = [Finding(**f) for f in data.pop("findings", [])]
-        return cls(findings=findings, **data)
+        known = {
+            "agent",
+            "timestamp",
+            "scan_duration_seconds",
+            "metrics",
+            "intelligence_applied",
+            "learning_updates",
+        }
+        filtered = {k: v for k, v in data.items() if k in known}
+        return cls(findings=findings, **filtered)
 
     @classmethod
     def from_json(cls, text: str) -> "AgentReport":
