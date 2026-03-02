@@ -42,6 +42,20 @@ _RUNTIME_DEPS: set[str] = {
     "email-validator",  # Pydantic EmailStr validator (loaded by pydantic at runtime)
     "python-multipart",  # FastAPI form/file upload support (loaded by fastapi at runtime)
     "python-dotenv",  # Loaded by pydantic-settings for .env files
+    # Used outside app/ (mcp_server/, agents/, scripts/, finance_team/) — not dead
+    "mcp",  # mcp_server/ MCP SDK
+    "openpyxl",  # finance_team/ Excel export
+    "posthog",  # PostHog Python SDK (backend uses httpx; kept for future direct SDK use)
+    "langgraph-checkpoint",  # LangGraph checkpoint interface (loaded by langgraph)
+    "langgraph-checkpoint-redis",  # LangGraph Redis checkpointer (loaded by config)
+    "langchain-anthropic",  # LangChain Anthropic integration (transitive of langgraph)
+    "markdownify",  # Transitive dep of python-jobspy (pinned for GHSA-7mpr-5m44-h73r)
+    "python-jobspy",  # Imported as `jobspy` (import name differs from package name)
+    "PyJWT",  # Imported as `jwt` (import name differs from package name)
+    "google-genai",  # Imported as `google.genai` (namespace package)
+    "google-auth",  # Imported as `google.auth` (namespace package)
+    # Test-only dependencies
+    "fakeredis",  # Used in tests/ for Redis mocking
 }
 
 # Import names that are provided by another declared dependency (transitive)
@@ -50,6 +64,9 @@ _TRANSITIVE_IMPORTS: set[str] = {
     "jose",  # provided by python-jose
     "multipart",  # provided by python-multipart
     "dotenv",  # provided by python-dotenv
+    "jwt",  # provided by PyJWT[crypto]
+    "jobspy",  # provided by python-jobspy
+    "google",  # namespace package covering google-genai, google-auth, etc.
 }
 
 # Standard-library modules that should never be flagged as missing deps
@@ -130,10 +147,25 @@ _STDLIB_MODULES: set[str] = {
     "xml",
     "zipfile",
     "zlib",
+    "statistics",
     # typing extensions
     "typing_extensions",
     # __future__ is special
     "__future__",
+}
+
+# Local project modules that are not pip packages
+_LOCAL_MODULES: set[str] = {
+    "app",
+    "agents",
+    "ops_team",
+    "data_team",
+    "product_team",
+    "finance_team",
+    "gtm_team",
+    "mcp_server",
+    "scripts",
+    "tests",
 }
 
 
@@ -415,11 +447,11 @@ def _check_imports(deps: list[dict], app_dir: Path) -> tuple[list[Finding], int,
         req_import_names[import_name] = dep["name"]
         req_base_names.add(dep["base_name"])
 
-    # Filter out stdlib and local app imports
+    # Filter out stdlib and local project imports
     external_imports = {
         imp
         for imp in actual_imports
-        if imp not in _STDLIB_MODULES and imp != "app" and imp != "agents"
+        if imp not in _STDLIB_MODULES and imp not in _LOCAL_MODULES
     }
 
     # Missing from requirements (imported but not declared)
