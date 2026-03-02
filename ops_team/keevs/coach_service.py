@@ -55,6 +55,8 @@ RULES:
 - NEVER highlight empty states negatively for new users. Zero applications, zero contacts, zero searches are EXPECTED for someone who just joined. Don't say "you have 0 applications" — instead focus on what they CAN do. Frame everything as opportunity, not deficit.
 - If the user already has contacts uploaded (network.total_contacts > 0), do NOT suggest uploading contacts again. They've already done it.
 - The user is looking for a NEW job EXTERNALLY. Never recommend reaching out to contacts at the user's CURRENT company (user.company) for referrals — that makes no sense. Focus on contacts at OTHER companies.
+- Keep output scannable: 1-2 sentences per paragraph, separated by blank lines.
+- If giving steps, use a short numbered list (max 4 items) with one sentence per item.
 
 CONTEXT: You receive the user's data as a JSON snapshot. Use it to give personalized advice."""
 
@@ -114,6 +116,33 @@ def _format_contact_results_markdown(search_result: dict, limit: int = 10) -> st
 
     lines.append("\nWant me to help you draft a referral message to any of them?")
     return "\n".join(lines)
+
+
+def _chunk_response_text(text: str) -> str:
+    """Split dense prose into short, chat-friendly chunks."""
+    if not text:
+        return text
+
+    sentence_re = re.compile(r"[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$")
+    out_lines: list[str] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^(?:[-*]\s|\d+\.\s)", line):
+            out_lines.append(line)
+            continue
+
+        sentences = [s.strip() for s in sentence_re.findall(line) if s.strip()]
+        if len(sentences) <= 2:
+            out_lines.append(line)
+            continue
+
+        for i in range(0, len(sentences), 2):
+            out_lines.append(" ".join(sentences[i : i + 2]).strip())
+
+    return "\n".join(out_lines).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -819,6 +848,7 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
         briefing_text = await _generate_briefing_via_claude(
             context, session_number, stage
         )
+    briefing_text = _chunk_response_text(briefing_text)
 
     suggested = get_suggested_prompts(context)
 
@@ -897,6 +927,7 @@ async def generate_chat_response(
             message, conversation_history or [], context_snapshot, contact_results
         )
         topic = _detect_topic(message)
+    response_text = _chunk_response_text(response_text)
 
     # Track topic in session (P4)
     if topic:
@@ -1014,7 +1045,7 @@ async def generate_chat_response_stream(
     """Yield text chunks as they arrive from Claude. Mock mode yields full text at once."""
     if settings.AI_MOCK_MODE:
         text, _ = _mock_chat_response(message, context, contact_results=contact_results)
-        yield text
+        yield _chunk_response_text(text)
         return
 
     try:
@@ -1034,4 +1065,4 @@ async def generate_chat_response_stream(
     except Exception as exc:
         logger.error("Claude stream API failed: %s — falling back to mock", exc)
         text, _ = _mock_chat_response(message, context, contact_results=contact_results)
-        yield text
+        yield _chunk_response_text(text)

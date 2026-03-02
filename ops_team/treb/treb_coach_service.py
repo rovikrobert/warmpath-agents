@@ -50,6 +50,8 @@ RULES:
 - Never mention that you're an AI unless directly asked.
 - Celebrate milestones: first listing, first intro approved, reputation score increases.
 - NEVER highlight empty states negatively for new users. Zero listings, zero intros are EXPECTED for someone who just joined. Focus on what they CAN do, not what is missing.
+- Keep output scannable: 1-2 sentences per paragraph, separated by blank lines.
+- If giving steps, use a short numbered list (max 4 items) with one sentence per item.
 
 CONTEXT: You receive the user's data as a JSON snapshot. Use it to give personalized advice."""
 
@@ -93,6 +95,33 @@ _NH_TOPIC_PATTERNS = [
 def is_nh_topic(message: str) -> bool:
     """Return True if the message is about network-holder topics."""
     return any(p.search(message) for p in _NH_TOPIC_PATTERNS)
+
+
+def _chunk_response_text(text: str) -> str:
+    """Split dense prose into short, chat-friendly chunks."""
+    if not text:
+        return text
+
+    sentence_re = re.compile(r"[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$")
+    out_lines: list[str] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^(?:[-*]\s|\d+\.\s)", line):
+            out_lines.append(line)
+            continue
+
+        sentences = [s.strip() for s in sentence_re.findall(line) if s.strip()]
+        if len(sentences) <= 2:
+            out_lines.append(line)
+            continue
+
+        for i in range(0, len(sentences), 2):
+            out_lines.append(" ".join(sentences[i : i + 2]).strip())
+
+    return "\n".join(out_lines).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -701,6 +730,7 @@ async def generate_nh_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
         briefing_text = await _generate_nh_briefing_via_claude(
             context, session_number, stage
         )
+    briefing_text = _chunk_response_text(briefing_text)
 
     suggested = get_nh_suggested_prompts(context)
 
@@ -791,6 +821,7 @@ async def generate_nh_chat_response(
             message, conversation_history or [], context_snapshot
         )
         topic = _detect_nh_topic(message)
+    response_text = _chunk_response_text(response_text)
 
     if topic:
         await _record_nh_topic(coaching_session, topic, db)
@@ -869,7 +900,7 @@ async def generate_nh_chat_response_stream(
     """Yield text chunks as they arrive from Claude. Mock mode yields full text at once."""
     if settings.AI_MOCK_MODE:
         text, _ = _mock_nh_chat_response(message, context)
-        yield text
+        yield _chunk_response_text(text)
         return
 
     try:
@@ -887,4 +918,4 @@ async def generate_nh_chat_response_stream(
     except Exception as exc:
         logger.error("Claude NH stream API failed: %s — falling back to mock", exc)
         text, _ = _mock_nh_chat_response(message, context)
-        yield text
+        yield _chunk_response_text(text)
