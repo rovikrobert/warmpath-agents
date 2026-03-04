@@ -130,6 +130,23 @@ def cmd_all(skip_tests: bool = False) -> None:
     all_findings = merge_reports(reports)
     record_brief_metrics(all_findings)
 
+    # Auto-repair phase: fix auto_fixable findings (ruff lint + format)
+    repair_result = None
+    try:
+        from agents.shared.repair import repair_auto_fixable
+
+        repair_result = repair_auto_fixable(all_findings)
+        if repair_result.fixed_count > 0:
+            logger.info(
+                "Auto-repair: fixed %d findings, PR: %s",
+                repair_result.fixed_count,
+                repair_result.pr_url,
+            )
+        if repair_result.errors:
+            logger.warning("Auto-repair errors: %s", repair_result.errors)
+    except Exception as exc:
+        logger.warning("Auto-repair phase failed: %s", exc)
+
     # Record health snapshot
     try:
         from agents.shared.learning import get_learning_state

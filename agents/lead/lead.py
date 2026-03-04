@@ -253,6 +253,23 @@ def generate_daily_brief(reports: list[AgentReport] | None = None) -> str:
         lines.append(f"- {rec}")
     lines.append("")
 
+    # Auto-Repairs summary
+    auto_fixed = [
+        f for f in all_findings if getattr(f, "repair_status", "pending") == "fixed"
+    ]
+    auto_failed = [
+        f for f in all_findings if getattr(f, "repair_status", "pending") == "failed"
+    ]
+    if auto_fixed or auto_failed:
+        lines.append("### Auto-Repairs")
+        if auto_fixed:
+            lines.append(f"- Fixed {len(auto_fixed)} issues (ruff lint + format)")
+        if auto_failed:
+            lines.append(
+                f"- Failed to fix {len(auto_failed)} issues (tests failed after repair)"
+            )
+        lines.append("")
+
     # Learning Updates (never breaks the brief)
     try:
         from agents.shared.learning import get_learning_state
