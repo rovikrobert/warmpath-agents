@@ -346,6 +346,28 @@ def run_daily() -> str:
     # Request tracking report (Gap 6)
     request_report = get_request_tracking_report()
 
+    # Run auto-repair on merged findings before synthesizing
+    _repair_data = None
+    _recommendation_data = None
+    try:
+        from agents.shared.repair import repair_auto_fixable
+        from agents.shared.report import merge_reports as _merge_for_repair
+
+        _all_findings = _merge_for_repair(reports) if reports else []
+        _repair_result = repair_auto_fixable(_all_findings)
+        if _repair_result.fixed_count > 0 or _repair_result.failed_count > 0:
+            _repair_data = {
+                "fixed_count": _repair_result.fixed_count,
+                "failed_count": _repair_result.failed_count,
+                "skipped_count": _repair_result.skipped_count,
+                "pr_url": _repair_result.pr_url,
+                "errors": _repair_result.errors,
+            }
+        if _repair_result.recommendations:
+            _recommendation_data = _repair_result.recommendations
+    except Exception as _exc:
+        logger.warning("CoS repair phase skipped: %s", _exc)
+
     brief, brief_data = synthesize_daily(
         reports,
         kpi_snapshot,
@@ -354,6 +376,8 @@ def run_daily() -> str:
         cross_team_requests,
         founder_requests=founder_requests,
         resolutions=[r.model_dump() for r in resolutions],
+        repairs=_repair_data,
+        recommendations=_recommendation_data,
     )
 
     # Append new sections to brief

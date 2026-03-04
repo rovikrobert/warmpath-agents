@@ -22,6 +22,7 @@ class Finding:
     recurrence_count: int = 1
     first_seen: str = ""
     auto_fixable: bool = False
+    repair_status: str = "pending"  # pending | fixed | failed | skipped
 
     def __post_init__(self):
         if not self.first_seen:

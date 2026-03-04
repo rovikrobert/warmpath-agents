@@ -65,6 +65,8 @@ def synthesize_daily(
     cross_team_requests: list[dict[str, Any]] | None = None,
     founder_requests: list[dict[str, Any]] | None = None,
     resolutions: list[dict[str, Any]] | None = None,
+    repairs: dict[str, Any] | None = None,
+    recommendations: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Daily cycle: load reports -> classify -> enrich -> render brief."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -134,7 +136,13 @@ def synthesize_daily(
 
     rendered = _render_daily_brief(brief, alerts or [])
     # Return both markdown and structured data for Telegram/Notion consumers
-    return rendered, brief.model_dump()
+    data = brief.model_dump()
+    # Attach repair + recommendation data for Telegram (not part of FounderBrief model)
+    if repairs:
+        data["repairs"] = repairs
+    if recommendations:
+        data["recommendations"] = recommendations
+    return rendered, data
 
 
 def _check_operational_health(

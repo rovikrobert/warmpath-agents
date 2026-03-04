@@ -91,6 +91,8 @@ class TelegramBridge:
         decisions: list[str],
         cost: str,
         notion_url: str = "",
+        repairs: dict[str, Any] | None = None,
+        recommendations: list[str] | None = None,
     ) -> str:
         status_icon = {"green": "[G]", "yellow": "[Y]", "red": "[R]"}
         lines = [f"WarmPath Daily — {date}", ""]
@@ -100,6 +102,18 @@ class TelegramBridge:
             summary = ts.get("summary", "No report")
             lines.append(f"{team}: {summary} {icon}")
         lines.append(f"Cost: {cost}")
+
+        # Auto-repairs
+        if repairs and repairs.get("fixed_count", 0) > 0:
+            pr_note = f" ({repairs['pr_url']})" if repairs.get("pr_url") else ""
+            lines.append(f"[+] Fixed: {repairs['fixed_count']} issues{pr_note}")
+
+        # Recommendations
+        if recommendations:
+            lines.append(f"[!] {len(recommendations)} recommendations:")
+            for i, rec in enumerate(recommendations[:5], 1):
+                lines.append(f"  {i}. {rec}")
+
         if decisions:
             lines.append("")
             lines.append("Need your call:")
@@ -206,12 +220,18 @@ class TelegramBridge:
         notion_url = ""
         if notion_page_id:
             notion_url = f"https://notion.so/{notion_page_id.replace('-', '')}"
+        # Extract repairs and recommendations from brief_data
+        repairs = brief_data.get("repairs")
+        recommendations = brief_data.get("recommendations")
+
         message = self.format_daily_brief(
             date=date_str,
             team_summaries=team_summaries,
             decisions=decisions,
             cost=cost_str,
             notion_url=notion_url,
+            repairs=repairs,
+            recommendations=recommendations,
         )
         if alerts:
             message += "\n\n" + "\n".join(f"[!] {a}" for a in alerts)
