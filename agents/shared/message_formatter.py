@@ -210,6 +210,35 @@ class MessageFormatter:
             lines.append(f" {name} (Day {day}/{total}): {summary} {icon}")
         return "\n".join(lines)
 
+    def execution_summary(
+        self,
+        events: list[dict[str, str]],
+    ) -> str:
+        """Format autonomous execution events for the daily brief."""
+        if not events:
+            return "No autonomous actions overnight."
+
+        auto_fixed = [e for e in events if e.get("action") == "auto_fixed"]
+        prs = [e for e in events if e.get("action") == "pr_created"]
+        escalated = [e for e in events if e.get("action") == "escalated"]
+
+        lines = ["Autonomous Actions:"]
+        if auto_fixed:
+            lines.append(f"  Auto-fixed: {len(auto_fixed)}")
+            for e in auto_fixed[:3]:
+                lines.append(f"    - {e.get('detail', '?')}")
+        if prs:
+            lines.append(f"  PRs opened: {len(prs)}")
+            for e in prs[:3]:
+                pr_url = e.get("pr_url", "")
+                lines.append(f"    - {e.get('detail', '?')} {pr_url}")
+        if escalated:
+            lines.append(f"  Escalated: {len(escalated)}")
+            for e in escalated[:3]:
+                lines.append(f"    - {e.get('detail', '?')}")
+
+        return "\n".join(lines)
+
     # -----------------------------------------------------------------
     # Parse founder replies
     # -----------------------------------------------------------------

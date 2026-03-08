@@ -52,6 +52,8 @@ _AGENT_MODULES = {
     "doc_keeper": "agents.doc_keeper.doc_keeper",
     "security": "agents.security.security",
     "privy": "agents.privy.privy",
+    "ux_lead": "product_team.ux_lead.ux_lead",
+    "design_lead": "product_team.design_lead.design_lead",
 }
 
 
@@ -136,22 +138,36 @@ def cmd_all(skip_tests: bool = False) -> None:
     all_findings = merge_reports(reports)
     record_brief_metrics(all_findings)
 
-    # Auto-repair phase: fix auto_fixable findings (ruff lint + format)
-    repair_result = None
+    # Execution engine phase: triage findings and take action
+    _execution_summary = None
     try:
-        from agents.shared.repair import repair_auto_fixable
+        from agents.shared.execution_engine import ExecutionEngine
 
-        repair_result = repair_auto_fixable(all_findings)
-        if repair_result.fixed_count > 0:
-            logger.info(
-                "Auto-repair: fixed %d findings, PR: %s",
-                repair_result.fixed_count,
-                repair_result.pr_url,
+        engine = ExecutionEngine()
+        if engine.enabled:
+            _execution_summary = engine.process_findings(
+                all_findings, team="engineering"
             )
-        if repair_result.errors:
-            logger.warning("Auto-repair errors: %s", repair_result.errors)
+            engine.publish_events("engineering")
+            logger.info(
+                "Execution engine: %s",
+                engine.get_summary_for_brief(),
+            )
+        else:
+            # Fallback to legacy repair pipeline
+            from agents.shared.repair import repair_auto_fixable
+
+            repair_result = repair_auto_fixable(all_findings)
+            if repair_result.fixed_count > 0:
+                logger.info(
+                    "Auto-repair: fixed %d findings, PR: %s",
+                    repair_result.fixed_count,
+                    repair_result.pr_url,
+                )
+            if repair_result.errors:
+                logger.warning("Auto-repair errors: %s", repair_result.errors)
     except Exception as exc:
-        logger.warning("Auto-repair phase failed: %s", exc)
+        logger.warning("Execution/repair phase failed: %s", exc)
 
     # Record health snapshot
     try:

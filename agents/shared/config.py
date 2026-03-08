@@ -73,6 +73,8 @@ AGENT_NAMES = [
     "doc_keeper",
     "security",
     "privy",
+    "ux_lead",
+    "design_lead",
 ]
 
 # KPI targets — (agent, kpi_name) → {target, yellow (optional)}
@@ -96,15 +98,21 @@ KPI_TARGETS: dict[tuple[str, str], dict] = {
     ("security", "medium_findings"): {"target": 5, "yellow": 10},
     ("privy", "critical_high"): {"target": 0},
     ("privy", "check_pass_rate"): {"target": 0.90, "yellow": 0.80},
+    ("ux_lead", "a11y_violations"): {"target": 0},
+    ("ux_lead", "lighthouse_score"): {"target": 90, "yellow": 80},
+    ("design_lead", "token_violations"): {"target": 0},
+    ("design_lead", "consistency_score"): {"target": 0.95, "yellow": 0.90},
 }
 
 # Health score weights per agent (total = 100)
 HEALTH_WEIGHTS: dict[str, int] = {
-    "security": 25,
-    "privy": 20,
+    "security": 20,
+    "privy": 15,
     "deps_manager": 15,
     "test_engineer": 15,
     "architect": 10,
     "perf_monitor": 10,
+    "ux_lead": 5,
+    "design_lead": 5,
     "doc_keeper": 5,
 }

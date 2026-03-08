@@ -33,8 +33,6 @@ EXPERIMENT_REGISTRY_PATH = PRODUCT_TEAM_DIR / "shared" / "experiment_registry.js
 PRODUCT_AGENT_NAMES: list[str] = [
     "user_researcher",
     "product_manager",
-    "ux_lead",
-    "design_lead",
     "product_lead",
 ]
 
@@ -152,9 +150,7 @@ INTEL_CACHE_TTL_HOURS = 24  # default intelligence cache TTL
 
 # Health score weights per agent (total = 100)
 HEALTH_WEIGHTS: dict[str, int] = {
-    "user_researcher": 20,
-    "product_manager": 25,
-    "ux_lead": 25,
-    "design_lead": 15,
-    "product_lead": 15,
+    "user_researcher": 25,
+    "product_manager": 35,
+    "product_lead": 40,
 }

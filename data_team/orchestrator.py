@@ -99,6 +99,23 @@ def cmd_all() -> None:
         else:
             print("  [SKIPPED]")
 
+    # Execution engine phase
+    try:
+        from agents.shared.execution_engine import ExecutionEngine
+
+        engine = ExecutionEngine()
+        if engine.enabled:
+            all_findings = []
+            for report in reports:
+                if hasattr(report, "findings"):
+                    all_findings.extend(report.findings)
+            if all_findings:
+                engine.process_findings(all_findings, team="data")
+                engine.publish_events("data")
+                logger.info("data execution: %s", engine.get_summary_for_brief())
+    except Exception as exc:
+        logger.warning("data execution phase failed: %s", exc)
+
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")
     print(f"Done in {elapsed:.1f}s — {len(reports)} agents reported")

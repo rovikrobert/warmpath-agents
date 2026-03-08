@@ -39,8 +39,6 @@ logger = logging.getLogger(__name__)
 _AGENT_MODULES: dict[str, str] = {
     "user_researcher": "product_team.user_researcher.user_researcher",
     "product_manager": "product_team.product_manager.product_manager",
-    "ux_lead": "product_team.ux_lead.ux_lead",
-    "design_lead": "product_team.design_lead.design_lead",
     "product_lead": "product_team.product_lead.product_lead",
 }
 
@@ -92,8 +90,6 @@ def cmd_all() -> None:
     agent_order = [
         "user_researcher",
         "product_manager",
-        "ux_lead",
-        "design_lead",
         "product_lead",
     ]
     for name in agent_order:
@@ -105,6 +101,23 @@ def cmd_all() -> None:
             print(f"  {findings_count} findings, {report.scan_duration_seconds:.1f}s")
         else:
             print("  [SKIPPED]")
+
+    # Execution engine phase
+    try:
+        from agents.shared.execution_engine import ExecutionEngine
+
+        engine = ExecutionEngine()
+        if engine.enabled:
+            all_findings = []
+            for report in reports:
+                if hasattr(report, "findings"):
+                    all_findings.extend(report.findings)
+            if all_findings:
+                engine.process_findings(all_findings, team="product")
+                engine.publish_events("product")
+                logger.info("product execution: %s", engine.get_summary_for_brief())
+    except Exception as exc:
+        logger.warning("product execution phase failed: %s", exc)
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")
