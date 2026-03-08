@@ -31,7 +31,15 @@ def _get_guard():
     return _guard
 
 
-@mcp.tool()
+@mcp.tool(
+    name="query_audit_log",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def query_audit_log(
     action: str | None = None,
     limit: int = 50,
@@ -40,6 +48,10 @@ def query_audit_log(
 
     Optional filters: action type. No PII in output.
     Audit logs are immutable — this is read-only.
+
+    Returns:
+        {"rows": list[dict], "count": int} on success.
+        {"error": str} on failure.
     """
     qe = _get_data_executor()
     if not qe.is_available():
@@ -66,12 +78,24 @@ def query_audit_log(
         return {"error": f"Audit log query failed: {exc}"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="enrichment_stats",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def enrichment_stats() -> dict[str, Any]:
     """Enrichment cache statistics — contacts by enrichment status.
 
     Shows how many contacts have relationship_type, would_refer,
     and other enrichment signals filled in.
+
+    Returns:
+        {"rows": list[dict], "count": int} on success.
+        {"error": str} on failure.
     """
     qe = _get_data_executor()
     if not qe.is_available():
@@ -93,12 +117,23 @@ def enrichment_stats() -> dict[str, Any]:
         return {"error": f"Enrichment stats query failed: {exc}"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="privacy_audit_log",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def privacy_audit_log(limit: int = 100) -> dict[str, Any]:
     """View PrivacyGuard's in-memory query audit trail.
 
     Shows the last N validated queries with timestamps, agent names,
     and SQL previews. Useful for debugging privacy violations.
+
+    Returns:
+        {"entries": list, "total": int}.
     """
     guard = _get_guard()
     entries = guard.get_audit_log()

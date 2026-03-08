@@ -25,9 +25,21 @@ def _unavailable_error() -> dict[str, str]:
     return {"error": "Stripe unavailable (STRIPE_SECRET_KEY not set)"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="stripe_balance",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
 def stripe_balance() -> dict[str, Any]:
-    """Get current Stripe account balance (available + pending)."""
+    """Get current Stripe account balance (available + pending).
+
+    Returns:
+        Balance details from Stripe API, or {"error": str} on failure.
+    """
     client = _get_client()
     if not client.is_available():
         return _unavailable_error()
@@ -35,9 +47,21 @@ def stripe_balance() -> dict[str, Any]:
     return result or {"error": "Stripe API call failed"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="stripe_subscriptions",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
 def stripe_subscriptions(status: str = "active") -> dict[str, Any]:
-    """List Stripe subscriptions by status (default: active)."""
+    """List Stripe subscriptions by status (default: active).
+
+    Returns:
+        Subscription list from Stripe API, or {"error": str} on failure.
+    """
     client = _get_client()
     if not client.is_available():
         return _unavailable_error()
@@ -45,9 +69,25 @@ def stripe_subscriptions(status: str = "active") -> dict[str, Any]:
     return result or {"error": "Stripe API call failed"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="stripe_charges",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
 def stripe_charges(limit: int = 25, created_after: int | None = None) -> dict[str, Any]:
-    """List recent Stripe charges. Optional: limit (default 25), created_after (unix timestamp)."""
+    """List recent Stripe charges.
+
+    Args:
+        limit: Maximum number of charges to return (default 25).
+        created_after: Unix timestamp — only return charges after this time.
+
+    Returns:
+        Charge list from Stripe API, or {"error": str} on failure.
+    """
     client = _get_client()
     if not client.is_available():
         return _unavailable_error()
@@ -55,9 +95,21 @@ def stripe_charges(limit: int = 25, created_after: int | None = None) -> dict[st
     return result or {"error": "Stripe API call failed"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="stripe_disputes",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
 def stripe_disputes() -> dict[str, Any]:
-    """List open Stripe disputes."""
+    """List open Stripe disputes.
+
+    Returns:
+        Dispute list from Stripe API, or {"error": str} on failure.
+    """
     client = _get_client()
     if not client.is_available():
         return _unavailable_error()

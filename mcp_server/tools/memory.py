@@ -37,7 +37,15 @@ def _check_enabled() -> dict[str, Any] | None:
     return None
 
 
-@mcp.tool()
+@mcp.tool(
+    name="search_memory",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def search_memory(
     query: str,
     team: str | None = None,
@@ -57,6 +65,10 @@ def search_memory(
         top_k: Maximum results to return (default 10).
         bm25_weight: Override BM25 weight in hybrid scoring.
         temporal_half_life: Override temporal decay half-life in days.
+
+    Returns:
+        {"count": int, "results": list[dict]} on success.
+        {"error": str} on failure.
     """
     disabled = _check_enabled()
     if disabled:
@@ -90,7 +102,15 @@ def search_memory(
         return {"error": f"Search failed: {exc}"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="save_memory",
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
 def save_memory(
     content: str,
     summary: str | None = None,
@@ -112,6 +132,10 @@ def save_memory(
         tags: Optional list of tags for categorisation.
         importance: Importance weight 0.0-1.0 (default 0.5).
         ttl_hours: Optional time-to-live in hours (None = never expires).
+
+    Returns:
+        {"id": str, "status": "saved"} on success.
+        {"error": str} on failure.
     """
     disabled = _check_enabled()
     if disabled:
@@ -147,7 +171,15 @@ def save_memory(
         return {"error": f"Save failed: {exc}"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="index_session",
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
 def index_session(
     session_summary: str,
     key_learnings: list[str] | None = None,
@@ -161,6 +193,10 @@ def index_session(
     Args:
         session_summary: Overall summary of the session.
         key_learnings: Optional list of individual learnings to index.
+
+    Returns:
+        {"status": "indexed", "memories_created": int} on success.
+        {"error": str} on failure.
     """
     disabled = _check_enabled()
     if disabled:

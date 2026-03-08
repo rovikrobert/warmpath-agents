@@ -89,9 +89,21 @@ def _check_alembic() -> dict[str, Any]:
         return {"status": "error", "reason": str(exc)}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="check_health",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
 def check_health() -> dict[str, Any]:
-    """Hit the production /health endpoint and return status + response time."""
+    """Hit the production /health endpoint and return status + response time.
+
+    Returns:
+        {"healthy": bool, "status_code": int, "response_ms": float}.
+    """
     status = _check_health_impl()
     return {
         "healthy": status.healthy,
@@ -100,12 +112,23 @@ def check_health() -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(
+    name="check_services",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def check_services() -> dict[str, Any]:
     """Aggregated health check across all backend services.
 
     Checks: database connection, Redis ping, Celery worker count,
     latest Alembic migration revision.
+
+    Returns:
+        {"database": dict, "redis": dict, "celery": dict, "alembic": dict}.
     """
     return {
         "database": _check_db(),
@@ -115,9 +138,22 @@ def check_services() -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(
+    name="redis_info",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def redis_info() -> dict[str, Any]:
-    """Redis server info — memory, clients, queue depth, key count."""
+    """Redis server info — memory, clients, queue depth, key count.
+
+    Returns:
+        {"connected": bool, "memory": str, "celery_queues": dict, ...} on success.
+        {"error": str} on failure.
+    """
     client = _get_redis_client()
     if client is None:
         return {"error": "Redis unavailable (REDIS_URL not set)"}

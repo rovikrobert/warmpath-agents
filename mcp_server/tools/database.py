@@ -42,12 +42,23 @@ def _get_engine():
         return None
 
 
-@mcp.tool()
+@mcp.tool(
+    name="list_templates",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def list_templates() -> list[dict[str, str]]:
     """List all available SQL query templates (data team + finance team).
 
     Returns template names and which team they belong to.
     Use these names with the query_template tool.
+
+    Returns:
+        List of {"name": str, "source": str} dicts.
     """
     from data_team.shared.sql_templates import ALL_TEMPLATES
     from finance_team.shared.sql_templates import FINANCE_TEMPLATES
@@ -60,7 +71,15 @@ def list_templates() -> list[dict[str, str]]:
     return result
 
 
-@mcp.tool()
+@mcp.tool(
+    name="query_template",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def query_template(
     name: str,
     params: dict[str, Any] | None = None,
@@ -69,6 +88,10 @@ def query_template(
 
     Templates are pre-approved, privacy-validated queries. Use list_templates
     to see available names. Common params: start_date, end_date, user_id.
+
+    Returns:
+        {"template": str, "rows": list[dict], "count": int} on success.
+        {"error": str} on failure.
     """
     from data_team.shared.sql_templates import ALL_TEMPLATES
     from finance_team.shared.sql_templates import FINANCE_TEMPLATES
@@ -98,7 +121,15 @@ def query_template(
     }
 
 
-@mcp.tool()
+@mcp.tool(
+    name="query_sql",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
 def query_sql(
     sql: str,
     params: dict[str, Any] | None = None,
@@ -114,6 +145,10 @@ def query_sql(
     - Audit logs are immutable (no UPDATE/DELETE)
 
     Use parameterized queries with :param_name placeholders.
+
+    Returns:
+        {"rows": list[dict], "count": int} on success.
+        {"error": str} on failure.
     """
     from data_team.shared.privacy_guard import PrivacyViolation
 
@@ -134,12 +169,24 @@ def query_sql(
         return {"error": f"Query failed: {exc}"}
 
 
-@mcp.tool()
+@mcp.tool(
+    name="get_schema",
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 def get_schema(table_name: str | None = None) -> dict[str, Any]:
     """Introspect database schema — list tables, columns, types.
 
     If table_name is provided, returns columns for that table only.
     Otherwise returns all tables with their columns.
+
+    Returns:
+        {"tables": list[dict], "table_count": int} on success.
+        {"error": str} on failure.
     """
     engine = _get_engine()
     if engine is None:
