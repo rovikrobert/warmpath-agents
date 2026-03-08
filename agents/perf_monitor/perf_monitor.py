@@ -319,7 +319,7 @@ def _scan_ai_token_costs(app_dir: Path) -> tuple[list[Finding], dict[str, Any]]:
 
 
 def _extract_indexed_columns(models_dir: Path) -> dict[str, set[str]]:
-    """Parse model files to find columns declared with index=True.
+    """Parse model files to find columns with index=True or in __table_args__ Index().
 
     Returns {model_class_name: {column_name, ...}}.
     """
@@ -385,6 +385,36 @@ def _extract_indexed_columns(models_dir: Path) -> dict[str, set[str]]:
                             and kw.value.value is True
                         ):
                             cols.add(col_name)
+
+            # Also check __table_args__ for Index() declarations
+            for item in node.body:
+                if not isinstance(item, ast.Assign):
+                    continue
+                for target in item.targets:
+                    if isinstance(target, ast.Name) and target.id == "__table_args__":
+                        table_args_value = item.value
+                        elements = []
+                        if isinstance(table_args_value, ast.Tuple):
+                            elements = table_args_value.elts
+                        for elem in elements:
+                            if not isinstance(elem, ast.Call):
+                                continue
+                            # Check if this is an Index() call
+                            func = elem.func
+                            is_index = (
+                                isinstance(func, ast.Name) and func.id == "Index"
+                            ) or (
+                                isinstance(func, ast.Attribute) and func.attr == "Index"
+                            )
+                            if not is_index:
+                                continue
+                            # Extract column names from positional args
+                            # (skip first arg which is the index name)
+                            for arg in elem.args[1:]:
+                                if isinstance(arg, ast.Constant) and isinstance(
+                                    arg.value, str
+                                ):
+                                    cols.add(arg.value)
 
             if cols:
                 indexed[class_name] = cols

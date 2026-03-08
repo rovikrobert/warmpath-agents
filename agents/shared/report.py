@@ -23,10 +23,13 @@ class Finding:
     first_seen: str = ""
     auto_fixable: bool = False
     repair_status: str = "pending"  # pending | fixed | failed | skipped
+    last_validated_at: str = ""
 
     def __post_init__(self):
         if not self.first_seen:
             self.first_seen = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if not self.last_validated_at:
+            self.last_validated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     @property
     def sort_key(self) -> tuple:

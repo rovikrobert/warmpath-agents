@@ -284,6 +284,66 @@ def run_daily() -> str:
     if not reports:
         return "# Founder Daily Brief\n\nNo engineering reports available. Run agent scans first."
 
+    # -- Stale scan detection --------------------------------------------------
+    # Check each report's timestamp; flag teams whose latest report is >48h old.
+    from datetime import datetime, timedelta, timezone as _tz
+
+    _stale_threshold = timedelta(hours=48)
+    _now = datetime.now(_tz.utc)
+    _stale_teams: list[str] = []
+    _team_agents_map = {
+        "engineering": {
+            "architect",
+            "test_engineer",
+            "perf_monitor",
+            "deps_manager",
+            "doc_keeper",
+        },
+        "data": {"pipeline", "analyst", "model_engineer", "data_lead"},
+        "product": {
+            "user_researcher",
+            "product_manager",
+            "ux_lead",
+            "design_lead",
+            "product_lead",
+        },
+        "ops": {"keevs", "treb", "naiv", "marsh", "ops_lead"},
+        "finance": {
+            "finance_manager",
+            "credits_manager",
+            "investor_relations",
+            "legal_compliance",
+            "finance_lead",
+        },
+        "gtm": {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"},
+    }
+    # Find the most recent report timestamp per team
+    _team_latest: dict[str, datetime] = {}
+    for _r in reports:
+        _team_name_for_r = "engineering"
+        for _tn, _agents in _team_agents_map.items():
+            if _r.agent in _agents:
+                _team_name_for_r = _tn
+                break
+        if _r.timestamp:
+            try:
+                _ts = datetime.fromisoformat(_r.timestamp)
+                if _ts.tzinfo is None:
+                    _ts = _ts.replace(tzinfo=_tz.utc)
+                if (
+                    _team_name_for_r not in _team_latest
+                    or _ts > _team_latest[_team_name_for_r]
+                ):
+                    _team_latest[_team_name_for_r] = _ts
+            except (ValueError, TypeError):
+                pass
+    for _tn, _ts in _team_latest.items():
+        if _now - _ts > _stale_threshold:
+            _hours_old = int((_now - _ts).total_seconds() / 3600)
+            _stale_teams.append(f"{_tn} ({_hours_old}h old)")
+    if _stale_teams:
+        logger.warning("Stale scan reports detected: %s", ", ".join(_stale_teams))
+
     kpi_snapshot = _get_kpi_snapshot(reports)
     costs = get_team_cost_summary(reports)
     alerts = check_budget_alerts(costs, COS_CONFIG["cost_budget"])
@@ -379,6 +439,26 @@ def run_daily() -> str:
         repairs=_repair_data,
         recommendations=_recommendation_data,
     )
+
+    # Inject stale scan alerts into decisions_needed so they surface in Notion/Telegram
+    if _stale_teams:
+        _stale_decision = {
+            "id": "stale-scans",
+            "summary": f"STALE SCANS: {', '.join(_stale_teams)} — re-run with `python3 -m agents.orchestrator --all`",
+            "severity": "high",
+            "business_impact": "Blind spots — decisions based on outdated data",
+            "recommended_action": "Re-run agent scans to refresh report data",
+            "outcomes": [],
+        }
+        brief_data.setdefault("decisions_needed", []).insert(0, _stale_decision)
+        # Also prepend to the rendered brief
+        _parts = brief.split("\n", 1)
+        _stale_block = (
+            "\n\n> **STALE SCANS:** "
+            + ", ".join(_stale_teams)
+            + " — re-run with `python3 -m agents.orchestrator --all`\n\n"
+        )
+        brief = _parts[0] + _stale_block + (_parts[1] if len(_parts) > 1 else "")
 
     # Append new sections to brief
     for section in (budget_report, pod_report, request_report):
