@@ -60,6 +60,12 @@ def _run_agent(name: str) -> object | None:
         mod = importlib.import_module(mod_path)
         report = mod.scan()
         mod.save_report(report)
+        try:
+            from agents.shared.report_store import publish_report
+
+            publish_report("data_team", report.agent, report.serialize())
+        except Exception:
+            pass  # Redis publish is best-effort
         return report
     except Exception as e:
         logger.error("Agent %s failed: %s", name, e)

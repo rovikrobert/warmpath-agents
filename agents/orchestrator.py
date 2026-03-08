@@ -72,6 +72,12 @@ def _run_agent(name: str) -> AgentReport | None:
         logger.info("Running %s ...", name)
         report = scan_fn()
         save_report(report)
+        try:
+            from agents.shared.report_store import publish_report
+
+            publish_report("agents", report.agent, report.serialize())
+        except Exception:
+            pass  # Redis publish is best-effort
         logger.info(
             "  %s: %d findings in %.1fs",
             name,

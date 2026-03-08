@@ -90,7 +90,7 @@ GTM_TEAM_REPORTS_DIR = _TEAM_REPORT_DIRS.get("gtm")
 
 
 def _load_reports() -> tuple[list[AgentReport], list[dict]]:
-    """Load cached *_latest.json reports from all team REPORTS_DIRs.
+    """Load cached reports from Redis (preferred) or filesystem (fallback).
 
     Returns (reports, cross_team_requests) — cross-team requests are extracted
     from team reports and surfaced separately for the daily brief.
@@ -108,6 +108,34 @@ def _load_reports() -> tuple[list[AgentReport], list[dict]]:
         "learning_updates",
     }
 
+    # Try Redis first (persists across Railway Cron container restarts)
+    try:
+        from agents.shared.report_store import load_all_reports_from_redis
+
+        redis_reports = load_all_reports_from_redis()
+        if redis_reports:
+            logger.info("Loading %d reports from Redis", len(redis_reports))
+            for data in redis_reports:
+                try:
+                    # Extract cross-team requests
+                    for req in data.get("cross_team_requests", []):
+                        req["source_agent"] = data.get("agent", "unknown")
+                        cross_team_requests.append(req)
+
+                    clean = {k: v for k, v in data.items() if k in _AR_FIELDS}
+                    reports.append(AgentReport.from_dict(clean))
+                except (KeyError, TypeError) as exc:
+                    logger.warning("Failed to parse Redis report: %s", exc)
+                    continue
+            if reports:
+                return reports, cross_team_requests
+            logger.warning(
+                "Redis reports parsed but none valid, falling back to filesystem"
+            )
+    except Exception:
+        logger.debug("Redis report loading unavailable, using filesystem")
+
+    # Filesystem fallback (local dev or Redis unavailable)
     def _load_dir(
         reports_dir: Path | None, team_label: str, is_engineering: bool = False
     ) -> None:
