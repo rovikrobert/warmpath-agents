@@ -5,7 +5,6 @@ credits, market trends) into a context snapshot, then generates personalized
 briefings and chat responses via Claude (or deterministic mocks).
 """
 
-import asyncio
 import json
 import logging
 import re
@@ -158,7 +157,7 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Build a context snapshot from all user data sources.
 
     Cached for 5 minutes to avoid re-running 7 queries on every chat message.
-    Queries run in parallel via asyncio.gather for lower latency.
+    Queries run sequentially (asyncpg forbids concurrent ops on one connection).
     """
     cache_key = str(user_id)
     now_ts = datetime.now(timezone.utc).timestamp()
@@ -169,87 +168,63 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
         if now_ts - cached_ts < _CONTEXT_CACHE_TTL:
             return cached_ctx
 
-    # --- Run independent queries in parallel ---
+    # --- Run queries sequentially (asyncpg forbids concurrent ops on one connection) ---
 
-    async def _fetch_user():
-        result = await db.execute(
-            select(User)
-            .options(selectinload(User.connector_profile))
-            .where(User.id == user_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def _fetch_prefs():
-        result = await db.execute(
-            select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def _fetch_pipeline():
-        result = await db.execute(
-            select(Application.status, func.count(Application.id))
-            .where(
-                Application.user_id == user_id,
-                Application.deleted_at.is_(None),
-            )
-            .group_by(Application.status)
-        )
-        return {row[0]: row[1] for row in result.all()}
-
-    async def _fetch_followups():
-        now = datetime.now(timezone.utc)
-        result = await db.execute(
-            select(func.count(Application.id)).where(
-                Application.user_id == user_id,
-                Application.deleted_at.is_(None),
-                Application.follow_up_at.isnot(None),
-                Application.follow_up_at <= now,
-                Application.status.notin_(["rejected", "withdrawn", "offer_accepted"]),
-            )
-        )
-        return result.scalar() or 0
-
-    async def _fetch_searches():
-        now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(days=30)
-        result = await db.execute(
-            select(SearchRequest.name, SearchRequest.status, SearchRequest.created_at)
-            .where(
-                SearchRequest.user_id == user_id,
-                SearchRequest.deleted_at.is_(None),
-                SearchRequest.created_at >= cutoff,
-            )
-            .order_by(SearchRequest.created_at.desc())
-            .limit(5)
-        )
-        return [
-            {
-                "name": row[0],
-                "status": row[1],
-                "created_at": row[2].isoformat() if row[2] else None,
-            }
-            for row in result.all()
-        ]
-
-    async def _fetch_credits():
-        return await get_balance(user_id, db)
-
-    # Run all 6 fast queries in parallel
-    (
-        user,
-        prefs,
-        status_counts,
-        follow_ups_needed,
-        recent_searches,
-        credit_balance,
-    ) = await asyncio.gather(
-        _fetch_user(),
-        _fetch_prefs(),
-        _fetch_pipeline(),
-        _fetch_followups(),
-        _fetch_searches(),
-        _fetch_credits(),
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.connector_profile))
+        .where(User.id == user_id)
     )
+    user = result.scalar_one_or_none()
+
+    result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
+    )
+    prefs = result.scalar_one_or_none()
+
+    result = await db.execute(
+        select(Application.status, func.count(Application.id))
+        .where(
+            Application.user_id == user_id,
+            Application.deleted_at.is_(None),
+        )
+        .group_by(Application.status)
+    )
+    status_counts = {row[0]: row[1] for row in result.all()}
+
+    now_q = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(func.count(Application.id)).where(
+            Application.user_id == user_id,
+            Application.deleted_at.is_(None),
+            Application.follow_up_at.isnot(None),
+            Application.follow_up_at <= now_q,
+            Application.status.notin_(["rejected", "withdrawn", "offer_accepted"]),
+        )
+    )
+    follow_ups_needed = result.scalar() or 0
+
+    cutoff = now_q - timedelta(days=30)
+    result = await db.execute(
+        select(SearchRequest.name, SearchRequest.status, SearchRequest.created_at)
+        .where(
+            SearchRequest.user_id == user_id,
+            SearchRequest.deleted_at.is_(None),
+            SearchRequest.created_at >= cutoff,
+        )
+        .order_by(SearchRequest.created_at.desc())
+        .limit(5)
+    )
+    recent_searches = [
+        {
+            "name": row[0],
+            "status": row[1],
+            "created_at": row[2].isoformat() if row[2] else None,
+        }
+        for row in result.all()
+    ]
+
+    credit_balance = await get_balance(user_id, db)
 
     # Build user context
     user_ctx: dict = {"name": None, "title": None, "company": None, "location": None}

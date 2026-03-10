@@ -4,7 +4,6 @@ Parallel to Keevs (job seekers), Treb coaches network holders on sharing
 their network, managing intro requests, and capturing referral bonuses.
 """
 
-import asyncio
 import json
 import logging
 import re
@@ -179,118 +178,91 @@ async def _assemble_nh_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
         if now_ts - cached_ts < _CONTEXT_CACHE_TTL:
             return cached_ctx
 
-    async def _fetch_user():
-        result = await db.execute(select(User).where(User.id == user_id))
-        return result.scalar_one_or_none()
+    # --- Run queries sequentially (asyncpg forbids concurrent ops on one connection) ---
 
-    async def _fetch_contact_count():
-        result = await db.execute(
-            select(func.count(Contact.id)).where(
-                Contact.user_id == user_id,
-                Contact.deleted_at.is_(None),
-            )
-        )
-        return result.scalar() or 0
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
 
-    async def _fetch_enrichment_count():
-        result = await db.execute(
-            select(func.count(Contact.id)).where(
-                Contact.user_id == user_id,
-                Contact.deleted_at.is_(None),
-                Contact.relationship_type.isnot(None),
-            )
+    result = await db.execute(
+        select(func.count(Contact.id)).where(
+            Contact.user_id == user_id,
+            Contact.deleted_at.is_(None),
         )
-        return result.scalar() or 0
+    )
+    total_contacts = result.scalar() or 0
 
-    async def _fetch_listings():
-        total_result = await db.execute(
-            select(func.count(MarketplaceListing.id)).where(
-                MarketplaceListing.network_holder_id == user_id,
-                MarketplaceListing.deleted_at.is_(None),
-            )
+    result = await db.execute(
+        select(func.count(Contact.id)).where(
+            Contact.user_id == user_id,
+            Contact.deleted_at.is_(None),
+            Contact.relationship_type.isnot(None),
         )
-        available_result = await db.execute(
-            select(func.count(MarketplaceListing.id)).where(
-                MarketplaceListing.network_holder_id == user_id,
-                MarketplaceListing.deleted_at.is_(None),
-                MarketplaceListing.is_available.is_(True),
-            )
+    )
+    enriched_contacts = result.scalar() or 0
+
+    total_result = await db.execute(
+        select(func.count(MarketplaceListing.id)).where(
+            MarketplaceListing.network_holder_id == user_id,
+            MarketplaceListing.deleted_at.is_(None),
         )
-        return {
-            "total": total_result.scalar() or 0,
-            "available": available_result.scalar() or 0,
+    )
+    available_result = await db.execute(
+        select(func.count(MarketplaceListing.id)).where(
+            MarketplaceListing.network_holder_id == user_id,
+            MarketplaceListing.deleted_at.is_(None),
+            MarketplaceListing.is_available.is_(True),
+        )
+    )
+    listings = {
+        "total": total_result.scalar() or 0,
+        "available": available_result.scalar() or 0,
+    }
+
+    result = await db.execute(
+        select(IntroFacilitation.status, func.count(IntroFacilitation.id))
+        .where(IntroFacilitation.network_holder_id == user_id)
+        .group_by(IntroFacilitation.status)
+    )
+    intro_counts = {row[0]: row[1] for row in result.all()}
+
+    result = await db.execute(
+        select(NetworkSharingPreferences).where(
+            NetworkSharingPreferences.user_id == user_id
+        )
+    )
+    prefs_row = result.scalar_one_or_none()
+    if not prefs_row:
+        sharing_prefs = {"opt_in_marketplace": False}
+    else:
+        sharing_prefs = {
+            "opt_in_marketplace": prefs_row.opt_in_marketplace,
+            "category_filters": prefs_row.category_filters,
+            "paused": prefs_row.paused_at is not None,
         }
 
-    async def _fetch_intros():
-        result = await db.execute(
-            select(IntroFacilitation.status, func.count(IntroFacilitation.id))
-            .where(IntroFacilitation.network_holder_id == user_id)
-            .group_by(IntroFacilitation.status)
-        )
-        return {row[0]: row[1] for row in result.all()}
-
-    async def _fetch_sharing_prefs():
-        result = await db.execute(
-            select(NetworkSharingPreferences).where(
-                NetworkSharingPreferences.user_id == user_id
-            )
-        )
-        prefs = result.scalar_one_or_none()
-        if not prefs:
-            return {"opt_in_marketplace": False}
-        return {
-            "opt_in_marketplace": prefs.opt_in_marketplace,
-            "category_filters": prefs.category_filters,
-            "paused": prefs.paused_at is not None,
-        }
-
-    async def _fetch_connector_profile():
-        result = await db.execute(
-            select(ConnectorProfile).where(ConnectorProfile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
-        if not profile:
-            return None
-        return {
+    result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == user_id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile:
+        connector_profile = None
+    else:
+        connector_profile = {
             "intros_facilitated": profile.intros_facilitated,
             "response_rate": profile.response_rate,
             "avg_rating": profile.avg_rating,
         }
 
-    async def _fetch_credits():
-        return await get_balance(user_id, db)
+    credit_balance = await get_balance(user_id, db)
 
-    async def _fetch_last_activity():
-        result = await db.execute(
-            select(UsageLog.created_at)
-            .where(UsageLog.user_id == user_id)
-            .order_by(UsageLog.created_at.desc())
-            .limit(1)
-        )
-        row = result.scalar_one_or_none()
-        return row.isoformat() if row else None
-
-    (
-        user,
-        total_contacts,
-        enriched_contacts,
-        listings,
-        intro_counts,
-        sharing_prefs,
-        connector_profile,
-        credit_balance,
-        last_activity,
-    ) = await asyncio.gather(
-        _fetch_user(),
-        _fetch_contact_count(),
-        _fetch_enrichment_count(),
-        _fetch_listings(),
-        _fetch_intros(),
-        _fetch_sharing_prefs(),
-        _fetch_connector_profile(),
-        _fetch_credits(),
-        _fetch_last_activity(),
+    result = await db.execute(
+        select(UsageLog.created_at)
+        .where(UsageLog.user_id == user_id)
+        .order_by(UsageLog.created_at.desc())
+        .limit(1)
     )
+    row = result.scalar_one_or_none()
+    last_activity = row.isoformat() if row else None
 
     user_ctx: dict = {"name": None}
     if user:
