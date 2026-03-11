@@ -73,9 +73,39 @@ def _load_cross_team_summaries() -> list[tuple[str, AgentReport]]:
 
 
 def save_report(report: AgentReport) -> Path:
-    """Save an agent report to REPORTS_DIR as <agent>_latest.json."""
+    """Save an agent report to REPORTS_DIR as <agent>_latest.json.
+
+    Refuses to overwrite a real report with a stub (scan_duration == 0
+    and <= 1 finding with no metrics).
+    """
+    import json as _json
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"{report.agent}_latest.json"
+
+    # Guard: don't overwrite a real report with a stub
+    if (
+        report.scan_duration_seconds == 0
+        and len(report.findings) <= 1
+        and not report.metrics
+        and path.exists()
+    ):
+        try:
+            existing = _json.loads(path.read_text(encoding="utf-8"))
+            if (
+                existing.get("scan_duration_seconds", 0) > 0
+                or len(existing.get("findings", [])) > 1
+            ):
+                logger.warning(
+                    "Refusing to overwrite real %s report with stub "
+                    "(scan_duration=0, %d findings)",
+                    report.agent,
+                    len(report.findings),
+                )
+                return path
+        except (ValueError, OSError):
+            pass  # Existing file is corrupt — ok to overwrite
+
     path.write_text(report.serialize())
     return path
 

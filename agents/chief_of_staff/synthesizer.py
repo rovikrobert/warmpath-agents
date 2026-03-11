@@ -73,6 +73,17 @@ def synthesize_daily(
 
     # Merge and enrich
     all_findings = merge_reports(reports) if reports else []
+    # Filter noise: skip low-value categories that clutter briefs
+    _NOISE_CATEGORIES = {
+        "dependency-update",
+        "dependency-dead",
+        "dependency-missing",
+    }
+    all_findings = [
+        f
+        for f in all_findings
+        if f.category not in _NOISE_CATEGORIES or f.severity in ("critical", "high")
+    ]
     enriched = [_enrich_finding(f) for f in all_findings]
 
     # Sort by composite score

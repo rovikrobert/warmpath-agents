@@ -46,12 +46,39 @@ def _get_sync_redis():
 
 
 def publish_report(team: str, agent_name: str, report_json: str) -> bool:
-    """Publish a report to Redis. Returns True on success."""
+    """Publish a report to Redis. Returns True on success.
+
+    Refuses to overwrite a real report with a stub (scan_duration == 0,
+    <= 1 finding, no metrics) to prevent failed scanners from clobbering
+    legitimate data.
+    """
     client = _get_sync_redis()
     if client is None:
         return False
     try:
         key = f"{_REDIS_KEY_PREFIX}:{team}:{agent_name}_latest"
+
+        # Guard: don't overwrite real reports with stubs
+        new_data = json.loads(report_json)
+        is_stub = (
+            new_data.get("scan_duration_seconds", 0) == 0
+            and len(new_data.get("findings", [])) <= 1
+            and not new_data.get("metrics")
+        )
+        if is_stub:
+            existing_json = client.get(key)
+            if existing_json:
+                existing = json.loads(existing_json)
+                if (
+                    existing.get("scan_duration_seconds", 0) > 0
+                    or len(existing.get("findings", [])) > 1
+                ):
+                    logger.warning(
+                        "Refusing to overwrite real Redis report %s with stub",
+                        key,
+                    )
+                    return False
+
         client.set(key, report_json, ex=_REPORT_TTL_SECONDS)
         logger.debug("Published report to Redis: %s", key)
         return True

@@ -147,7 +147,10 @@ class AgentReport:
 def merge_reports(
     reports: list[AgentReport], *, skip_resolved: bool = True
 ) -> list[Finding]:
-    """Merge findings from multiple reports, deduplicating by file + line + category.
+    """Merge findings from multiple reports, deduplicating by finding ID.
+
+    Primary dedup key is finding.id (stable across scans). Falls back to
+    file:line:category only when multiple findings share the same id.
 
     When skip_resolved=True (default), findings that appear in the global
     resolved-issues registry are silently dropped.
@@ -155,7 +158,10 @@ def merge_reports(
     seen: dict[str, Finding] = {}
     for report in reports:
         for f in report.findings:
-            key = f"{f.file}:{f.line}:{f.category}"
+            # Use finding.id as primary dedup key (stable across scans).
+            # Fall back to file:line:category for findings with duplicate IDs
+            # from different agents.
+            key = f.id
             if key in seen:
                 existing = seen[key]
                 # Keep the higher severity
