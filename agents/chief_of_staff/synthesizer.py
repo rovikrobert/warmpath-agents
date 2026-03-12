@@ -12,6 +12,7 @@ from agents.shared.business_outcomes import (
     get_business_impact,
     score_alignment,
 )
+from agents.shared.learning import filter_resolved_findings
 from agents.shared.report import AgentReport, Finding, merge_reports
 
 from .cos_config import COS_CONFIG, SEVERITY_WEIGHT, TEAM_REGISTRY
@@ -71,8 +72,9 @@ def synthesize_daily(
     """Daily cycle: load reports -> classify -> enrich -> render brief."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Merge and enrich
+    # Merge, filter resolved, and enrich
     all_findings = merge_reports(reports) if reports else []
+    all_findings = filter_resolved_findings(all_findings)
     # Filter noise: skip low-value categories that clutter briefs
     _NOISE_CATEGORIES = {
         "dependency-update",
@@ -97,16 +99,25 @@ def synthesize_daily(
     # Operational health checks
     operational_health = _check_operational_health(reports, cross_team_requests or [])
 
-    # Compute per-team summaries
+    # Compute per-team summaries (with resolved findings filtered out)
     _team_agents_sets = {team: set(agents) for team, agents in TEAM_REGISTRY.items()}
     team_report_groups: dict[str, list[AgentReport]] = {}
     for r in reports:
+        filtered_r = AgentReport(
+            agent=r.agent,
+            timestamp=r.timestamp,
+            scan_duration_seconds=r.scan_duration_seconds,
+            findings=filter_resolved_findings(r.findings),
+            metrics=r.metrics,
+            intelligence_applied=r.intelligence_applied,
+            learning_updates=r.learning_updates,
+        )
         for team_name, agent_set in _team_agents_sets.items():
             if r.agent in agent_set:
-                team_report_groups.setdefault(team_name, []).append(r)
+                team_report_groups.setdefault(team_name, []).append(filtered_r)
                 break
         else:
-            team_report_groups.setdefault("engineering", []).append(r)
+            team_report_groups.setdefault("engineering", []).append(filtered_r)
 
     team_summaries_list = [
         summarize_team(team, team_reports)

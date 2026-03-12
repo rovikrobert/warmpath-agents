@@ -827,11 +827,44 @@ def filter_resolved_findings(findings: list) -> list:
     if not registry:
         return findings
 
+    def _match_resolved(fid: str) -> dict | None:
+        """Match finding ID against registry, including prefix matches.
+
+        Matching rules (evaluated in order):
+        1. Exact match — finding ID equals a registry key.
+        2. Finding ID is a longer variant of a registry key (finding starts
+           with registry key).  Example: registry has ``SEC-001``, finding
+           is ``SEC-001-detail``.
+        3. Registry key is a longer variant of the finding ID (registry key
+           starts with finding ID).  Example: finding is ``SEC-001``,
+           registry has ``SEC-001-detail``.
+
+        To avoid false positives from unrelated IDs that happen to share
+        a short common prefix, we require that the shorter string covers
+        at least half the length of the longer one.
+        """
+        # 1. Exact
+        entry = registry.get(fid)
+        if entry is not None:
+            return entry
+        # 2-3. Prefix with minimum-overlap guard
+        for reg_id, reg_entry in registry.items():
+            if fid.startswith(reg_id) or reg_id.startswith(fid):
+                shorter = min(len(fid), len(reg_id))
+                longer = max(len(fid), len(reg_id))
+                if shorter >= longer * 0.5:
+                    return reg_entry
+        return None
+
     now = datetime.now(timezone.utc)
     result = []
     for f in findings:
         fid = f.id if hasattr(f, "id") else f.get("id", "")
-        entry = registry.get(fid)
+        if not fid:
+            # Findings without an ID cannot be matched — keep them
+            result.append(f)
+            continue
+        entry = _match_resolved(fid)
         if entry is None:
             result.append(f)
             continue

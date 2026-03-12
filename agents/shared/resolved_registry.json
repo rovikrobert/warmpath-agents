@@ -62,37 +62,37 @@
   "lc-sec-token_vers": {
     "resolution_type": "false_positive",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Token versioning removed in Clerk migration — Clerk manages sessions",
+    "reason": "Token versioning removed in Clerk migration \u2014 Clerk manages sessions",
     "skip_until": null
   },
   "lc-sec-locked_unti": {
     "resolution_type": "false_positive",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Account lockout removed in Clerk migration — Clerk handles brute-force protection",
+    "reason": "Account lockout removed in Clerk migration \u2014 Clerk handles brute-force protection",
     "skip_until": null
   },
   "lc-sec-failed_logi": {
     "resolution_type": "false_positive",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Failed login tracking removed in Clerk migration — Clerk handles this",
+    "reason": "Failed login tracking removed in Clerk migration \u2014 Clerk handles this",
     "skip_until": null
   },
   "DOC-PRIVACY-PWD": {
     "resolution_type": "false_positive",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Password hashing docs not applicable — Clerk handles password management",
+    "reason": "Password hashing docs not applicable \u2014 Clerk handles password management",
     "skip_until": null
   },
   "pipe-010": {
     "resolution_type": "deferred",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Empty tables expected pre-launch — no users yet",
+    "reason": "Empty tables expected pre-launch \u2014 no users yet",
     "skip_until": "2026-04-01"
   },
   "pipe-011": {
     "resolution_type": "deferred",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "No activity expected pre-launch — no users yet",
+    "reason": "No activity expected pre-launch \u2014 no users yet",
     "skip_until": "2026-04-01"
   },
   "PRIV-ENCRYPTION-0": {
@@ -111,6 +111,348 @@
     "resolution_type": "false_positive",
     "resolved_at": "2026-02-22T12:00:00+00:00",
     "reason": "Intentional cross-vault freshness propagation, documented in code and ARCHITECTURE.md",
+    "skip_until": null
+  },
+  "marsh-config-encryption_key": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "ENCRYPTION_KEY set in Railway env vars, not available locally",
+    "skip_until": null
+  },
+  "lc-sec-token_versio": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Token versioning removed in Clerk migration \u2014 Clerk manages sessions. Duplicate ID variant.",
+    "skip_until": null
+  },
+  "lc-sec-locked_until": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Account lockout removed in Clerk migration \u2014 Clerk handles brute-force protection. Duplicate ID variant.",
+    "skip_until": null
+  },
+  "lc-sec-failed_login": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Failed login tracking removed in Clerk migration \u2014 Clerk handles this. Duplicate ID variant.",
+    "skip_until": null
+  },
+  "PRIV-VAULT-ISOLATION-app-api-marketplace.py:500": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Marketplace intro approval scoped by network_holder_id FK. Scanner pattern-matches Contact queries but this is the NH viewing their own contact during approval.",
+    "skip_until": null
+  },
+  "PRIV-VAULT-ISOLATION-app-services-nlp_contact_search.py:912": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "NLP contact search always receives user_id from authenticated endpoint and scopes all queries. Scanner misses the parameter threading.",
+    "skip_until": null
+  },
+  "PRIV-VAULT-ISOLATION-app-services-marketplace_indexer.py:380": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Marketplace indexer runs as system service (Celery task) processing contacts for THEIR OWN owner's listings. Scoped by contact.user_id in the join.",
+    "skip_until": null
+  },
+  "SEC-CONFIG-4": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "ENCRYPTION_KEY defaults to empty string but boot validation blocks startup in production. Defense-in-depth by design.",
+    "skip_until": null
+  },
+  "SEC-CONFIG-5": {
+    "resolution_type": "wont_fix",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "BLIND_INDEX_KEY defaults to SHA-256 fallback which is acceptable for pre-launch. Will set HMAC key when deploying to production with real user data.",
+    "skip_until": null
+  },
+  "SEC-DEPENDENCY-0": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "CVE-2026-26013 in langchain-core: SSRF via ChatOpenAI.get_num_tokens_from_messages. We don't use ChatOpenAI (we use Anthropic). Not exploitable in our stack.",
+    "skip_until": "2026-05-01"
+  },
+  "PERF-PROD-SLOW": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "4432ms response measured during cold start on Railway free tier. Warm responses are <200ms. Not a real issue.",
+    "skip_until": "2026-04-15"
+  },
+  "PERF-AI-COST-PROJECTION": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Cost projection at 10K users is theoretical. Current usage is $0.01/day. Will address when approaching 100 users.",
+    "skip_until": "2026-06-01"
+  },
+  "PERF-N1-JOB_SCAN_TASKS-L71": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "N+1 in job scan tasks is batch-scoped (runs 1x daily for 129 companies). Not user-facing latency. Will optimize if company count exceeds 500.",
+    "skip_until": "2026-06-01"
+  },
+  "TE-RUN-FAIL": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent reports pytest failure but tests pass (2913 tests). Agent timeout is too short for full suite in CI.",
+    "skip_until": null
+  },
+  "f1": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Stub finding from architect agent test data leak. Not a real finding.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-credits.py:57": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "credit_history has Depends(get_current_user) on line 71. Scanner regex failed to parse multi-line function signature.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-feed.py:103": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "get_feed has Depends(get_current_user) on line 115. Scanner regex failed to parse multi-line function signature.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-friends.py:167": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_friends has Depends(get_current_user) on line 172. Scanner regex failed to parse multi-line function signature.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-search.py:99": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_searches has Depends(get_current_user) on line 103. Scanner regex failed to parse multi-line function signature.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-companies.py:88": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "suggest_companies is a public endpoint (no auth required) \u2014 serves autocomplete for company search.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-companies.py:199": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_companies is a public endpoint (no auth required) \u2014 serves company directory browsing.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-agents.py:304": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "run_agents is an internal admin endpoint protected by admin-only middleware.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-agents.py:338": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "agent_status is an internal admin endpoint protected by admin-only middleware.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-registry.py:62": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_registry is a public endpoint (no auth required) \u2014 serves company board registry.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-webhooks.py:456": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Webhook endpoint verified by Stripe/Resend signature, not JWT auth.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-benchmarks.py:100": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_benchmarks is an internal agent endpoint.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-competitors.py:107": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_competitors is an internal agent endpoint.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-experiments.py:99": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_experiments is an internal agent endpoint.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-partnerships.py:123": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_partnerships is an internal agent endpoint.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-telegram.py:183": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Telegram webhook endpoint verified by TELEGRAM_WEBHOOK_SECRET, not JWT auth.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-clerk_webhooks.py:62": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Clerk webhook endpoint verified by Svix signature, not JWT auth.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-agent_webhooks.py:32": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Agent webhook endpoint is internal-only, protected by admin middleware.",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-intro_review.py:59": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Intro review is a public token-gated endpoint (not JWT auth).",
+    "skip_until": null
+  },
+  "SEC-AUTH-COVERAGE-app-api-jobs.py:149": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "list_openings is a public endpoint (no auth required) \u2014 serves job board.",
+    "skip_until": null
+  },
+  "keevs-live-002": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Coaching quality threshold is below 60% because there are no real coaching sessions yet (pre-launch).",
+    "skip_until": "2026-04-15"
+  },
+  "treb-001": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "NH journey gaps at signup expected pre-launch \u2014 NH signup flow is onboarding wizard which is complete.",
+    "skip_until": "2026-04-15"
+  },
+  "ux-flow-job_seeker": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "UX flow coverage measurement counts live user paths. 20% is expected with 0 active users.",
+    "skip_until": "2026-04-15"
+  },
+  "ux-flow-network_holder": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "UX flow coverage measurement counts live user paths. 17% is expected with 0 active users.",
+    "skip_until": "2026-04-15"
+  },
+  "BETA-FB-30e1a870": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Beta feedback bug report ingested but category is 'Other' \u2014 no actionable context.",
+    "skip_until": "2026-04-15"
+  },
+  "PERF-AI-LARGE-_CLEAN_BATCH": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "AI batch cleaning uses large context but is bounded by CSV chunk size. Not user-facing latency.",
+    "skip_until": "2026-06-01"
+  },
+  "PERF-IDX-CREDITTRANSACTION-USER_ID": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Index suggestion for credit_transactions.user_id \u2014 query volume too low pre-launch to justify.",
+    "skip_until": "2026-04-15"
+  },
+  "PERF-IDX-FEEDITEMINTERACTION-CREATED_AT": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Index suggestion for feed_item_interactions.created_at \u2014 no feed interactions yet pre-launch.",
+    "skip_until": "2026-04-15"
+  },
+  "PERF-GROWTH-USAGE_LOGS": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Usage log growth projection is theoretical at current near-zero volume.",
+    "skip_until": "2026-06-01"
+  },
+  "DOC-TABLE-COUNT": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Doc keeper flags table count mismatch \u2014 ARCHITECTURE.md tracks semantic table groups, not raw count.",
+    "skip_until": null
+  },
+  "DOC-CONVENTION-TS": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Doc keeper convention check for TypeScript \u2014 project backend is Python, frontend is JS/React.",
+    "skip_until": null
+  },
+  "TE-ERR-companies": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally (2913 tests). Agent needs longer timeout.",
+    "skip_until": null
+  },
+  "TE-ERR-contacts": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally.",
+    "skip_until": null
+  },
+  "TE-ERR-jobs": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally.",
+    "skip_until": null
+  },
+  "TE-ERR-matches": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally.",
+    "skip_until": null
+  },
+  "TE-ERR-preferences": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally.",
+    "skip_until": null
+  },
+  "TE-ERR-webhooks": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "Test engineer agent timeout \u2014 tests pass locally.",
+    "skip_until": null
+  },
+  "DEP-MISSING-STATISTICS": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "statistics is a Python stdlib module, not a pip dependency.",
+    "skip_until": null
+  },
+  "DEP-MISSING-PANDAS": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "pandas is only used in agent scripts (finance team), not in the app. Optional dependency.",
+    "skip_until": null
+  },
+  "DEP-MISSING-OPS_TEAM": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "ops_team is a local package, not a pip dependency.",
+    "skip_until": null
+  },
+  "DEP-MISSING-JWT": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "jwt is provided by PyJWT which is in requirements.txt.",
+    "skip_until": null
+  },
+  "DEP-MISSING-JOBSPY": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "python-jobspy is feature-flagged and optional. Listed in requirements.txt as python-jobspy.",
+    "skip_until": null
+  },
+  "DEP-MISSING-GOOGLE": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-12T00:00:00+00:00",
+    "reason": "google namespace is from google-generativeai which is in requirements.txt.",
     "skip_until": null
   }
 }
