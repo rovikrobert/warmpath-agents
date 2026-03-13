@@ -12,6 +12,7 @@ from agents.shared.business_outcomes import (
     get_business_impact,
     score_alignment,
 )
+from agents.shared.decision_registry import PendingDecision, save_pending_decisions
 from agents.shared.learning import filter_resolved_findings
 from agents.shared.report import AgentReport, Finding, merge_reports
 
@@ -86,6 +87,8 @@ def synthesize_daily(
         for f in all_findings
         if f.category not in _NOISE_CATEGORIES or f.severity in ("critical", "high")
     ]
+    # Preserve original Findings before enrichment (CosFinding drops file/auto_fixable)
+    _original_findings = {f.id: f for f in all_findings}
     enriched = [_enrich_finding(f) for f in all_findings]
 
     # Sort by composite score
@@ -164,6 +167,28 @@ def synthesize_daily(
         data["repairs"] = repairs
     if recommendations:
         data["recommendations"] = recommendations
+    # Persist pending decisions for Telegram approval execution
+    from dataclasses import asdict as _asdict
+
+    from agents.shared.execution_engine import ExecutionEngine
+
+    _engine = ExecutionEngine()
+    _pending = []
+    for i, cf in enumerate(decisions_needed[:3], 1):
+        _orig = _original_findings.get(cf.id)
+        if _orig:
+            _tier = _engine.triage(_orig)
+            _pending.append(
+                PendingDecision(
+                    number=i,
+                    finding_id=cf.id,
+                    finding=_asdict(_orig),
+                    brief_date=today,
+                    tier=_tier.value,
+                    action_plan=cf.recommended_action or f"Review: {cf.summary}",
+                )
+            )
+    save_pending_decisions(_pending)
     return rendered, data
 
 

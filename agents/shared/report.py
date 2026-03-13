@@ -37,6 +37,15 @@ class Finding:
         order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
         return (order.get(self.severity, 9), -self.recurrence_count, self.effort_hours)
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "Finding":
+        """Reconstruct from serialized dict, ignoring unknown fields."""
+        from dataclasses import fields as dc_fields
+
+        known = {f.name for f in dc_fields(cls)}
+        filtered = {k: v for k, v in data.items() if k in known}
+        return cls(**filtered)
+
 
 @dataclass
 class AgentReport:
