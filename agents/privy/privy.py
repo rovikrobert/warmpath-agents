@@ -34,10 +34,13 @@ def _convert_findings(raw: list[dict]) -> list[Finding]:
         file_path = f.get("file", "") or None
         line = f.get("line", 0) or None
 
-        # Generate a stable ID
+        # Generate a stable ID — use file name only (no line number) so
+        # the resolved registry doesn't break when code shifts by a few lines.
         base_id = f"PRIV-{category.upper().replace('_', '-')}"
-        if file_path and line:
-            candidate = f"{base_id}-{file_path.replace('/', '-')}:{line}"
+        if file_path:
+            # Use filename without extension for stability
+            fname = file_path.replace("/", "-").rsplit(".", 1)[0]
+            candidate = f"{base_id}-{fname}"
         else:
             candidate = f"{base_id}-{i}"
 

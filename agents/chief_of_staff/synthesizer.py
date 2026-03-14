@@ -22,6 +22,37 @@ from .schemas import CosFinding, FounderBrief
 
 
 # ---------------------------------------------------------------------------
+# Category-level noise suppression
+# ---------------------------------------------------------------------------
+
+# Categories that generate recurring false positives from broad regex scanners.
+# Findings in these categories are dropped unless critical severity.
+_NOISE_CATEGORIES = {
+    "dependency-update",
+    "dependency-dead",
+    "dependency-missing",
+}
+_SUPPRESSED_CATEGORIES = {
+    "auth_coverage",  # Clerk handles auth; scanner can't detect non-JWT auth
+    "sql_injection",  # Scanner matches safe parameterized queries
+    "pii_leak",  # Scanner matches hashed/anonymized value logging
+    "validation",  # Input validation noise on internal fields
+    "info_leak",  # Pre-launch, no real users to enumerate
+    "debug_print",  # Low-value debug print detection
+}
+
+
+def _filter_noisy_findings(findings: list[Finding]) -> list[Finding]:
+    """Remove known false-positive-heavy categories unless critical."""
+    return [
+        f
+        for f in findings
+        if (f.category not in _NOISE_CATEGORIES or f.severity in ("critical", "high"))
+        and (f.category not in _SUPPRESSED_CATEGORIES or f.severity == "critical")
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Finding enrichment
 # ---------------------------------------------------------------------------
 
@@ -73,20 +104,10 @@ def synthesize_daily(
     """Daily cycle: load reports -> classify -> enrich -> render brief."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Merge, filter resolved, and enrich
+    # Merge, filter resolved, and suppress noisy categories
     all_findings = merge_reports(reports) if reports else []
     all_findings = filter_resolved_findings(all_findings)
-    # Filter noise: skip low-value categories that clutter briefs
-    _NOISE_CATEGORIES = {
-        "dependency-update",
-        "dependency-dead",
-        "dependency-missing",
-    }
-    all_findings = [
-        f
-        for f in all_findings
-        if f.category not in _NOISE_CATEGORIES or f.severity in ("critical", "high")
-    ]
+    all_findings = _filter_noisy_findings(all_findings)
     # Preserve original Findings before enrichment (CosFinding drops file/auto_fixable)
     _original_findings = {f.id: f for f in all_findings}
     enriched = [_enrich_finding(f) for f in all_findings]
@@ -524,6 +545,7 @@ def synthesize_weekly(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     all_findings = merge_reports(reports) if reports else []
+    all_findings = _filter_noisy_findings(all_findings)
     enriched = [_enrich_finding(f) for f in all_findings]
     enriched.sort(key=_score_finding, reverse=True)
 
@@ -607,6 +629,7 @@ def synthesize_status(reports: list[AgentReport]) -> str:
     """Quick cross-team status snapshot."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     all_findings = merge_reports(reports) if reports else []
+    all_findings = _filter_noisy_findings(all_findings)
 
     lines: list[str] = []
     lines.append(f"# Status Snapshot - {today}\n")
