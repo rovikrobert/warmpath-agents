@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
 from typing import Any
@@ -10,15 +9,6 @@ from typing import Any
 from mcp_server.server import mcp
 
 logger = logging.getLogger(__name__)
-
-
-def _run_async(coro: Any) -> Any:
-    """Run an async coroutine from sync MCP tool context.
-
-    Uses asyncio.run() since MCP tools are called from sync context with no
-    running event loop.
-    """
-    return asyncio.run(coro)
 
 
 async def _get_session() -> Any:
@@ -46,7 +36,7 @@ def _check_enabled() -> dict[str, Any] | None:
         "openWorldHint": False,
     },
 )
-def search_memory(
+async def search_memory(
     query: str,
     team: str | None = None,
     top_k: int = 10,
@@ -96,7 +86,7 @@ def search_memory(
             finally:
                 await session.close()
 
-        return _run_async(_search())
+        return await _search()
     except Exception as exc:
         logger.exception("search_memory failed")
         return {"error": f"Search failed: {exc}"}
@@ -111,7 +101,7 @@ def search_memory(
         "openWorldHint": False,
     },
 )
-def save_memory(
+async def save_memory(
     content: str,
     summary: str | None = None,
     team: str | None = None,
@@ -165,7 +155,7 @@ def save_memory(
             finally:
                 await session.close()
 
-        return _run_async(_save())
+        return await _save()
     except Exception as exc:
         logger.exception("save_memory failed")
         return {"error": f"Save failed: {exc}"}
@@ -180,7 +170,7 @@ def save_memory(
         "openWorldHint": False,
     },
 )
-def index_session(
+async def index_session(
     session_summary: str,
     key_learnings: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -244,7 +234,7 @@ def index_session(
             finally:
                 await session.close()
 
-        return _run_async(_index())
+        return await _index()
     except Exception as exc:
         logger.exception("index_session failed")
         return {"error": f"Index failed: {exc}"}

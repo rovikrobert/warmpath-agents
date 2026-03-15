@@ -45,6 +45,13 @@ Every query template is validated by `privacy_guard.py` at import time. Violatio
 - Monitor feed system engagement funnel (feed_items -> feed_item_interactions -> email_campaign_logs)
 - Track `memories` table growth and retrieval quality for Unified Memory Service
 
+## Shared Infrastructure Ownership
+
+| Service | Owner Agent | What to Monitor | Health Check |
+|---------|------------|-----------------|--------------|
+| **Memory Service** | pipeline | `memories` table row count, staleness (oldest unread), tsvector index health | `query_sql "SELECT COUNT(*), MAX(created_at) FROM memories"` |
+| **Qdrant (vector search)** | model_engineer | Collection point count, embedding sync lag, query latency | Qdrant dashboard / `VECTOR_SEARCH_ENABLED` flag |
+
 ### Phase 3: ML Pipeline (Scale)
 - Automated warm score recalibration based on outcome data
 - Anomaly detection for marketplace health

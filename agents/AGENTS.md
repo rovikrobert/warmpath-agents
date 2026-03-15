@@ -53,6 +53,16 @@ agents/
     └── *_latest.json         # Latest report from each agent (auto-generated)
 ```
 
+## Shared Infrastructure Ownership
+
+The engineering team owns monitoring for these cross-cutting services:
+
+| Service | Owner Agent | What to Monitor | Health Check |
+|---------|------------|-----------------|--------------|
+| **MCP Server** | perf_monitor | Response times, error rates, Railway service health | `check_health` MCP tool, Railway dashboard |
+| **W&B Weave** | security | Trace volume vs 100K/month free-tier cap, PII redaction compliance | W&B dashboard usage page |
+| **Auto-repair PRs** | code_quality (architect) | PR merge/revert rate, fix quality scores | `gh pr list --label auto-repair` |
+
 ## Quick Start
 
 ```bash

@@ -38,6 +38,7 @@ Every scan enforces WarmPath's credit economy and compliance architecture:
 - W&B Weave trace volume tracking (100K/month free tier cap -- overage triggers paid plan)
 - MCP server Railway service cost tracking (`mcp-server` service on Railway, SSE transport)
 - Memory service infrastructure costs (Qdrant hosting for vector search, OpenAI embedding API calls)
+- Auto-repair PR infrastructure cost tracking (compute time for `repair.py` branch creation + pytest runs)
 
 ### Credit Economy (CreditsManager)
 - Earn/spend completeness: CSV upload (100), intro facilitation (50), data freshness (10/quarter), cross-network search (5), intro request (20)

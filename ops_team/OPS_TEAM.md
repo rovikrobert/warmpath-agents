@@ -42,6 +42,7 @@ Audits user experience quality across both sides:
 - Usage tracking coverage for satisfaction correlation
 - Empty state UX quality
 - MCP server health monitoring (deployed Railway service at `mcp-server-production-23a9.up.railway.app`)
+- Auto-repair PR quality tracking (merge rate, revert rate, time-to-review for automated PRs)
 - Email circuit breaker compliance (3/week marketing cap per user)
 - Stuck upload watchdog coverage (15-min Celery Beat task → auto-fail + notification)
 
