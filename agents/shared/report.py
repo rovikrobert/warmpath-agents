@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,6 +63,17 @@ class AgentReport:
     def __post_init__(self):
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Warn on findings with empty recommendations (gstack: actionable errors)
+        for f in self.findings:
+            if f.severity in ("critical", "high", "medium") and not f.recommendation:
+                logger.warning(
+                    "Finding %s (%s/%s) has empty recommendation — "
+                    "use 'do X in Y because Z' format",
+                    f.id,
+                    f.severity,
+                    f.category,
+                )
 
     # -- Serialisation -------------------------------------------------------
 

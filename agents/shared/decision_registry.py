@@ -10,7 +10,7 @@ from __future__ import annotations
 import fcntl
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,8 +31,19 @@ class PendingDecision:
     brief_date: str
     tier: str
     action_plan: str
+    failure_modes: list[str] = field(default_factory=list)
+    rollback_plan: str = ""
     executed_at: str | None = None
     result_summary: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PendingDecision:
+        """Reconstruct from dict, ignoring unknown fields for forward-compat."""
+        from dataclasses import fields as dc_fields
+
+        known = {f.name for f in dc_fields(cls)}
+        filtered = {k: v for k, v in data.items() if k in known}
+        return cls(**filtered)
 
 
 def save_pending_decisions(decisions: list[PendingDecision]) -> Path:
@@ -64,7 +75,7 @@ def load_pending_decisions() -> list[PendingDecision]:
                 data = json.load(f)
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
-        return [PendingDecision(**d) for d in data]
+        return [PendingDecision.from_dict(d) for d in data]
     except (json.JSONDecodeError, TypeError, KeyError) as exc:
         logger.warning("Failed to load pending decisions: %s", exc)
         return []
