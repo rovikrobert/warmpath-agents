@@ -139,9 +139,11 @@ TRACKED_COMPETITORS: list[str] = [
     "Handshake",
     "Blind",
     "Refer.me",
-    "Teamable",
-    "Drafted",
-    "Lunchclub",
+    "Refer Me",
+    "Careerflow",
+    "Teamable",  # acquired by Findem
+    "Drafted",  # acquired by Beamery
+    "Lunchclub",  # pivoted to AI networking
 ]
 
 # ---------------------------------------------------------------------------

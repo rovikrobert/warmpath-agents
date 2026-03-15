@@ -426,10 +426,10 @@
     "skip_until": null
   },
   "DEP-MISSING-PANDAS": {
-    "resolution_type": "false_positive",
-    "resolved_at": "2026-03-12T00:00:00+00:00",
-    "reason": "pandas is only used in agent scripts (finance team), not in the app. Optional dependency.",
-    "skip_until": null
+    "resolution_type": "fixed",
+    "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "pandas added to requirements.txt — used in app/services/jobspy_fetcher.py (direct import).",
+    "skip_until": "2026-04-15T00:00:00+00:00"
   },
   "DEP-MISSING-OPS_TEAM": {
     "resolution_type": "false_positive",
@@ -453,6 +453,30 @@
     "resolution_type": "false_positive",
     "resolved_at": "2026-03-12T00:00:00+00:00",
     "reason": "google namespace is from google-generativeai which is in requirements.txt.",
+    "skip_until": null
+  },
+  "ARCH-N+1": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "infra_tasks.py loop iterates pre-fetched uploads with in-memory checks. No DB calls inside the loop — not an N+1.",
+    "skip_until": null
+  },
+  "ARCH-VAULT-LEAK": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "rectify_contact_data intentionally operates cross-vault for GDPR rectification (Article 16). Uses blind-index lookups, not raw PII scan.",
+    "skip_until": null
+  },
+  "DEP-MISSING-CLOBBERING": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "Scanner matched 'from clobbering' in a docstring, not an actual import. Import scanner now skips docstrings.",
+    "skip_until": null
+  },
+  "DEP-MISSING-CONTEXTVARS": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "contextvars is a Python stdlib module (3.7+). Now added to _STDLIB_MODULES.",
     "skip_until": null
   }
 }

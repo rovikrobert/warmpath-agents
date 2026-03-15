@@ -30,17 +30,20 @@ Every query template is validated by `privacy_guard.py` at import time. Violatio
 
 ## Data Strategy (3 Phases)
 
-### Phase 1: Infrastructure Audit (Current)
+### Phase 1: Infrastructure Audit (Complete)
 - Scan codebase for schema completeness, instrumentation gaps
 - Build pre-approved SQL query templates with privacy validation
 - Assess warm score algorithm for calibration readiness
 - Map full user funnel and identify tracking gaps
 
-### Phase 2: Live Analytics (Post-Launch)
+### Phase 2: Live Analytics (Current)
 - Connect to production DB (read replica)
 - Stand up KPI dashboards using validated query templates
 - Implement cohort analysis and retention tracking
 - Build A/B testing framework for warm score calibration
+- Track CSV V2 pipeline health (4-stage Redis Streams: parse/clean/import/score)
+- Monitor feed system engagement funnel (feed_items -> feed_item_interactions -> email_campaign_logs)
+- Track `memories` table growth and retrieval quality for Unified Memory Service
 
 ### Phase 3: ML Pipeline (Scale)
 - Automated warm score recalibration based on outcome data
@@ -55,7 +58,7 @@ Every query template is validated by `privacy_guard.py` at import time. Violatio
 | Upload-to-search rate | 60% | Funnel |
 | Search-to-intro rate | 15% | Funnel |
 | Intro approval rate | 50% | Marketplace |
-| Marketplace supply coverage | 100 companies | Marketplace |
+| Marketplace supply coverage | 129 companies | Marketplace |
 | Warm score accuracy | 80% | Model |
 | Credit velocity | 500/week | Economy |
 

@@ -21,7 +21,7 @@ API_DIR = APP_DIR / "api"
 TESTS_DIR = PROJECT_ROOT / "tests"
 
 # ---------------------------------------------------------------------------
-# Database table registry (from CLAUDE.md: 27 tables)
+# Database table registry (from CLAUDE.md: 29 tables)
 # ---------------------------------------------------------------------------
 
 DATABASE_TABLES: dict[str, list[str]] = {
@@ -56,6 +56,10 @@ DATABASE_TABLES: dict[str, list[str]] = {
         "network_holder_availability",
         "network_sharing_preferences",
     ],
+    "engagement": [
+        "memories",
+        "email_campaign_logs",
+    ],
     "security": [
         "audit_logs",
     ],
@@ -72,7 +76,7 @@ KPI_TARGETS: dict[str, dict] = {
     "upload_to_search_rate": {"target": 0.60, "yellow": 0.40, "unit": "ratio"},
     "search_to_intro_rate": {"target": 0.15, "yellow": 0.08, "unit": "ratio"},
     "intro_approval_rate": {"target": 0.50, "yellow": 0.30, "unit": "ratio"},
-    "marketplace_supply_coverage": {"target": 100, "yellow": 50, "unit": "companies"},
+    "marketplace_supply_coverage": {"target": 129, "yellow": 50, "unit": "companies"},
     "warm_score_accuracy": {"target": 0.80, "yellow": 0.60, "unit": "ratio"},
     "credit_velocity": {"target": 500, "yellow": 200, "unit": "credits/week"},
 }

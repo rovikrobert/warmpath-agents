@@ -31,9 +31,13 @@ Every scan enforces WarmPath's credit economy and compliance architecture:
 ### Billing & Payments (FinanceManager)
 - Stripe webhook event handler coverage (checkout.session.completed, invoice.paid, customer.subscription.*)
 - Credit purchase endpoint validation (amount limits, idempotency, error handling)
+- Credit purchase endpoint blocked for non-admins in production (Phase 0 hardening) -- audit event `credit_purchase_blocked`
 - Subscription model schema (plan tiers, billing cycles, trial periods)
 - Billing audit trail completeness (credit_transactions, usage_logs, audit_logs)
 - Agent team cost tracking (scan_duration_seconds across all teams)
+- W&B Weave trace volume tracking (100K/month free tier cap -- overage triggers paid plan)
+- MCP server Railway service cost tracking (`mcp-server` service on Railway, SSE transport)
+- Memory service infrastructure costs (Qdrant hosting for vector search, OpenAI embedding API calls)
 
 ### Credit Economy (CreditsManager)
 - Earn/spend completeness: CSV upload (100), intro facilitation (50), data freshness (10/quarter), cross-network search (5), intro request (20)
@@ -68,7 +72,9 @@ Every scan enforces WarmPath's credit economy and compliance architecture:
 | Alembic head count | 1 | Investor |
 | GDPR/PDPA gap count | 0 critical | Compliance |
 | Suppression list enforcement | 100% at import | Compliance |
-| Agent scan cost (all teams) | < $2/day | Operations |
+| Agent scan cost (all teams) | < $3/day | Operations |
+
+> **Note:** Agent scan cost KPI target aligned to $3/day to match `cos_config.py:daily_cost_cap_usd`. Previously documented as $2/day here; CoS enforces the $3/day cap with Haiku fallback on budget exhaustion.
 
 ## Shared Modules
 

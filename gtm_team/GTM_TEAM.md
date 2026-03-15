@@ -7,7 +7,7 @@ The GTM team is WarmPath's **go-to-market intelligence engine**. It scans strate
 **Mission:** Ensure WarmPath launches with validated positioning, defensible pricing, ready channels, and activated partnerships -- reducing time-to-traction and avoiding costly GTM pivots.
 
 **Key outcomes:**
-- Competitive positioning validated against 8 tracked competitors
+- Competitive positioning validated against 10 tracked competitors
 - Pricing validated with 10+ SaaS/marketplace benchmarks
 - Content pipeline of 20+ SEO articles ready for launch
 - 15+ active partnership conversations (bootcamps, universities, career coaches)
@@ -39,7 +39,7 @@ gtm_team/
 
 ### StratOps (Strategic Operations)
 Scans strategy documents and competitive landscape to:
-- Track 8 competitors (The Swarm, LinkedIn, Handshake, Blind, Refer.me, Teamable, Drafted, Lunchclub)
+- Track 10 competitors (The Swarm, LinkedIn, Handshake, Blind, Refer.me, Refer Me, Careerflow, Teamable [acquired by Findem], Drafted [acquired by Beamery], Lunchclub [pivoted to AI networking])
 - Validate positioning and differentiation strength
 - Assess market sizing assumptions (TAM/SAM/SOM)
 - Monitor geographic strategy alignment (Singapore-first, SEA expansion)
@@ -60,6 +60,11 @@ Scans frontend, strategy docs, and content pipeline to:
 - Validate marketing compliance (no false privacy claims, no PII in marketing)
 - Assess channel readiness (content, community, referral programs)
 - Monitor marketing regulation changes across operating jurisdictions
+- Track `/join` page as acquisition channel (dual-purpose intent-based personalization for job seekers vs network holders, "Copy invite link" with intent params)
+- Monitor referral codes system as viral growth feature (user-to-user invite tracking)
+- Validate bot-aware OG tag middleware for social sharing (link previews on Telegram, Slack, Twitter, etc.)
+- Track relay email as growth channel (NH recruitment CTA embedded in intro relay emails drives supply-side acquisition)
+- Monitor Phase 3 adaptive scope experiment (`warmpath_search_scope_v1`) conversion funnel impact (scope telemetry: `search_scope_selected`, `marketplace_nudge_shown`, `marketplace_nudge_accepted`)
 
 ### Partnerships
 Scans partnership landscape and strategy docs to:

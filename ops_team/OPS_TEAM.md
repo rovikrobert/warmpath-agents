@@ -41,6 +41,9 @@ Audits user experience quality across both sides:
 - Journey milestone celebration/acknowledgment patterns
 - Usage tracking coverage for satisfaction correlation
 - Empty state UX quality
+- MCP server health monitoring (deployed Railway service at `mcp-server-production-23a9.up.railway.app`)
+- Email circuit breaker compliance (3/week marketing cap per user)
+- Stuck upload watchdog coverage (15-min Celery Beat task → auto-fail + notification)
 
 ### Marsh (Marketplace Health Auditor)
 Audits marketplace infrastructure and economics:
@@ -48,6 +51,8 @@ Audits marketplace infrastructure and economics:
 - Credit economy (earn/spend actions, expiry, non-transferability)
 - Intro pipeline metrics (pending/approved/declined trackability)
 - Suppression list marketplace impact, coverage signals
+- Velocity rate limit auditing (`velocity_limit_hit` audit events, 3 daily caps from Phase 4: intro requests, intro approvals, manual intro confirmations)
+- Feed generator performance (runs 3x daily for all active users via Celery Beat)
 
 ### OpsLead (Coordinator)
 Aggregates all sub-agent reports and produces:

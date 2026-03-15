@@ -96,7 +96,7 @@ def _build_ast_cache(py_files: list[Path]) -> ASTCache:
 
 def _scan_ruff_check(findings: list[Finding]) -> int:
     """Run ruff check in JSON mode and create findings. Return issue count."""
-    result = _run_tool(["ruff", "check", "app/", "--output-format=json"])
+    result = _run_tool(["ruff", "check", "app/", "mcp_server/", "--output-format=json"])
     if result is None:
         findings.append(
             Finding(
@@ -159,7 +159,7 @@ def _scan_ruff_check(findings: list[Finding]) -> int:
 
 def _scan_ruff_format(findings: list[Finding]) -> None:
     """Run ruff format --check and flag files with formatting drift."""
-    result = _run_tool(["ruff", "format", "--check", "app/"])
+    result = _run_tool(["ruff", "format", "--check", "app/", "mcp_server/"])
     if result is None:
         findings.append(
             Finding(
@@ -894,7 +894,7 @@ def _scan_mypy(findings: list[Finding]) -> dict[str, object]:
     metrics: dict[str, object] = {}
 
     result = _run_tool(
-        ["mypy", "app/", "--no-error-summary", "--no-color"],
+        ["mypy", "app/", "mcp_server/", "--no-error-summary", "--no-color"],
         timeout=60,
     )
     if result is None:
@@ -1300,6 +1300,9 @@ def scan() -> AgentReport:
     # Collect Python files to scan
     backend_root = SCAN_TARGETS.get("backend", PROJECT_ROOT / "app")
     py_files = _py_files(backend_root) if isinstance(backend_root, Path) else []
+    mcp_root = SCAN_TARGETS.get("mcp_server")
+    if isinstance(mcp_root, Path):
+        py_files.extend(_py_files(mcp_root))
     metrics["total_files_scanned"] = len(py_files)
 
     # Build AST cache once — all scan functions reuse it

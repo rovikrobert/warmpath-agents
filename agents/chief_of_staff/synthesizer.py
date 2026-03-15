@@ -118,10 +118,27 @@ def synthesize_daily(
     # Classify
     decisions_needed = [cf for cf in enriched if cf.severity in ("critical", "high")]
     key_updates = [cf for cf in enriched if cf.severity == "medium"]
-    progress_items = _build_progress(reports)
+    # Use the same per-team filtered reports for progress detection so that
+    # resolved / noisy findings don't prevent "clean scan" labels.
+    _filtered_reports = [
+        AgentReport(
+            agent=r.agent,
+            timestamp=r.timestamp,
+            scan_duration_seconds=r.scan_duration_seconds,
+            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
+            metrics=r.metrics,
+            intelligence_applied=r.intelligence_applied,
+            learning_updates=r.learning_updates,
+        )
+        for r in reports
+    ]
+    progress_items = _build_progress(_filtered_reports)
 
-    # Operational health checks
-    operational_health = _check_operational_health(reports, cross_team_requests or [])
+    # Operational health checks (use filtered reports so noise doesn't
+    # inflate finding-volume warnings that surface in Telegram)
+    operational_health = _check_operational_health(
+        _filtered_reports, cross_team_requests or []
+    )
 
     # Compute per-team summaries (with resolved findings filtered out)
     _team_agents_sets = {team: set(agents) for team, agents in TEAM_REGISTRY.items()}
@@ -131,7 +148,7 @@ def synthesize_daily(
             agent=r.agent,
             timestamp=r.timestamp,
             scan_duration_seconds=r.scan_duration_seconds,
-            findings=filter_resolved_findings(r.findings),
+            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
             metrics=r.metrics,
             intelligence_applied=r.intelligence_applied,
             learning_updates=r.learning_updates,
@@ -545,6 +562,7 @@ def synthesize_weekly(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     all_findings = merge_reports(reports) if reports else []
+    all_findings = filter_resolved_findings(all_findings)
     all_findings = _filter_noisy_findings(all_findings)
     enriched = [_enrich_finding(f) for f in all_findings]
     enriched.sort(key=_score_finding, reverse=True)
@@ -628,8 +646,22 @@ def synthesize_weekly(
 def synthesize_status(reports: list[AgentReport]) -> str:
     """Quick cross-team status snapshot."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    # Pre-filter all reports so resolved/noisy findings are excluded everywhere
+    reports = [
+        AgentReport(
+            agent=r.agent,
+            timestamp=r.timestamp,
+            scan_duration_seconds=r.scan_duration_seconds,
+            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
+            metrics=r.metrics,
+            intelligence_applied=r.intelligence_applied,
+            learning_updates=r.learning_updates,
+        )
+        for r in reports
+    ]
+
     all_findings = merge_reports(reports) if reports else []
-    all_findings = _filter_noisy_findings(all_findings)
 
     lines: list[str] = []
     lines.append(f"# Status Snapshot - {today}\n")

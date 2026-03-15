@@ -36,6 +36,15 @@ FUNNEL_STEPS = [
     "application_update",
 ]
 
+# Phase 3 adaptive scope experiment events (PostHog / frontend telemetry)
+EXPERIMENT_EVENTS = [
+    "search_scope_selected",
+    "search_scope_auto_selected",
+    "marketplace_nudge_shown",
+    "marketplace_nudge_accepted",
+    "search_scope_decision",
+]
+
 # Application status enum values (expected)
 APPLICATION_STATUSES = [
     "applied",
@@ -204,6 +213,59 @@ def _check_credit_transaction_types(
                 detail=f"Expected terms not found: {', '.join(missing[:3])}",
                 file=str(credits_service),
                 recommendation="Verify all earn/spend scenarios have transaction_type strings",
+            )
+        )
+
+
+def _check_experiment_instrumentation(
+    findings: list[Finding],
+    metrics: dict,
+) -> None:
+    """Check that Phase 3 adaptive scope experiment events are instrumented.
+
+    Scans frontend source for PostHog capture calls matching EXPERIMENT_EVENTS.
+    """
+    frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "src"
+    if not frontend_dir.is_dir():
+        return
+
+    # Collect all string literals from frontend source that match event names
+    found_events: set[str] = set()
+    for path in frontend_dir.rglob("*.tsx"):
+        try:
+            source = path.read_text()
+        except OSError:
+            continue
+        for event in EXPERIMENT_EVENTS:
+            if event in source:
+                found_events.add(event)
+    for path in frontend_dir.rglob("*.ts"):
+        if path.suffix == ".tsx":
+            continue
+        try:
+            source = path.read_text()
+        except OSError:
+            continue
+        for event in EXPERIMENT_EVENTS:
+            if event in source:
+                found_events.add(event)
+
+    metrics["experiment_events_expected"] = len(EXPERIMENT_EVENTS)
+    metrics["experiment_events_instrumented"] = len(found_events)
+
+    missing = [e for e in EXPERIMENT_EVENTS if e not in found_events]
+    if missing:
+        findings.append(
+            Finding(
+                id="analyst-007",
+                severity="medium",
+                category="instrumentation",
+                title=f"{len(missing)} experiment events not found in frontend source",
+                detail=f"Missing: {', '.join(missing)}",
+                recommendation=(
+                    "Ensure Phase 3 adaptive scope experiment events are captured "
+                    "via PostHog for funnel analysis"
+                ),
             )
         )
 
@@ -576,6 +638,7 @@ def scan() -> DataTeamReport:
     _check_application_statuses(findings, metrics)
     _check_marketplace_endpoints(endpoints, findings, metrics)
     _check_credit_transaction_types(findings, metrics)
+    _check_experiment_instrumentation(findings, metrics)
     _scan_anomaly_detection(findings, insights, metrics)
     _scan_cohort_retention(findings, insights, metrics)
 

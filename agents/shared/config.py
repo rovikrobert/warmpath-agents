@@ -12,6 +12,7 @@ INTEL_CACHE = AGENTS_DIR / "shared" / "intel_cache.json"
 # Scan targets by category
 SCAN_TARGETS = {
     "backend": PROJECT_ROOT / "app",
+    "mcp_server": PROJECT_ROOT / "mcp_server",
     "tests": PROJECT_ROOT / "tests",
     "frontend": PROJECT_ROOT / "frontend" / "src",
     "migrations": PROJECT_ROOT / "alembic",

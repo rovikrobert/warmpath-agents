@@ -829,6 +829,7 @@ _GROWTH_ESTIMATES = {
     "csv_uploads": 5,
     "companies": 100,  # shared/deduplicated
     "enrichment_cache": 200,
+    "memories": 500,  # agent scans + session indexing + manual saves (shared, not per-user)
 }
 
 

@@ -71,12 +71,14 @@ def list_reports() -> dict[str, Any]:
         if not report_path.is_dir():
             continue
 
-        for f in sorted(report_path.iterdir()):
+        for f in sorted(report_path.rglob("*")):
             if f.is_file() and f.suffix in (".json", ".md", ".txt"):
+                # Use path relative to the reports dir so subdirs are preserved
+                rel = f.relative_to(report_path)
                 reports.append(
                     {
                         "team": team_dir,
-                        "filename": f.name,
+                        "filename": str(rel),
                         "size_bytes": f.stat().st_size,
                         "modified": f.stat().st_mtime,
                     }
@@ -105,7 +107,7 @@ def read_report(team: str, filename: str) -> dict[str, Any]:
         {"team": str, "filename": str, "content": str, "size_bytes": int} on success.
         {"error": str} on failure.
     """
-    if ".." in filename or "/" in filename or "\\" in filename:
+    if ".." in filename or "\\" in filename:
         return {"error": "Invalid filename — path traversal not allowed"}
 
     # Try Redis first
@@ -123,7 +125,12 @@ def read_report(team: str, filename: str) -> dict[str, Any]:
         return {"error": f"Unknown team: {team}. Valid: {', '.join(_TEAM_DIRS)}"}
 
     root = Path(_get_project_root())
-    report_path = root / team / "reports" / filename
+    report_path = (root / team / "reports" / filename).resolve()
+
+    # Ensure resolved path stays within the reports directory
+    reports_root = (root / team / "reports").resolve()
+    if not str(report_path).startswith(str(reports_root)):
+        return {"error": "Invalid filename — path traversal not allowed"}
 
     if not report_path.is_file():
         return {"error": f"Report not found: {team}/reports/{filename}"}

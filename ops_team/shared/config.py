@@ -115,6 +115,7 @@ MARKETPLACE_ACTIONS = [
     "request_intro",
     "approve_intro",
     "decline_intro",
+    "velocity_limit_hit",
 ]
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ Funnel analysis, engagement metrics, marketplace health, anomaly detection.
 3. **Application Funnel** — Check application status enum covers the full hiring pipeline
 4. **Marketplace Coverage** — Verify marketplace API endpoints are instrumented
 5. **Credit Analytics** — Check credit transaction types cover earn/spend scenarios
+6. **Experiment Instrumentation** — Validate Phase 3 adaptive scope experiment events (search_scope_selected, search_scope_auto_selected, marketplace_nudge_shown, marketplace_nudge_accepted, search_scope_decision) are present in frontend source
 
 ## How It Works
 - Scans API endpoint files via AST to map the full endpoint surface
@@ -27,6 +28,8 @@ intro_approve -> application_create -> application_update
 - `funnel_coverage`: Ratio of instrumented steps
 - `engagement_events_instrumented`: Engagement events found
 - `marketplace_patterns_found`: Marketplace action patterns detected
+- `experiment_events_expected`: Phase 3 experiment events to validate
+- `experiment_events_instrumented`: Experiment events found in frontend source
 
 ## CLI Usage
 ```bash

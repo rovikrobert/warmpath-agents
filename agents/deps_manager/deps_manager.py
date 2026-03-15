@@ -81,6 +81,7 @@ _STDLIB_MODULES: set[str] = {
     "concurrent",
     "configparser",
     "contextlib",
+    "contextvars",
     "copy",
     "csv",
     "ctypes",
@@ -245,14 +246,25 @@ def _collect_imports(app_dir: Path) -> set[str]:
         except OSError:
             continue
 
+        in_docstring = False
         for line in text.splitlines():
             stripped = line.strip()
+            # Track triple-quoted docstrings to avoid matching prose
+            # that starts with "from" or "import" inside docstrings.
+            triple_count = stripped.count('"""') + stripped.count("'''")
+            if triple_count % 2 == 1:
+                in_docstring = not in_docstring
+            if in_docstring:
+                continue
+            # Skip comments
+            if stripped.startswith("#"):
+                continue
             # import foo / import foo.bar
             m = re.match(r"^import\s+([\w]+)", stripped)
             if m:
                 imports.add(m.group(1))
             # from foo import ... / from foo.bar import ...
-            m = re.match(r"^from\s+([\w]+)", stripped)
+            m = re.match(r"^from\s+([\w]+)(?:\.\w+)*\s+import\s+", stripped)
             if m:
                 imports.add(m.group(1))
 

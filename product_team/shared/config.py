@@ -50,8 +50,11 @@ PERSONAS: dict[str, dict] = {
             "FindReferrals",
             "ReferralResults",
             "ApplicationsPage",
-            "NewSearch",
             "SearchResults",
+            "NotificationsPage",
+            "MarketplaceBrowse",
+            "MyRequests",
+            "EditProfile",
         ],
         "tier": "demand",
     },
@@ -65,6 +68,9 @@ PERSONAS: dict[str, dict] = {
             "SharingSettings",
             "MarketplaceOverview",
             "CreditsPage",
+            "NotificationsPage",
+            "MyRequests",
+            "EditProfile",
         ],
         "tier": "supply",
     },
@@ -77,14 +83,18 @@ PERSONAS: dict[str, dict] = {
 PERSONA_JOURNEYS: dict[str, list[list[str]]] = {
     "job_seeker": [
         ["AuthPage", "OnboardingPage", "CoachPage", "FindReferrals", "ReferralResults"],
-        ["AuthPage", "OnboardingPage", "CoachPage", "NewSearch", "SearchResults"],
+        ["AuthPage", "OnboardingPage", "CoachPage", "FindReferrals", "SearchResults"],
         ["CoachPage", "ApplicationsPage"],
         ["CoachPage", "CreditsPage"],
+        ["CoachPage", "MarketplaceBrowse", "MyRequests"],
+        ["CoachPage", "EditProfile"],
     ],
     "network_holder": [
         ["AuthPage", "OnboardingPage", "CoachPage", "ContactsPage", "SharingSettings"],
         ["CoachPage", "MarketplaceOverview"],
         ["CoachPage", "CreditsPage"],
+        ["CoachPage", "MyRequests"],
+        ["CoachPage", "EditProfile"],
     ],
 }
 
