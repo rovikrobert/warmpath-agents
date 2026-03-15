@@ -24,6 +24,7 @@ from enum import Enum
 from typing import Any
 
 from agents.shared.event_stream import STREAM_KEY
+from agents.shared.repair import repair_auto_fixable
 from agents.shared.report import Finding
 from agents.shared.risk_classifier import RiskLevel, classify_risk
 
@@ -81,9 +82,14 @@ class ExecutionEngine:
         max_auto_merges_per_day: int = 10,
     ):
         if enabled is None:
-            enabled = (
-                os.getenv("AUTONOMOUS_EXECUTION_ENABLED", "false").lower() == "true"
-            )
+            try:
+                from app.config import settings
+
+                enabled = settings.AUTONOMOUS_EXECUTION_ENABLED
+            except Exception:
+                enabled = (
+                    os.getenv("AUTONOMOUS_EXECUTION_ENABLED", "false").lower() == "true"
+                )
         self.enabled = enabled
         self.max_auto_merges_per_day = max_auto_merges_per_day
         # Resets per-run (new ExecutionEngine instance per orchestrator invocation),
@@ -139,22 +145,8 @@ class ExecutionEngine:
                 detail=f"Escalated: {finding.severity} {finding.title}",
             )
 
-        if tier == ExecutionTier.AUTO_DO:
-            self._auto_merge_count += 1
-            return ExecutionResult(
-                finding_id=finding.id,
-                tier=tier,
-                action=ExecutionAction.AUTO_FIXED,
-                detail=f"Auto-fixed: {finding.title}",
-            )
-
-        if tier == ExecutionTier.AUTO_PR:
-            return ExecutionResult(
-                finding_id=finding.id,
-                tier=tier,
-                action=ExecutionAction.PR_CREATED,
-                detail=f"PR created for: {finding.title}",
-            )
+        if tier in (ExecutionTier.AUTO_DO, ExecutionTier.AUTO_PR):
+            return self._execute_repair(finding, tier)
 
         return ExecutionResult(
             finding_id=finding.id,
@@ -162,6 +154,43 @@ class ExecutionEngine:
             action=ExecutionAction.SKIPPED,
             detail="Unknown tier",
         )
+
+    def _execute_repair(self, finding: Finding, tier: ExecutionTier) -> ExecutionResult:
+        """Run repair_auto_fixable and return real results."""
+        try:
+            repair_result = repair_auto_fixable([finding])
+            if repair_result.fixed_count > 0:
+                if tier == ExecutionTier.AUTO_DO:
+                    self._auto_merge_count += 1
+                action = (
+                    ExecutionAction.AUTO_FIXED
+                    if tier == ExecutionTier.AUTO_DO
+                    else ExecutionAction.PR_CREATED
+                )
+                return ExecutionResult(
+                    finding_id=finding.id,
+                    tier=tier,
+                    action=action,
+                    detail=f"Repaired: {finding.title}",
+                    pr_url=repair_result.pr_url,
+                )
+            detail = "No changes produced"
+            if repair_result.errors:
+                detail = f"Repair failed: {repair_result.errors[0][:200]}"
+            return ExecutionResult(
+                finding_id=finding.id,
+                tier=tier,
+                action=ExecutionAction.SKIPPED,
+                detail=detail,
+            )
+        except Exception as exc:
+            logger.error("Repair failed for %s: %s", finding.id, exc)
+            return ExecutionResult(
+                finding_id=finding.id,
+                tier=tier,
+                action=ExecutionAction.SKIPPED,
+                detail=f"Repair exception: {exc}",
+            )
 
     def process_findings(
         self,

@@ -70,10 +70,14 @@ def load_pending_decisions() -> list[PendingDecision]:
         return []
 
 
-def find_decision(number: int) -> PendingDecision | None:
-    """Find a pending decision by its display number."""
+def find_decision(
+    number: int | None = None, *, finding_id: str | None = None
+) -> PendingDecision | None:
+    """Find a pending decision by display number or stable finding_id."""
     for d in load_pending_decisions():
-        if d.number == number:
+        if number is not None and d.number == number:
+            return d
+        if finding_id is not None and d.finding_id == finding_id:
             return d
     return None
 

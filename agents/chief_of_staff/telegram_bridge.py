@@ -106,7 +106,9 @@ class TelegramBridge:
         # Auto-repairs
         if repairs and repairs.get("fixed_count", 0) > 0:
             pr_note = f" ({repairs['pr_url']})" if repairs.get("pr_url") else ""
-            lines.append(f"[+] Fixed: {repairs['fixed_count']} issues{pr_note}")
+            lines.append("")
+            lines.append("Auto-actions:")
+            lines.append(f"  [+] Fixed {repairs['fixed_count']} issues{pr_note}")
 
         # Recommendations
         if recommendations:

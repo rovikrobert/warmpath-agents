@@ -149,6 +149,18 @@ def cmd_all(skip_tests: bool = False) -> None:
                 all_findings, team="engineering"
             )
             engine.publish_events("engineering")
+            # Extract real repair data from engine results for brief
+            _pr_results = [r for r in engine._results if r.pr_url]
+            if _pr_results:
+                _execution_summary["repairs"] = {
+                    "fixed_count": len(_pr_results),
+                    "pr_url": _pr_results[0].pr_url,
+                }
+            _escalated = [r for r in engine._results if r.action.value == "escalated"]
+            if _escalated:
+                _execution_summary["recommendations"] = [r.detail for r in _escalated][
+                    :5
+                ]
             logger.info(
                 "Execution engine: %s",
                 engine.get_summary_for_brief(),
