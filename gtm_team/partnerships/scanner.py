@@ -60,10 +60,10 @@ def _relative(path: Path) -> str:
 
 
 def _find_jsx_files() -> list[Path]:
-    """Return all .jsx files under frontend/src/pages/."""
+    """Return all .jsx/.tsx files under frontend/src/pages/."""
     if not PAGES_DIR.is_dir():
         return []
-    return sorted(PAGES_DIR.glob("*.jsx"))
+    return sorted([*PAGES_DIR.glob("*.jsx"), *PAGES_DIR.glob("*.tsx")])
 
 
 # ---------------------------------------------------------------------------

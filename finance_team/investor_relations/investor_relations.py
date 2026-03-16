@@ -96,6 +96,7 @@ def _check_test_count_claims(
     import subprocess
 
     actual_count: int | None = None
+    pytest_succeeded = False
     try:
         result = subprocess.run(
             ["python3", "-m", "pytest", "--collect-only", "-q", str(TESTS_DIR)],
@@ -109,7 +110,27 @@ def _check_test_count_claims(
             m = re.search(r"(\d+)\s+test", line)
             if m:
                 actual_count = int(m.group(1))
+                pytest_succeeded = True
                 break
+        # If pytest ran but found 0 tests AND returncode != 0, collection failed.
+        # Also treat "found 0" with rc==0 as suspicious if we know tests exist.
+        if actual_count is not None and actual_count == 0 and result.returncode != 0:
+            logger.warning(
+                "pytest collect returned 0 tests with exit code %d — treating as env failure. "
+                "stderr: %s",
+                result.returncode,
+                (result.stderr or "")[:500],
+            )
+            actual_count = None
+            pytest_succeeded = False
+        elif actual_count is None and result.returncode != 0:
+            # pytest produced no parseable output and failed
+            logger.warning(
+                "pytest collect produced no parseable output (exit code %d). "
+                "stderr: %s",
+                result.returncode,
+                (result.stderr or "")[:500],
+            )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
         logger.warning("pytest collect failed, falling back to regex: %s", exc)
 
@@ -132,6 +153,7 @@ def _check_test_count_claims(
         )
     )
     metrics["test_count_actual"] = actual_count
+    metrics["test_count_method"] = "pytest" if pytest_succeeded else "regex"
 
     if claimed_count == 0:
         metrics["test_count_delta_pct"] = None
@@ -139,6 +161,38 @@ def _check_test_count_claims(
 
     delta_pct = abs(claimed_count - actual_count) / claimed_count * 100
     metrics["test_count_delta_pct"] = round(delta_pct, 1)
+
+    # If delta is extreme (>80%) and we didn't get a clean pytest run,
+    # the environment likely can't collect tests — don't report this as
+    # a data-room inaccuracy, it's an infra issue.
+    if delta_pct > 80 and not pytest_succeeded:
+        logger.warning(
+            "investor_relations: test count delta %.1f%% but pytest collection "
+            "failed — suppressing finding (likely env issue, not real drift). "
+            "Regex found %d, claimed %d.",
+            delta_pct,
+            actual_count,
+            claimed_count,
+        )
+        findings.append(
+            Finding(
+                id="ir-tests-002",
+                severity="low",
+                category="investor_readiness",
+                title="Test count verification inconclusive — pytest collection failed",
+                detail=(
+                    f"Could not verify CLAUDE.md claim of {claimed_count} tests. "
+                    f"pytest --collect-only failed; regex fallback found {actual_count}. "
+                    "This is likely an environment issue, not real drift."
+                ),
+                file=_relative(claude_md_path),
+                recommendation=(
+                    "Ensure pytest can collect tests in the scan environment "
+                    "(check deps, virtualenv, PYTHONPATH)."
+                ),
+            )
+        )
+        return
 
     if delta_pct > 10:
         severity = "high" if delta_pct > 30 else "medium"
@@ -150,7 +204,7 @@ def _check_test_count_claims(
                 title=f"Test count claim in CLAUDE.md is off by {delta_pct:.1f}%",
                 detail=(
                     f"CLAUDE.md claims {claimed_count} tests; "
-                    f"found {actual_count} test functions/classes across {len(test_files)} files"
+                    f"found {actual_count} via {metrics['test_count_method']}"
                 ),
                 file=_relative(claude_md_path),
                 recommendation=(

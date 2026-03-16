@@ -404,16 +404,24 @@ def _scan_cohort_retention(
         "signup_cohort_retention",
         {"start_date": "2020-01-01"},
     )
+    # Minimum total users across all cohorts before metrics are reportable.
+    # Below this, a single user churning can swing retention by 20%+.
+    _MIN_COHORT_USERS = 30
+
     if retention_rows:
         cohort_count = len(retention_rows)
         metrics["cohort_count"] = cohort_count
 
         retention_rates = []
+        total_users = 0
         for row in retention_rows:
             size = row.get("cohort_size", 0) or 0
             retained = row.get("retained_week_2", 0) or 0
+            total_users += size
             if size > 0:
                 retention_rates.append(retained / size)
+
+        metrics["cohort_total_users"] = total_users
 
         if retention_rates:
             avg_retention = sum(retention_rates) / len(retention_rates)
@@ -421,14 +429,25 @@ def _scan_cohort_retention(
             metrics["min_week2_retention"] = round(min(retention_rates), 3)
             metrics["max_week2_retention"] = round(max(retention_rates), 3)
 
-            if avg_retention < 0.20:
+            if total_users < _MIN_COHORT_USERS:
+                # Sample too small — log but don't surface as a finding.
+                logger.info(
+                    "analyst: suppressing retention finding — sample too small "
+                    "(%d users < %d minimum)",
+                    total_users,
+                    _MIN_COHORT_USERS,
+                )
+            elif avg_retention < 0.20:
                 findings.append(
                     Finding(
                         id="analyst-cohort-001",
                         severity="high",
                         category="retention",
                         title=f"Week-2 retention is {avg_retention:.0%} — below 20% threshold",
-                        detail=f"Across {cohort_count} cohorts, avg retention = {avg_retention:.1%}",
+                        detail=(
+                            f"Across {cohort_count} cohorts ({total_users} users), "
+                            f"avg retention = {avg_retention:.1%}"
+                        ),
                         recommendation=(
                             "Focus on activation: reduce time-to-first-value, "
                             "improve onboarding, add re-engagement emails"
@@ -442,15 +461,14 @@ def _scan_cohort_retention(
                     category="retention",
                     title="Cohort retention analysis",
                     evidence=(
-                        f"{cohort_count} cohorts, avg week-2 retention: {avg_retention:.1%}, "
+                        f"{cohort_count} cohorts ({total_users} users), "
+                        f"avg week-2 retention: {avg_retention:.1%}, "
                         f"range: {min(retention_rates):.1%}–{max(retention_rates):.1%}"
                     ),
                     impact="Retention directly drives LTV and marketplace liquidity",
                     recommendation="Target 30%+ week-2 retention for marketplace viability",
-                    confidence=0.85,
-                    sample_size=sum(
-                        r.get("cohort_size", 0) or 0 for r in retention_rows
-                    ),
+                    confidence=0.3 if total_users < _MIN_COHORT_USERS else 0.85,
+                    sample_size=total_users,
                     actionable_by="product_team",
                 )
             )
@@ -462,9 +480,11 @@ def _scan_cohort_retention(
     )
     if activation_rows:
         activation_rates = []
+        total_activation_users = 0
         for row in activation_rows:
             size = row.get("cohort_size", 0) or 0
             activated = row.get("activated", 0) or 0
+            total_activation_users += size
             if size > 0:
                 activation_rates.append(activated / size)
 
@@ -472,14 +492,24 @@ def _scan_cohort_retention(
             avg_activation = sum(activation_rates) / len(activation_rates)
             metrics["avg_activation_rate"] = round(avg_activation, 3)
 
-            if avg_activation < 0.40:
+            if total_activation_users < _MIN_COHORT_USERS:
+                logger.info(
+                    "analyst: suppressing activation finding — sample too small "
+                    "(%d users < %d minimum)",
+                    total_activation_users,
+                    _MIN_COHORT_USERS,
+                )
+            elif avg_activation < 0.40:
                 findings.append(
                     Finding(
                         id="analyst-cohort-002",
                         severity="medium",
                         category="retention",
                         title=f"Activation rate is {avg_activation:.0%} — below 40% target",
-                        detail="Activation = first CSV upload after signup",
+                        detail=(
+                            f"Activation = first CSV upload after signup "
+                            f"({total_activation_users} users)"
+                        ),
                         recommendation="Simplify onboarding, provide sample CSV, add activation nudges",
                     )
                 )

@@ -38,10 +38,10 @@ def _find_api_files() -> list[Path]:
 
 
 def _find_page_files() -> list[Path]:
-    """Return all .jsx files under frontend/src/pages/."""
+    """Return all .jsx/.tsx files under frontend/src/pages/."""
     if not PAGES_DIR.is_dir():
         return []
-    return sorted(PAGES_DIR.glob("*.jsx"))
+    return sorted([*PAGES_DIR.glob("*.jsx"), *PAGES_DIR.glob("*.tsx")])
 
 
 def _find_test_files() -> list[Path]:
@@ -335,7 +335,7 @@ def _validate_api_contracts(
                 r"(?:data|resp|response|result)\s*[\[.](\w+)"
             )
             frontend_fields: set[str] = set()
-            for page in page_dir.glob("*.jsx"):
+            for page in [*page_dir.glob("*.jsx"), *page_dir.glob("*.tsx")]:
                 page_source = _read_safe(page)
                 frontend_fields.update(field_access_pattern.findall(page_source))
             metrics["frontend_response_fields"] = len(frontend_fields)

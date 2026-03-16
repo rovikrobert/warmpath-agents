@@ -47,7 +47,7 @@ _APP_ERROR_RE = re.compile(
 # Feedback-related patterns in JSX
 _FEEDBACK_PATTERNS = re.compile(
     r"\b(rating|feedback|survey|nps|satisfaction|thumbs|review|poll|star[sS]core"
-    r"|FeedbackForm|SurveyWidget|NpsPrompt)\b",
+    r"|FeedbackForm|FeedbackModal|SurveyWidget|NpsPrompt)\b",
     re.IGNORECASE,
 )
 
@@ -104,11 +104,11 @@ def _find_api_files() -> list[Path]:
 
 
 def _find_jsx_files() -> list[Path]:
-    """Glob frontend/src/pages/*.jsx."""
+    """Glob frontend/src/pages/*.jsx and *.tsx."""
     if not PAGES_DIR.exists():
         logger.warning("Pages directory not found: %s", PAGES_DIR)
         return []
-    return sorted(PAGES_DIR.glob("*.jsx"))
+    return sorted([*PAGES_DIR.glob("*.jsx"), *PAGES_DIR.glob("*.tsx")])
 
 
 # ---------------------------------------------------------------------------

@@ -59,10 +59,10 @@ def _relative(path: Path) -> str:
 
 
 def _find_jsx_files() -> list[Path]:
-    """Return all .jsx files under frontend/src/pages/."""
+    """Return all .jsx/.tsx files under frontend/src/pages/."""
     if not PAGES_DIR.is_dir():
         return []
-    return sorted(PAGES_DIR.glob("*.jsx"))
+    return sorted([*PAGES_DIR.glob("*.jsx"), *PAGES_DIR.glob("*.tsx")])
 
 
 # ---------------------------------------------------------------------------
@@ -733,23 +733,31 @@ def _check_analytics_integration(
     metrics: dict,
 ) -> None:
     """Scan frontend source files for PostHog integration."""
-    main_jsx = PROJECT_ROOT / "frontend" / "src" / "main.jsx"
-    analytics_js = PROJECT_ROOT / "frontend" / "src" / "utils" / "analytics.js"
+    # Check both .jsx and .tsx (project uses TypeScript)
+    src_dir = PROJECT_ROOT / "frontend" / "src"
+    main_candidates = [src_dir / "main.jsx", src_dir / "main.tsx"]
+    analytics_candidates = [
+        src_dir / "utils" / "analytics.js",
+        src_dir / "utils" / "analytics.ts",
+    ]
 
     has_posthog_init = False
-    has_analytics_util = analytics_js.exists()
+    has_analytics_util = any(p.exists() for p in analytics_candidates)
 
-    if main_jsx.exists():
-        content = _read_safe(main_jsx)
-        has_posthog_init = "posthog" in content.lower()
+    for main_path in main_candidates:
+        if main_path.exists():
+            content = _read_safe(main_path)
+            has_posthog_init = "posthog" in content.lower()
+            break
 
-    # Count trackEvent calls across all JSX files
+    # Count trackEvent calls across all JSX/TSX files
     track_count = 0
-    pages_dir = PROJECT_ROOT / "frontend" / "src" / "pages"
+    pages_dir = src_dir / "pages"
     if pages_dir.exists():
-        for jsx in pages_dir.rglob("*.jsx"):
-            if "trackEvent" in _read_safe(jsx):
-                track_count += 1
+        for ext in ("*.jsx", "*.tsx"):
+            for page_file in pages_dir.rglob(ext):
+                if "trackEvent" in _read_safe(page_file):
+                    track_count += 1
 
     metrics["posthog_initialized"] = has_posthog_init
     metrics["analytics_util_exists"] = has_analytics_util
