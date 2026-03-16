@@ -43,12 +43,17 @@ _SUPPRESSED_CATEGORIES = {
 
 
 def _filter_noisy_findings(findings: list[Finding]) -> list[Finding]:
-    """Remove known false-positive-heavy categories unless critical."""
+    """Remove known false-positive-heavy categories and low-confidence findings.
+
+    Low-confidence findings (< 0.5) are suppressed unless critical severity,
+    preventing statistically unreliable data from reaching the daily brief.
+    """
     return [
         f
         for f in findings
         if (f.category not in _NOISE_CATEGORIES or f.severity in ("critical", "high"))
         and (f.category not in _SUPPRESSED_CATEGORIES or f.severity == "critical")
+        and (f.confidence >= 0.5 or f.severity == "critical")
     ]
 
 

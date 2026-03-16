@@ -102,8 +102,20 @@ class ExecutionEngine:
         return self._auto_merge_count >= self.max_auto_merges_per_day
 
     def triage(self, finding: Finding) -> ExecutionTier:
-        """Classify a finding into an execution tier."""
+        """Classify a finding into an execution tier.
+
+        Low-confidence findings (confidence < 0.5) are always report-only
+        to prevent the engine from acting on statistically unreliable data.
+        """
         if not self.enabled:
+            return ExecutionTier.REPORT_ONLY
+
+        if finding.confidence < 0.5:
+            logger.info(
+                "Finding %s has low confidence (%.2f) — downgrading to REPORT_ONLY",
+                finding.id,
+                finding.confidence,
+            )
             return ExecutionTier.REPORT_ONLY
 
         risk = classify_risk(finding)
