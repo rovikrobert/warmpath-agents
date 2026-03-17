@@ -24,6 +24,7 @@ class Finding:
     effort_hours: float = 0
     recurrence_count: int = 1
     first_seen: str = ""
+    confidence: float = 1.0  # 0.0–1.0; findings below 0.5 are low-confidence
     auto_fixable: bool = False
     repair_status: str = "pending"  # pending | fixed | failed | skipped
     last_validated_at: str = ""
