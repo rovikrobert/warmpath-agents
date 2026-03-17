@@ -141,24 +141,7 @@ def synthesize_daily(
     )
 
     # Compute per-team summaries (with resolved findings filtered out)
-    _team_agents_sets = {team: set(agents) for team, agents in TEAM_REGISTRY.items()}
-    team_report_groups: dict[str, list[AgentReport]] = {}
-    for r in reports:
-        filtered_r = AgentReport(
-            agent=r.agent,
-            timestamp=r.timestamp,
-            scan_duration_seconds=r.scan_duration_seconds,
-            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
-            metrics=r.metrics,
-            intelligence_applied=r.intelligence_applied,
-            learning_updates=r.learning_updates,
-        )
-        for team_name, agent_set in _team_agents_sets.items():
-            if r.agent in agent_set:
-                team_report_groups.setdefault(team_name, []).append(filtered_r)
-                break
-        else:
-            team_report_groups.setdefault("engineering", []).append(filtered_r)
+    team_report_groups = _group_reports_by_team(_filtered_reports)
 
     team_summaries_list = [
         summarize_team(team, team_reports)
@@ -230,6 +213,11 @@ def synthesize_daily(
     return rendered, data
 
 
+def _team_agent_sets() -> dict[str, set[str]]:
+    """Derive team→agent set mapping from TEAM_REGISTRY (single source of truth)."""
+    return {team: set(agents) for team, agents in TEAM_REGISTRY.items()}
+
+
 def _check_operational_health(
     reports: list[AgentReport],
     cross_team_requests: list[dict[str, Any]],
@@ -259,39 +247,11 @@ def _check_operational_health(
         )
 
     # 2. Scan freshness (check timestamps)
-    _TEAM_AGENTS = {
-        "engineering": {
-            "architect",
-            "test_engineer",
-            "perf_monitor",
-            "deps_manager",
-            "doc_keeper",
-        },
-        "data": {"pipeline", "analyst", "model_engineer", "data_lead"},
-        "product": {
-            "user_researcher",
-            "product_manager",
-            "ux_lead",
-            "design_lead",
-            "product_lead",
-        },
-        "ops": {"keevs", "treb", "naiv", "marsh", "ops_lead"},
-        "finance": {
-            "finance_manager",
-            "credits_manager",
-            "investor_relations",
-            "legal_compliance",
-            "finance_lead",
-        },
-        "gtm": {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"},
-    }
-    all_agents_set = set()
-    for agents in _TEAM_AGENTS.values():
-        all_agents_set.update(agents)
+    team_agents = _team_agent_sets()
     reporting_agents = {r.agent for r in reports}
     teams_reporting = set()
     teams_silent = set()
-    for team_name, agents in _TEAM_AGENTS.items():
+    for team_name, agents in team_agents.items():
         if reporting_agents & agents:
             teams_reporting.add(team_name)
         else:
@@ -366,44 +326,23 @@ def _check_operational_health(
     return items
 
 
+def _agent_to_team(agent_name: str) -> str:
+    """Look up which team an agent belongs to via TEAM_REGISTRY."""
+    for team, agents in TEAM_REGISTRY.items():
+        if agent_name in agents:
+            return team
+    return "engineering"
+
+
 def _build_progress(reports: list[AgentReport]) -> list[dict[str, Any]]:
     """Identify areas that are going well."""
-    _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    _product_agents = {
-        "user_researcher",
-        "product_manager",
-        "ux_lead",
-        "design_lead",
-        "product_lead",
-    }
-    _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    _finance_agents = {
-        "finance_manager",
-        "credits_manager",
-        "investor_relations",
-        "legal_compliance",
-        "finance_lead",
-    }
-    _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
     progress: list[dict[str, Any]] = []
     for r in reports:
         critical_high = [f for f in r.findings if f.severity in ("critical", "high")]
         if not critical_high:
-            if r.agent in _data_agents:
-                team = "data"
-            elif r.agent in _product_agents:
-                team = "product"
-            elif r.agent in _ops_agents:
-                team = "ops"
-            elif r.agent in _finance_agents:
-                team = "finance"
-            elif r.agent in _gtm_agents:
-                team = "gtm"
-            else:
-                team = "engineering"
             progress.append(
                 {
-                    "team": team,
+                    "team": _agent_to_team(r.agent),
                     "agent": r.agent,
                     "note": f"{r.agent}: clean scan ({r.scan_duration_seconds:.1f}s)",
                 }
@@ -643,6 +582,70 @@ def synthesize_weekly(
 # ---------------------------------------------------------------------------
 
 
+def _group_reports_by_team(
+    reports: list[AgentReport],
+) -> dict[str, list[AgentReport]]:
+    """Group reports by team using TEAM_REGISTRY."""
+    team_agents = _team_agent_sets()
+    groups: dict[str, list[AgentReport]] = {team: [] for team in TEAM_REGISTRY}
+    for r in reports:
+        placed = False
+        for team, agents in team_agents.items():
+            if r.agent in agents:
+                groups[team].append(r)
+                placed = True
+                break
+        if not placed:
+            groups.setdefault("engineering", []).append(r)
+    return groups
+
+
+def _worst_severity(findings: list[Finding]) -> str:
+    """Return the worst severity across findings, or 'clean'."""
+    for sev in ("critical", "high", "medium", "low", "info"):
+        if any(f.severity == sev for f in findings):
+            return sev
+    return "clean"
+
+
+_TEAM_DISPLAY_NAMES: dict[str, str] = {
+    "engineering": "Engineering",
+    "data": "Data Team",
+    "product": "Product Team",
+    "ops": "Operations Team",
+    "finance": "Finance Team",
+    "gtm": "GTM Team",
+}
+
+_HEALTH_PENALTY: dict[str, int] = {
+    "critical": 20,
+    "high": 10,
+    "medium": 3,
+    "low": 1,
+    "info": 0,
+}
+
+
+def _render_team_status(
+    lines: list[str], team: str, team_reports: list[AgentReport]
+) -> None:
+    """Render a single team's status section. Mutates `lines` in place."""
+    display = _TEAM_DISPLAY_NAMES.get(team, team.title())
+    lines.append(f"## {display}")
+    findings = [f for r in team_reports for f in r.findings]
+    crit = sum(1 for f in findings if f.severity == "critical")
+    high = sum(1 for f in findings if f.severity == "high")
+    med = sum(1 for f in findings if f.severity == "medium")
+    low = sum(1 for f in findings if f.severity in ("low", "info"))
+    lines.append(f"- Agents: {len(team_reports)} reporting")
+    lines.append(f"- Findings: {crit} critical, {high} high, {med} medium, {low} low")
+
+    for r in team_reports:
+        worst = _worst_severity(r.findings)
+        lines.append(f"  - {r.agent}: {len(r.findings)} findings (worst: {worst})")
+    lines.append("")
+
+
 def synthesize_status(reports: list[AgentReport]) -> str:
     """Quick cross-team status snapshot."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -661,202 +664,33 @@ def synthesize_status(reports: list[AgentReport]) -> str:
         for r in reports
     ]
 
-    all_findings = merge_reports(reports) if reports else []
-
     lines: list[str] = []
     lines.append(f"# Status Snapshot - {today}\n")
 
-    # Summary counts
-    sev_counts: dict[str, int] = {}
-    for f in all_findings:
-        sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
-
-    sev_counts.get("critical", 0)
-    sev_counts.get("high", 0)
-    sev_counts.get("medium", 0)
-    sev_counts.get("low", 0) + sev_counts.get("info", 0)
-
-    # Split reports by team
-    _data_agents = {"pipeline", "analyst", "model_engineer", "data_lead"}
-    _product_agents = {
-        "user_researcher",
-        "product_manager",
-        "ux_lead",
-        "design_lead",
-        "product_lead",
-    }
-    _ops_agents = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
-    _finance_agents = {
-        "finance_manager",
-        "credits_manager",
-        "investor_relations",
-        "legal_compliance",
-        "finance_lead",
-    }
-    _gtm_agents = {"stratops", "monetization", "marketing", "partnerships", "gtm_lead"}
-    eng_reports = [
-        r
-        for r in reports
-        if r.agent not in _data_agents
-        and r.agent not in _product_agents
-        and r.agent not in _ops_agents
-        and r.agent not in _finance_agents
-        and r.agent not in _gtm_agents
-    ]
-    data_reports = [r for r in reports if r.agent in _data_agents]
-    product_reports = [r for r in reports if r.agent in _product_agents]
-    ops_reports = [r for r in reports if r.agent in _ops_agents]
-    finance_reports = [r for r in reports if r.agent in _finance_agents]
-    gtm_reports = [r for r in reports if r.agent in _gtm_agents]
-
-    lines.append("## Engineering")
-    eng_findings = [f for r in eng_reports for f in r.findings]
-    eng_crit = sum(1 for f in eng_findings if f.severity == "critical")
-    eng_high = sum(1 for f in eng_findings if f.severity == "high")
-    lines.append(f"- Agents: {len(eng_reports)} reporting")
-    lines.append(
-        f"- Findings: {eng_crit} critical, {eng_high} high, "
-        f"{sum(1 for f in eng_findings if f.severity == 'medium')} medium, "
-        f"{sum(1 for f in eng_findings if f.severity in ('low', 'info'))} low"
-    )
-
-    for r in eng_reports:
-        count = len(r.findings)
-        worst = "clean"
-        for sev in ("critical", "high", "medium", "low", "info"):
-            if any(f.severity == sev for f in r.findings):
-                worst = sev
-                break
-        lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-    lines.append("")
-
-    if data_reports:
-        lines.append("## Data Team")
-        data_findings_all = [f for r in data_reports for f in r.findings]
-        data_crit = sum(1 for f in data_findings_all if f.severity == "critical")
-        data_high = sum(1 for f in data_findings_all if f.severity == "high")
-        lines.append(f"- Agents: {len(data_reports)} reporting")
-        lines.append(
-            f"- Findings: {data_crit} critical, {data_high} high, "
-            f"{sum(1 for f in data_findings_all if f.severity == 'medium')} medium, "
-            f"{sum(1 for f in data_findings_all if f.severity in ('low', 'info'))} low"
-        )
-        for r in data_reports:
-            count = len(r.findings)
-            worst = "clean"
-            for sev in ("critical", "high", "medium", "low", "info"):
-                if any(f.severity == sev for f in r.findings):
-                    worst = sev
-                    break
-            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-        lines.append("")
-
-    if product_reports:
-        lines.append("## Product Team")
-        product_findings_all = [f for r in product_reports for f in r.findings]
-        product_crit = sum(1 for f in product_findings_all if f.severity == "critical")
-        product_high = sum(1 for f in product_findings_all if f.severity == "high")
-        lines.append(f"- Agents: {len(product_reports)} reporting")
-        lines.append(
-            f"- Findings: {product_crit} critical, {product_high} high, "
-            f"{sum(1 for f in product_findings_all if f.severity == 'medium')} medium, "
-            f"{sum(1 for f in product_findings_all if f.severity in ('low', 'info'))} low"
-        )
-        for r in product_reports:
-            count = len(r.findings)
-            worst = "clean"
-            for sev in ("critical", "high", "medium", "low", "info"):
-                if any(f.severity == sev for f in r.findings):
-                    worst = sev
-                    break
-            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-        lines.append("")
-
-    if ops_reports:
-        lines.append("## Operations Team")
-        ops_findings_all = [f for r in ops_reports for f in r.findings]
-        ops_crit = sum(1 for f in ops_findings_all if f.severity == "critical")
-        ops_high = sum(1 for f in ops_findings_all if f.severity == "high")
-        lines.append(f"- Agents: {len(ops_reports)} reporting")
-        lines.append(
-            f"- Findings: {ops_crit} critical, {ops_high} high, "
-            f"{sum(1 for f in ops_findings_all if f.severity == 'medium')} medium, "
-            f"{sum(1 for f in ops_findings_all if f.severity in ('low', 'info'))} low"
-        )
-        for r in ops_reports:
-            count = len(r.findings)
-            worst = "clean"
-            for sev in ("critical", "high", "medium", "low", "info"):
-                if any(f.severity == sev for f in r.findings):
-                    worst = sev
-                    break
-            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-        lines.append("")
-
-    if finance_reports:
-        lines.append("## Finance Team")
-        finance_findings_all = [f for r in finance_reports for f in r.findings]
-        finance_crit = sum(1 for f in finance_findings_all if f.severity == "critical")
-        finance_high = sum(1 for f in finance_findings_all if f.severity == "high")
-        lines.append(f"- Agents: {len(finance_reports)} reporting")
-        lines.append(
-            f"- Findings: {finance_crit} critical, {finance_high} high, "
-            f"{sum(1 for f in finance_findings_all if f.severity == 'medium')} medium, "
-            f"{sum(1 for f in finance_findings_all if f.severity in ('low', 'info'))} low"
-        )
-        for r in finance_reports:
-            count = len(r.findings)
-            worst = "clean"
-            for sev in ("critical", "high", "medium", "low", "info"):
-                if any(f.severity == sev for f in r.findings):
-                    worst = sev
-                    break
-            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-        lines.append("")
-
-    if gtm_reports:
-        lines.append("## GTM Team")
-        gtm_findings_all = [f for r in gtm_reports for f in r.findings]
-        gtm_crit = sum(1 for f in gtm_findings_all if f.severity == "critical")
-        gtm_high = sum(1 for f in gtm_findings_all if f.severity == "high")
-        lines.append(f"- Agents: {len(gtm_reports)} reporting")
-        lines.append(
-            f"- Findings: {gtm_crit} critical, {gtm_high} high, "
-            f"{sum(1 for f in gtm_findings_all if f.severity == 'medium')} medium, "
-            f"{sum(1 for f in gtm_findings_all if f.severity in ('low', 'info'))} low"
-        )
-        for r in gtm_reports:
-            count = len(r.findings)
-            worst = "clean"
-            for sev in ("critical", "high", "medium", "low", "info"):
-                if any(f.severity == sev for f in r.findings):
-                    worst = sev
-                    break
-            lines.append(f"  - {r.agent}: {count} findings (worst: {worst})")
-        lines.append("")
+    # Render each team
+    grouped = _group_reports_by_team(reports)
+    team_order = ["engineering", "data", "product", "ops", "finance", "gtm"]
+    for team in team_order:
+        team_reports = grouped.get(team, [])
+        if not team_reports and team != "engineering":
+            continue
+        _render_team_status(lines, team, team_reports)
 
     # Normalized metrics comparison across teams
     lines.append("## Team Metrics Summary")
     lines.append("| Team | Agents | Findings | Critical | High | Health |")
     lines.append("|------|--------|----------|----------|------|--------|")
-    for team_name, team_reports in [
-        ("engineering", eng_reports),
-        ("data", data_reports),
-        ("product", product_reports),
-        ("ops", ops_reports),
-        ("finance", finance_reports),
-        ("gtm", gtm_reports),
-    ]:
+    for team in team_order:
+        team_reports = grouped.get(team, [])
         if not team_reports:
             continue
         t_findings = [f for r in team_reports for f in r.findings]
         t_crit = sum(1 for f in t_findings if f.severity == "critical")
         t_high = sum(1 for f in t_findings if f.severity == "high")
-        penalty = {"critical": 20, "high": 10, "medium": 3, "low": 1, "info": 0}
-        t_penalty = sum(penalty.get(f.severity, 0) for f in t_findings)
+        t_penalty = sum(_HEALTH_PENALTY.get(f.severity, 0) for f in t_findings)
         t_health = max(0.0, 100.0 - t_penalty)
         lines.append(
-            f"| {team_name} | {len(team_reports)} | {len(t_findings)} | "
+            f"| {team} | {len(team_reports)} | {len(t_findings)} | "
             f"{t_crit} | {t_high} | {t_health:.0f}/100 |"
         )
     lines.append("")
