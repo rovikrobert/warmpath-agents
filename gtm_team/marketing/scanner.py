@@ -743,6 +743,7 @@ def _check_analytics_integration(
 
     has_posthog_init = False
     has_analytics_util = any(p.exists() for p in analytics_candidates)
+    frontend_source_available = src_dir.exists()
 
     for main_path in main_candidates:
         if main_path.exists():
@@ -764,17 +765,23 @@ def _check_analytics_integration(
     metrics["pages_with_tracking"] = track_count
 
     if not has_posthog_init:
-        findings.append(
-            Finding(
-                id="MKT-NO-ANALYTICS",
-                severity="high",
-                category="analytics",
-                title="PostHog analytics not initialized",
-                detail="frontend/src/main.jsx does not initialize PostHog",
-                recommendation="Add PostHog initialization with VITE_POSTHOG_KEY",
-                effort_hours=0.5,
+        if not frontend_source_available:
+            # Frontend source not present (e.g. backend-only Docker image) — skip
+            logger.info(
+                "Frontend source not available at %s; skipping PostHog check", src_dir
             )
-        )
+        else:
+            findings.append(
+                Finding(
+                    id="MKT-NO-ANALYTICS",
+                    severity="high",
+                    category="analytics",
+                    title="PostHog analytics not initialized",
+                    detail="frontend/src/main.{jsx,tsx} does not initialize PostHog",
+                    recommendation="Add PostHog initialization with VITE_POSTHOG_KEY",
+                    effort_hours=0.5,
+                )
+            )
 
     insights.append(
         MarketInsight(

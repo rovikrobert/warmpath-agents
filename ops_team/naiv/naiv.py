@@ -104,9 +104,18 @@ def _find_api_files() -> list[Path]:
 
 
 def _find_jsx_files() -> list[Path]:
-    """Glob frontend/src/pages/*.jsx and *.tsx."""
+    """Glob frontend/src/pages/*.jsx and *.tsx.
+
+    Returns an empty list when the frontend source directory is not available
+    (e.g. backend-only Docker image on Railway).  Callers should treat an
+    empty list from a missing directory differently from zero matches in an
+    existing directory.
+    """
     if not PAGES_DIR.exists():
-        logger.warning("Pages directory not found: %s", PAGES_DIR)
+        logger.warning(
+            "Pages directory not found: %s — frontend source may not be present",
+            PAGES_DIR,
+        )
         return []
     return sorted([*PAGES_DIR.glob("*.jsx"), *PAGES_DIR.glob("*.tsx")])
 
@@ -250,7 +259,9 @@ def _check_feedback_collection(
     metrics["feedback_pages_total"] = total_pages
     metrics["feedback_details"] = feedback_points
 
-    if pages_with_feedback == 0:
+    if pages_with_feedback == 0 and total_pages > 0:
+        # Only flag when we actually scanned pages but found nothing.
+        # When total_pages == 0, frontend source is likely unavailable (e.g. Railway).
         finding_id = "NAIV-FB-NONE"
         findings.append(
             Finding(
@@ -288,6 +299,8 @@ def _check_feedback_collection(
                 ),
             )
         )
+    elif total_pages == 0:
+        logger.info("No frontend pages found; skipping feedback collection check")
 
 
 # ---------------------------------------------------------------------------
