@@ -266,6 +266,7 @@ class MessageFormatter:
             "status": {"command": "status"},
             "cost": {"command": "cost"},
             "blockers": {"command": "blockers"},
+            "stats": {"command": "stats"},
         }
         if text in quick_commands:
             return quick_commands[text]
