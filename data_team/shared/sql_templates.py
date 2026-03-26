@@ -59,6 +59,28 @@ FROM (
 ) sub
 """
 
+ACTIVATION_FUNNEL_ADMIN = """
+SELECT  -- ADMIN ONLY: no k-anonymity filter
+    COUNT(*) AS total_users,
+    COUNT(CASE WHEN csv_upload_count > 0 THEN 1 END) AS uploaded,
+    COUNT(CASE WHEN search_count > 0 THEN 1 END) AS searched,
+    COUNT(CASE WHEN intro_request_count > 0 THEN 1 END) AS requested_intro
+FROM (
+    SELECT
+        u.id AS user_id,
+        COUNT(DISTINCT cu.id) AS csv_upload_count,
+        COUNT(DISTINCT sr.id) AS search_count,
+        COUNT(DISTINCT inf.id) AS intro_request_count
+    FROM users u
+    LEFT JOIN csv_uploads cu ON cu.user_id = u.id
+    LEFT JOIN search_requests sr ON sr.user_id = u.id
+    LEFT JOIN intro_facilitations inf ON inf.requester_id = u.id
+    WHERE u.created_at >= :start_date
+        AND u.created_at < :end_date
+    GROUP BY u.id
+) sub
+"""
+
 TIME_TO_FIRST_VALUE = """
 SELECT
     AVG(EXTRACT(EPOCH FROM (first_search - u.created_at)) / 3600) AS avg_hours_to_first_search
@@ -238,6 +260,7 @@ ALL_TEMPLATES: dict[str, str] = {
     "daily_signups": DAILY_SIGNUPS,
     "daily_uploads": DAILY_UPLOADS,
     "activation_funnel": ACTIVATION_FUNNEL,
+    "activation_funnel_admin": ACTIVATION_FUNNEL_ADMIN,
     "time_to_first_value": TIME_TO_FIRST_VALUE,
     "marketplace_health": MARKETPLACE_HEALTH,
     "supply_by_company": SUPPLY_BY_COMPANY,
