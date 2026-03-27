@@ -1024,17 +1024,14 @@ def _check_live_marketplace_volume(
         )
 
         statuses = ["requested", "approved", "declined", "completed", "expired"]
-        intros_by_status: dict[str, int] = {}
-        for status in statuses:
-            count = (
-                session.execute(
-                    select(func.count())
-                    .select_from(IntroFacilitation)
-                    .where(IntroFacilitation.status == status)
-                ).scalar()
-                or 0
-            )
-            intros_by_status[status] = count
+        status_rows = session.execute(
+            select(IntroFacilitation.status, func.count())
+            .where(IntroFacilitation.status.in_(statuses))
+            .group_by(IntroFacilitation.status)
+        ).all()
+        intros_by_status: dict[str, int] = {s: 0 for s in statuses}
+        for row_status, row_count in status_rows:
+            intros_by_status[row_status] = row_count
 
         total_intros = sum(intros_by_status.values())
 

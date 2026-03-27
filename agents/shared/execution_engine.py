@@ -223,7 +223,9 @@ class ExecutionEngine:
 
         for finding in findings:
             tier = self.triage(finding)
-            result = self.execute(finding, tier, dry_run=dry_run)
+            result = self.execute(  # n1-ok: not a DB query
+                finding, tier, dry_run=dry_run
+            )
             self._results.append(result)
 
             if tier == ExecutionTier.AUTO_DO:

@@ -578,17 +578,14 @@ def _check_live_referral_workflow(
 
         logger.info("treb: live referral workflow — querying intros/credits/reputation")
         statuses = ["requested", "approved", "declined", "completed"]
-        status_counts: dict[str, int] = {}
-        for status in statuses:
-            count = (
-                session.execute(
-                    select(func.count())
-                    .select_from(IntroFacilitation)
-                    .where(IntroFacilitation.status == status)
-                ).scalar()
-                or 0
-            )
-            status_counts[status] = count
+        status_rows = session.execute(
+            select(IntroFacilitation.status, func.count())
+            .where(IntroFacilitation.status.in_(statuses))
+            .group_by(IntroFacilitation.status)
+        ).all()
+        status_counts: dict[str, int] = {s: 0 for s in statuses}
+        for row_status, row_count in status_rows:
+            status_counts[row_status] = row_count
 
         credit_earns = (
             session.execute(
