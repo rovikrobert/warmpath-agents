@@ -460,6 +460,7 @@ def _scan_n_plus_one(
                 continue
 
         rel_path = _relative(path)
+        source_lines = source.splitlines() if source else []
 
         for node in ast.walk(tree):
             if not isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
@@ -537,9 +538,18 @@ def _scan_n_plus_one(
                     else:
                         continue
 
+                    # Respect # n1-ok suppression comments
+                    call_line = getattr(child, "lineno", 0)
+                    if (
+                        0 < call_line <= len(source_lines)
+                        and "n1-ok" in source_lines[call_line - 1]
+                    ):
+                        continue
+
+                    file_stem = Path(rel_path).stem.upper()
                     findings.append(
                         Finding(
-                            id="ARCH-N+1",
+                            id=f"ARCH-N+1-{file_stem}-L{node.lineno}",
                             severity="high",
                             category="performance",
                             title=f"Potential N+1 query: {label}() inside loop",

@@ -458,8 +458,26 @@
   "ARCH-N+1": {
     "resolution_type": "false_positive",
     "resolved_at": "2026-03-15T00:00:00+00:00",
+    "reason": "Legacy hardcoded ID — kept for prefix matching. infra_tasks.py loop iterates pre-fetched uploads with in-memory checks.",
+    "skip_until": null
+  },
+  "ARCH-N+1-INFRA_TASKS": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-29T00:00:00+00:00",
     "reason": "infra_tasks.py loop iterates pre-fetched uploads with in-memory checks. No DB calls inside the loop — not an N+1.",
     "skip_until": null
+  },
+  "PERF-N1-CSV_PIPELINE-L64": {
+    "resolution_type": "false_positive",
+    "resolved_at": "2026-03-29T00:00:00+00:00",
+    "reason": "Intentional batch pagination with LIMIT/OFFSET in while loop. Marked with # n1-ok comment.",
+    "skip_until": null
+  },
+  "treb-live-funnel-001": {
+    "resolution_type": "deferred",
+    "resolved_at": "2026-03-29T00:00:00+00:00",
+    "reason": "NH signup->upload rate is expected to be low pre-launch with few test users. Will monitor post-launch.",
+    "skip_until": "2026-05-01"
   },
   "ARCH-VAULT-LEAK": {
     "resolution_type": "false_positive",

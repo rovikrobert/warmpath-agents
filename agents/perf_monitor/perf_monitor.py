@@ -536,6 +536,7 @@ def _scan_n_plus_one(app_dir: Path) -> tuple[list[Finding], int]:
                 continue
 
             rel = str(path.relative_to(PROJECT_ROOT))
+            source_lines = source.splitlines() if source else []
 
             # Collect execute calls that live inside loops.
             # Deduplicate by (file, line) to avoid double-counting when
@@ -581,6 +582,11 @@ def _scan_n_plus_one(app_dir: Path) -> tuple[list[Finding], int]:
                         line_num = getattr(call_node, "lineno", 0)
                         if line_num in seen_lines:
                             continue
+                        # Respect # n1-ok suppression comments
+                        if 0 < line_num <= len(source_lines):
+                            src_line = source_lines[line_num - 1]
+                            if "n1-ok" in src_line:
+                                continue
                         seen_lines.add(line_num)
                         count += 1
 
