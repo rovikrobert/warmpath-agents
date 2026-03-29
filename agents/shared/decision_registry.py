@@ -22,6 +22,9 @@ DECISIONS_PATH = Path("agents/chief_of_staff/reports/pending_decisions.json")
 # Max decisions to store (matches Telegram display cap in MessageFormatter)
 MAX_DECISIONS = 3
 
+# Auto-expire decisions older than this many days
+DECISION_TTL_DAYS = 7
+
 
 @dataclass
 class PendingDecision:
@@ -65,7 +68,11 @@ def save_pending_decisions(decisions: list[PendingDecision]) -> Path:
 
 
 def load_pending_decisions() -> list[PendingDecision]:
-    """Load pending decisions from JSON file (under shared flock)."""
+    """Load pending decisions from JSON file (under shared flock).
+
+    Auto-expires decisions older than DECISION_TTL_DAYS based on brief_date.
+    Executed decisions are also pruned (they've already been acted on).
+    """
     if not DECISIONS_PATH.exists():
         return []
     try:
@@ -75,10 +82,47 @@ def load_pending_decisions() -> list[PendingDecision]:
                 data = json.load(f)
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
-        return [PendingDecision.from_dict(d) for d in data]
+        decisions = [PendingDecision.from_dict(d) for d in data]
+        return _prune_stale(decisions)
     except (json.JSONDecodeError, TypeError, KeyError) as exc:
         logger.warning("Failed to load pending decisions: %s", exc)
         return []
+
+
+def _prune_stale(decisions: list[PendingDecision]) -> list[PendingDecision]:
+    """Remove decisions whose brief_date is older than DECISION_TTL_DAYS."""
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=DECISION_TTL_DAYS)
+    kept: list[PendingDecision] = []
+
+    for d in decisions:
+        # Expire based on brief_date
+        try:
+            brief_dt = datetime.fromisoformat(d.brief_date)
+            if brief_dt.tzinfo is None:
+                brief_dt = brief_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            # brief_date might be just a date string like "2026-03-17"
+            try:
+                brief_dt = datetime.strptime(d.brief_date, "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
+            except (ValueError, TypeError):
+                kept.append(d)
+                continue
+        if brief_dt < cutoff:
+            logger.info(
+                "Auto-expired stale decision #%d (%s) from %s",
+                d.number,
+                d.finding_id,
+                d.brief_date,
+            )
+            continue
+        kept.append(d)
+
+    return kept
 
 
 def find_decision(

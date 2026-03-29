@@ -523,103 +523,16 @@ def _scan_missing_indexes(
 
 
 def _scan_n_plus_one(app_dir: Path) -> tuple[list[Finding], int]:
-    """Detect db.execute calls inside for/while loops using AST."""
-    findings: list[Finding] = []
-    count = 0
+    """Detect db.execute calls inside for/while loops using shared scanner."""
+    from agents.shared.n1_scanner import scan_n_plus_one
 
     scan_dirs = [app_dir / "api", app_dir / "services", app_dir / "tasks"]
+    py_files = []
     for scan_dir in scan_dirs:
-        for path in _iter_py_files(scan_dir):
-            source = _safe_read(path)
-            tree = _safe_parse_ast(source, path)
-            if tree is None:
-                continue
+        py_files.extend(_iter_py_files(scan_dir))
 
-            rel = str(path.relative_to(PROJECT_ROOT))
-            source_lines = source.splitlines() if source else []
-
-            # Collect execute calls that live inside loops.
-            # Deduplicate by (file, line) to avoid double-counting when
-            # ast.walk yields both an Await node and its inner Call node,
-            # or when nested loops cause the same call to be visited from
-            # multiple ancestor loops.
-            seen_lines: set[int] = set()
-
-            for node in ast.walk(tree):
-                if not isinstance(node, (ast.For, ast.While, ast.AsyncFor)):
-                    continue
-
-                # Only inspect direct body of this loop (not nested loops)
-                # to avoid double-counting from ancestor loop walks.
-                body_nodes = list(node.body) + list(getattr(node, "orelse", []))
-                worklist = list(body_nodes)
-                while worklist:
-                    child = worklist.pop()
-                    # Skip nested loops — they'll be caught by their own
-                    # top-level iteration.
-                    if isinstance(child, (ast.For, ast.While, ast.AsyncFor)):
-                        continue
-                    # Add child's sub-nodes (except nested loops)
-                    for sub in ast.iter_child_nodes(child):
-                        worklist.append(sub)
-
-                    # Detect await <expr>.execute(...)
-                    call_node: ast.Call | None = None
-                    if isinstance(child, ast.Await) and isinstance(
-                        child.value, ast.Call
-                    ):
-                        call_node = child.value
-                    elif isinstance(child, ast.Call):
-                        call_node = child
-                    else:
-                        continue
-
-                    if call_node is None:
-                        continue
-
-                    func = call_node.func
-                    if isinstance(func, ast.Attribute) and func.attr == "execute":
-                        line_num = getattr(call_node, "lineno", 0)
-                        if line_num in seen_lines:
-                            continue
-                        # Respect # n1-ok suppression comments
-                        if 0 < line_num <= len(source_lines):
-                            src_line = source_lines[line_num - 1]
-                            if "n1-ok" in src_line:
-                                continue
-                        seen_lines.add(line_num)
-                        count += 1
-
-                        # Try to identify the loop variable
-                        loop_info = ""
-                        if isinstance(node, (ast.For, ast.AsyncFor)) and isinstance(
-                            node.target, ast.Name
-                        ):
-                            loop_info = f" (iterating over '{node.target.id}')"
-
-                        findings.append(
-                            Finding(
-                                id=f"PERF-N1-{Path(rel).stem.upper()}-L{line_num}",
-                                severity="high",
-                                category="n_plus_1",
-                                title=f"Potential N+1: db.execute inside loop{loop_info}",
-                                detail=(
-                                    f"A database query (db.execute) is called inside a "
-                                    f"loop at {rel}:{line_num}. This causes one query per "
-                                    f"iteration instead of a single batch query."
-                                ),
-                                file=rel,
-                                line=line_num,
-                                recommendation=(
-                                    "Batch the query: collect all IDs/values first, "
-                                    "then execute a single query with an IN clause. "
-                                    "Or use selectinload/joinedload for relationship loading."
-                                ),
-                                effort_hours=1.5,
-                            )
-                        )
-
-    return findings, count
+    findings = scan_n_plus_one(py_files, id_prefix="PERF-N1")
+    return findings, len(findings)
 
 
 # ---------------------------------------------------------------------------
