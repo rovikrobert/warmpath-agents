@@ -5,6 +5,8 @@ Uses httpx (already a project dependency) for HTTP calls.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import re
@@ -201,6 +203,43 @@ class TelegramBridge:
     def parse_reply(text: str) -> dict[str, Any]:
         return MessageFormatter.parse_reply(text)
 
+    # -- Content fingerprinting -----------------------------------------------
+
+    _FINGERPRINT_FILE = "telegram-last-fingerprint.json"
+
+    def _content_fingerprint(
+        self,
+        team_summaries: list[dict[str, Any]],
+        decisions: list[str],
+        recommendations: list[str] | None,
+    ) -> str:
+        """Hash the meaningful parts of a brief (excluding date/cost which change daily)."""
+        parts = []
+        for ts in sorted(team_summaries, key=lambda t: t.get("team", "")):
+            parts.append(f"{ts.get('team')}:{ts.get('health')}:{ts.get('summary')}")
+        parts.extend(sorted(decisions))
+        if recommendations:
+            parts.extend(sorted(recommendations))
+        return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+    def _load_last_fingerprint(self) -> dict[str, Any]:
+        fp_path = self._output_dir / self._FINGERPRINT_FILE
+        if fp_path.exists():
+            try:
+                return json.loads(fp_path.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
+        return {}
+
+    def _save_fingerprint(self, fingerprint: str, date_str: str) -> None:
+        fp_path = self._output_dir / self._FINGERPRINT_FILE
+        fp_path.write_text(
+            json.dumps(
+                {"fingerprint": fingerprint, "date": date_str, "streak": 1},
+                indent=2,
+            )
+        )
+
     # -- CoS-level generators ------------------------------------------------
 
     def generate_daily_brief(
@@ -222,9 +261,40 @@ class TelegramBridge:
         notion_url = ""
         if notion_page_id:
             notion_url = f"https://notion.so/{notion_page_id.replace('-', '')}"
-        # Extract repairs and recommendations from brief_data
         repairs = brief_data.get("repairs")
         recommendations = brief_data.get("recommendations")
+
+        # Content-based dedup: skip if today's brief is identical to yesterday's
+        fingerprint = self._content_fingerprint(
+            team_summaries, decisions, recommendations
+        )
+        last = self._load_last_fingerprint()
+        last_fp = last.get("fingerprint", "")
+        last_date = last.get("date", "")
+        streak = last.get("streak", 0)
+
+        if fingerprint == last_fp and last_date != date_str:
+            streak += 1
+            # Save updated streak
+            fp_path = self._output_dir / self._FINGERPRINT_FILE
+            fp_path.write_text(
+                json.dumps(
+                    {"fingerprint": fingerprint, "date": date_str, "streak": streak},
+                    indent=2,
+                )
+            )
+            # Send a short "no change" message instead of repeating
+            message = (
+                f"WarmPath Daily — {date_str}\n\n"
+                f"No changes from yesterday (day {streak} unchanged).\n"
+                f"Cost: {cost_str}"
+            )
+            if notion_url:
+                message += f"\n\nFull brief: {notion_url}"
+            return self.send(message, msg_type="daily")
+
+        # New content — send full brief and reset streak
+        self._save_fingerprint(fingerprint, date_str)
 
         message = self.format_daily_brief(
             date=date_str,

@@ -39,6 +39,9 @@ _SUPPRESSED_CATEGORIES = {
     "validation",  # Input validation noise on internal fields
     "info_leak",  # Pre-launch, no real users to enumerate
     "debug_print",  # Low-value debug print detection
+    "n_plus_1",  # Perf scanner flags batch loops as N+1; most are false positives
+    "nh_funnel",  # NH funnel metrics expected to be low pre-launch
+    "nh_journey",  # NH journey gaps known and tracked in roadmap
 }
 
 
