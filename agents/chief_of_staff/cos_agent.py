@@ -441,7 +441,13 @@ def run_daily() -> str:
         from agents.shared.repair import repair_auto_fixable
         from agents.shared.report import merge_reports as _merge_for_repair
 
+        from agents.shared.learning import filter_resolved_findings
+
+        from .synthesizer import filter_noisy_findings
+
         _all_findings = _merge_for_repair(reports) if reports else []
+        _all_findings = filter_resolved_findings(_all_findings)
+        _all_findings = filter_noisy_findings(_all_findings)
         _repair_result = repair_auto_fixable(_all_findings)
         if _repair_result.fixed_count > 0 or _repair_result.failed_count > 0:
             _repair_data = {
@@ -668,15 +674,19 @@ def _push_daily_outputs(
 
     # Telegram message — skip if already sent today
     tg_marker = TELEGRAM_DIR / f"telegram-daily-{today}.txt"
-    if tg_marker.exists():
+    try:
+        tg = TelegramBridge()
+    except Exception:
+        tg = None
+    if tg_marker.exists() or (tg and tg._check_daily_marker(today)):
         logger.info("Daily Telegram already sent for %s — skipping", today)
-    else:
+    elif tg:
         try:
-            tg = TelegramBridge()
             tg_data = brief_data or {"decisions_needed": [], "team_summaries": []}
             tg.generate_daily_brief(
                 tg_data, costs, alerts, notion_page_id=notion_page_id
             )
+            tg._set_daily_marker(today)
         except Exception:
             logger.debug("Telegram daily brief generation skipped")
 

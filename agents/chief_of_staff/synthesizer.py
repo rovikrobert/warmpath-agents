@@ -45,7 +45,7 @@ _SUPPRESSED_CATEGORIES = {
 }
 
 
-def _filter_noisy_findings(findings: list[Finding]) -> list[Finding]:
+def filter_noisy_findings(findings: list[Finding]) -> list[Finding]:
     """Remove known false-positive-heavy categories and low-confidence findings.
 
     Low-confidence findings (< 0.5) are suppressed unless critical severity,
@@ -115,7 +115,7 @@ def synthesize_daily(
     # Merge, filter resolved, and suppress noisy categories
     all_findings = merge_reports(reports) if reports else []
     all_findings = filter_resolved_findings(all_findings)
-    all_findings = _filter_noisy_findings(all_findings)
+    all_findings = filter_noisy_findings(all_findings)
     # Preserve original Findings before enrichment (CosFinding drops file/auto_fixable)
     _original_findings = {f.id: f for f in all_findings}
     enriched = [_enrich_finding(f) for f in all_findings]
@@ -133,7 +133,7 @@ def synthesize_daily(
             agent=r.agent,
             timestamp=r.timestamp,
             scan_duration_seconds=r.scan_duration_seconds,
-            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
+            findings=filter_noisy_findings(filter_resolved_findings(r.findings)),
             metrics=r.metrics,
             intelligence_applied=r.intelligence_applied,
             learning_updates=r.learning_updates,
@@ -510,7 +510,7 @@ def synthesize_weekly(
 
     all_findings = merge_reports(reports) if reports else []
     all_findings = filter_resolved_findings(all_findings)
-    all_findings = _filter_noisy_findings(all_findings)
+    all_findings = filter_noisy_findings(all_findings)
     enriched = [_enrich_finding(f) for f in all_findings]
     enriched.sort(key=_score_finding, reverse=True)
 
@@ -664,7 +664,7 @@ def synthesize_status(reports: list[AgentReport]) -> str:
             agent=r.agent,
             timestamp=r.timestamp,
             scan_duration_seconds=r.scan_duration_seconds,
-            findings=_filter_noisy_findings(filter_resolved_findings(r.findings)),
+            findings=filter_noisy_findings(filter_resolved_findings(r.findings)),
             metrics=r.metrics,
             intelligence_applied=r.intelligence_applied,
             learning_updates=r.learning_updates,

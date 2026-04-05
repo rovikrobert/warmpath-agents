@@ -86,14 +86,14 @@
   "pipe-010": {
     "resolution_type": "deferred",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "Empty tables expected pre-launch \u2014 no users yet",
-    "skip_until": "2026-04-01"
+    "reason": "Empty tables expected pre-launch — no users yet",
+    "skip_until": "2026-07-01"
   },
   "pipe-011": {
     "resolution_type": "deferred",
     "resolved_at": "2026-02-21T12:00:00+00:00",
-    "reason": "No activity expected pre-launch \u2014 no users yet",
-    "skip_until": "2026-04-01"
+    "reason": "No activity expected pre-launch — no users yet",
+    "skip_until": "2026-07-01"
   },
   "PRIV-ENCRYPTION-0": {
     "resolution_type": "false_positive",

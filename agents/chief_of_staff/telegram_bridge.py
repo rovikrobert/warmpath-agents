@@ -5,6 +5,7 @@ Uses httpx (already a project dependency) for HTTP calls.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -206,6 +207,23 @@ class TelegramBridge:
     # -- Content fingerprinting -----------------------------------------------
 
     _FINGERPRINT_FILE = "telegram-last-fingerprint.json"
+    _REDIS_FP_KEY = "telegram:brief_fingerprint"
+    _REDIS_MARKER_KEY_PREFIX = "telegram:daily_marker"
+
+    @staticmethod
+    def _get_redis():
+        """Get sync Redis client, or None if unavailable."""
+        try:
+            import redis
+
+            url = os.environ.get("REDIS_URL", "")
+            if not url:
+                return None
+            client = redis.from_url(url, decode_responses=True, socket_timeout=5)
+            client.ping()
+            return client
+        except Exception:
+            return None
 
     def _content_fingerprint(
         self,
@@ -223,6 +241,16 @@ class TelegramBridge:
         return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
     def _load_last_fingerprint(self) -> dict[str, Any]:
+        # Try Redis first (persists across Railway deploys)
+        r = self._get_redis()
+        if r:
+            try:
+                raw = r.get(self._REDIS_FP_KEY)
+                if raw:
+                    return json.loads(raw)
+            except Exception:
+                pass
+        # Filesystem fallback (local dev)
         fp_path = self._output_dir / self._FINGERPRINT_FILE
         if fp_path.exists():
             try:
@@ -231,14 +259,40 @@ class TelegramBridge:
                 pass
         return {}
 
-    def _save_fingerprint(self, fingerprint: str, date_str: str) -> None:
-        fp_path = self._output_dir / self._FINGERPRINT_FILE
-        fp_path.write_text(
-            json.dumps(
-                {"fingerprint": fingerprint, "date": date_str, "streak": 1},
-                indent=2,
-            )
+    def _save_fingerprint(
+        self, fingerprint: str, date_str: str, streak: int = 1
+    ) -> None:
+        data = json.dumps(
+            {"fingerprint": fingerprint, "date": date_str, "streak": streak},
+            indent=2,
         )
+        # Write to Redis (48h TTL — survives Railway redeploys)
+        r = self._get_redis()
+        if r:
+            with contextlib.suppress(Exception):
+                r.set(self._REDIS_FP_KEY, data, ex=172800)
+        # Also write to filesystem (local dev)
+        fp_path = self._output_dir / self._FINGERPRINT_FILE
+        fp_path.write_text(data)
+
+    def _check_daily_marker(self, date_str: str) -> bool:
+        """Check if today's brief was already sent. Uses Redis if available."""
+        r = self._get_redis()
+        if r:
+            try:
+                key = f"{self._REDIS_MARKER_KEY_PREFIX}:{date_str}"
+                return r.exists(key) > 0
+            except Exception:
+                pass
+        return False
+
+    def _set_daily_marker(self, date_str: str) -> None:
+        """Mark today's brief as sent in Redis."""
+        r = self._get_redis()
+        if r:
+            with contextlib.suppress(Exception):
+                key = f"{self._REDIS_MARKER_KEY_PREFIX}:{date_str}"
+                r.set(key, "1", ex=172800)
 
     # -- CoS-level generators ------------------------------------------------
 
@@ -275,14 +329,7 @@ class TelegramBridge:
 
         if fingerprint == last_fp and last_date != date_str:
             streak += 1
-            # Save updated streak
-            fp_path = self._output_dir / self._FINGERPRINT_FILE
-            fp_path.write_text(
-                json.dumps(
-                    {"fingerprint": fingerprint, "date": date_str, "streak": streak},
-                    indent=2,
-                )
-            )
+            self._save_fingerprint(fingerprint, date_str, streak)
             # Send a short "no change" message instead of repeating
             message = (
                 f"WarmPath Daily — {date_str}\n\n"
