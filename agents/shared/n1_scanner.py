@@ -46,6 +46,20 @@ _SAFE_RECEIVER_SUFFIXES = (
 
 _DB_NAMES = {"db", "session", "database", "conn", "connection"}
 
+# Loop variable names that indicate intentional batch/chunk iteration
+_BATCH_LOOP_VARS = {
+    "chunk",
+    "chunks",
+    "batch",
+    "batches",
+    "page",
+    "pages",
+    "slice",
+    "slices",
+    "segment",
+    "partition",
+}
+
 
 def _is_db_receiver(node: ast.expr) -> bool:
     """Return True if *node* looks like a DB session variable."""
@@ -99,6 +113,15 @@ def scan_n_plus_one(
                 and isinstance(node.target, ast.Name)
                 and node.target.id in _DB_NAMES
             ):
+                continue
+
+            # Skip batch/chunk iteration patterns — intentional batching
+            loop_var_name = ""
+            if isinstance(node, (ast.For, ast.AsyncFor)) and isinstance(
+                node.target, ast.Name
+            ):
+                loop_var_name = node.target.id
+            if loop_var_name in _BATCH_LOOP_VARS:
                 continue
 
             # Collect iterator expression lines (safe — not in loop body)
