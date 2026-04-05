@@ -195,12 +195,14 @@ EXPECTED_CREDIT_EARN_ACTIONS: list[str] = [
     "intro_facilitation",
     "data_freshness",
     "purchase",
+    "enrichment_milestone",
+    "referral_bonus",
+    "feed_engagement",
 ]
 
 EXPECTED_CREDIT_SPEND_ACTIONS: list[str] = [
     "marketplace_search",
     "intro_request",
-    "smart_search_marketplace",
 ]
 
 # ---------------------------------------------------------------------------

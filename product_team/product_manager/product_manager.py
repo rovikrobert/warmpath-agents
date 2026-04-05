@@ -125,26 +125,25 @@ def _map_feature_coverage(
     api_to_page_map: dict[str, list[str]] = {
         "auth": [
             "AuthPage",
-            "ForgotPasswordPage",
-            "ResetPasswordPage",
-            "VerifyEmailPage",
             "EditProfile",
             "OnboardingPage",
+            "SettingsPage",
         ],
-        "contacts": ["ContactsPage"],
-        "search": ["NewSearch", "SearchResults", "FindReferrals", "ReferralResults"],
+        "contacts": ["ContactsPage", "ScoreGlossary"],
+        "search": ["SearchResults", "FindReferrals", "ReferralResults"],
         "marketplace": [
             "MarketplaceOverview",
             "SharingSettings",
             "MarketplaceBrowse",
             "MyRequests",
+            "IntroReview",
         ],
         "credits": ["CreditsPage"],
         "applications": ["ApplicationsPage"],
         "coach": ["CoachPage"],
         "privacy": ["PrivacyPage", "PrivacySettingsPage"],
-        "referrals": ["ReferralCodesPage"],
-        "feed": ["CoachPage"],
+        "referrals": ["ReferralCodesPage", "Join"],
+        "feed": ["NotificationsPage"],
     }
 
     # Check for orphan API modules (no frontend consumer)
