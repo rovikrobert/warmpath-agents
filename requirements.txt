@@ -1,0 +1,11 @@
+# Direct imports used by this repo's Python sources.
+# Full production runs additionally require the WarmPath product repo
+# (for `app.*`, which `_support/` and a few services import).
+anthropic>=0.84.0
+cryptography>=42.0
+httpx>=0.28
+mcp>=1.26.0
+pydantic>=2.10
+pydantic-settings>=2.6
+python-dotenv>=1.0
+sqlalchemy>=2.0
